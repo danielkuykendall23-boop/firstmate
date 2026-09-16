@@ -4,32 +4,31 @@
 // and one logical agent run is active (agent_start through the agent_end whose
 // willContinue is not true), the shared SSHHIP boat is installed as an
 // above-editor widget and built-in tool rows are collapsed. The state line under
-// the boat, the working-row text, and the footer hook status carry only what omp's
-// own events show: `working`, `waiting for you` (an open tool approval), or
-// `working, quiet Nm` when no tool or message event has arrived for a while. There
-// is never a percent, an estimate, or a "nearly done" claim, and the run is
-// reported finished only when omp settles it.
+// the boat and the footer hook status carry only what omp's own events show:
+// `working`, `waiting for you` (an open tool approval), or `working, quiet Nm`
+// when no tool or message event has arrived for a while. There is never a
+// percent, an estimate, or a "nearly done" claim, and the run is reported
+// finished only when omp settles it.
 //
 // Verified against omp 18.2.1: ctx.ui.setWidget(key, factory, { placement }) hands
 // the factory the live TUI (requestRender) and theme; setWidget(key, undefined)
-// disposes the component; setToolsExpanded/getToolsExpanded, setWorkingMessage
-// (undefined restores the stock text), and setStatus(key, undefined-to-clear)
-// are exposed by the interactive controller; agent_end carries willContinue;
-// tool_approval_requested/resolved fire only when a tool needs approval. omp has
-// no setWorkingVisible and no per-row renderer for built-in tools, so the stock
-// working row stays on screen under the boat and tool rows collapse rather than
-// disappear. Widgets are no-ops in RPC/ACP modes, so headless workers are unaffected.
+// disposes the component; setToolsExpanded/getToolsExpanded and setStatus(key,
+// undefined-to-clear) are exposed by the interactive controller; agent_end
+// carries willContinue; tool_approval_requested/resolved fire only when a tool
+// needs approval. omp has no setWorkingVisible and no per-row renderer for
+// built-in tools, so the stock working row stays on screen under the boat and
+// tool rows collapse rather than disappear.
 //
-// The preference is the same home-local config/calm file the Pi extension and the
-// Claude Code mod share; docs/configuration.md owns its contract. Toggling Calm
-// off restores the tool expansion observed when it was turned on and the stock
-// working message. No tool is registered and no model context is injected.
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+// The preference is the home-local config/calm file that
+// .pi/extensions/lib/fm-calm-preference.ts also serves the Pi extension from;
+// docs/configuration.md owns its contract. It is reloaded on every
+// session_start, so a choice made on another harness applies at the next omp
+// session. A worker omp launched from a Firstmate checkout loads this file too
+// but reads only its own effective home, where a crewmate worktree has no
+// config/calm. Toggling Calm off restores the tool expansion observed when it was
+// turned on. No tool is registered and no model context is injected.
+import { loadCalmPreference, persistCalmPreference } from "../../.pi/extensions/lib/fm-calm-preference.ts";
 import {
-  CALM_WORKING_SHIP_TICK_MS,
   CALM_WORKING_SHIP_WIDGET_KEY,
   createCalmWorkingShipAnimation,
   createCalmWorkingShipWidget,
@@ -42,7 +41,6 @@ type WidgetComponent = { render(width: number): string[]; invalidate(): void; di
 type WidgetTui = { requestRender(): void };
 type ExtensionUI = {
   setWidget(key: string, factory: ((tui: WidgetTui, theme: unknown) => WidgetComponent) | undefined, options?: { placement?: "aboveEditor" | "belowEditor" }): void;
-  setWorkingMessage(message: string | undefined): void;
   setStatus(key: string, text: string | undefined): void;
   setToolsExpanded(expanded: boolean): void;
   getToolsExpanded?(): boolean;
@@ -53,34 +51,6 @@ type ExtensionAPI = {
   on?: (event: string, handler: (event: unknown, ctx: Context) => unknown) => void;
   registerCommand?: (name: string, command: { description: string; handler: (args: string, ctx: Context) => unknown }) => void;
 };
-const extensionFile = fileURLToPath(import.meta.url);
-const root = resolve(dirname(extensionFile), "../..");
-const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-const configDirectory = process.env.FM_CONFIG_OVERRIDE || resolve(fmHome, "config");
-const calmPreferencePath = resolve(configDirectory, "calm");
-
-// "max" is the legacy value of a removed third level whose behavior is now ordinary
-// Calm; docs/configuration.md owns the persisted value schema.
-function loadCalmPreference(): boolean {
-  let stored: string;
-  try {
-    stored = readFileSync(calmPreferencePath, "utf8").trim();
-  } catch {
-    return false;
-  }
-  return stored === "on" || stored === "max";
-}
-
-function persistCalmPreference(active: boolean): void {
-  mkdirSync(dirname(calmPreferencePath), { recursive: true });
-  const temporaryPath = `${calmPreferencePath}.${process.pid}.${randomUUID()}.tmp`;
-  try {
-    writeFileSync(temporaryPath, active ? "on\n" : "off\n", { encoding: "utf8", flag: "wx", mode: 0o600 });
-    renameSync(temporaryPath, calmPreferencePath);
-  } finally {
-    rmSync(temporaryPath, { force: true });
-  }
-}
 
 const STATUS_KEY = "fm-calm";
 // A run with no tool or message event for this long is reported as quiet, with its
@@ -91,7 +61,7 @@ const DIM = "\u001b[2m";
 const RESET = "\u001b[22m";
 
 export default function (pi: ExtensionAPI) {
-  let calmActive = loadCalmPreference();
+  let calmActive = false;
   let agentRunActive = false;
   let approvalPending = false;
   let lastEventAt = 0;
@@ -134,7 +104,6 @@ export default function (pi: ExtensionAPI) {
     if (text !== lastStateText) {
       lastStateText = text;
       ui.setStatus(STATUS_KEY, text);
-      ui.setWorkingMessage(calmActive && agentRunActive ? text : undefined);
     }
     if (showShip && !refreshTimer) {
       refreshTimer = setInterval(() => apply(ui), STATE_REFRESH_MS);
@@ -175,10 +144,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on?.("session_start", (_event, ctx) => {
     animation.reset();
-    if (calmActive && restoreToolsExpanded === undefined) {
-      restoreToolsExpanded = ctx.ui.getToolsExpanded?.();
-      ctx.ui.setToolsExpanded(false);
-    }
+    setCalm(ctx.ui, loadCalmPreference());
     apply(ctx.ui);
   });
 
