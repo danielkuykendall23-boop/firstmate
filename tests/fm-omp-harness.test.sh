@@ -30,7 +30,7 @@
 #   7. The watch extension arms through fm_watch_arm_omp and delivers an
 #      actionable close as one follow-up.
 #   8. The Calm extension touches nothing while off, persists /calm to the
-#      shared preference file and reloads it on session_start, and reports
+#      shared preference file and reloads it on session_start and session_switch, and reports
 #      only working, waiting-for-you, quiet-age, and idle from omp's events.
 set -u
 
@@ -617,7 +617,7 @@ const stored = () => readFileSync(preference, "utf8");
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
 if (!calm) throw new Error("/calm was not registered");
-for (const name of ["session_start", "agent_start", "agent_end", "tool_approval_requested", "tool_approval_resolved", "tool_execution_start", "message_update", "session_shutdown"]) {
+for (const name of ["session_start", "session_switch", "agent_start", "agent_end", "tool_approval_requested", "tool_approval_resolved", "tool_execution_start", "message_update", "session_shutdown"]) {
   if (!handlers.has(name)) throw new Error(`${name} handler was not registered`);
 }
 // Calm off: a whole run, approval included, touches no surface and writes nothing.
@@ -659,7 +659,8 @@ calm("", ctx);
 if (stored() !== "off\n") throw new Error(`/calm off stored ${JSON.stringify(stored())}`);
 expect("calm off", [["setToolsExpanded", true], ["setStatus", "fm-calm", null], ["notify", "info"]]);
 if (!notices[1]?.startsWith("Calm off")) throw new Error(`unexpected notice: ${notices[1]}`);
-// session_start reloads a choice another harness wrote: on, the legacy max, then off.
+// session_start reloads a choice another harness wrote: on, the legacy max, then off;
+// an in-process /new arrives as session_switch and reloads the same way.
 writeFileSync(preference, "on\n");
 fire("session_start");
 expect("reload on", [["setToolsExpanded", false], ["setStatus", "fm-calm", "idle"]]);
@@ -668,6 +669,12 @@ expect("reload unchanged", []);
 writeFileSync(preference, "max\n");
 fire("session_start");
 expect("legacy max stays on", []);
+writeFileSync(preference, "off\n");
+fire("session_switch");
+expect("session_switch reload off", [["setToolsExpanded", true], ["setStatus", "fm-calm", null]]);
+writeFileSync(preference, "on\n");
+fire("session_switch");
+expect("session_switch reload on", [["setToolsExpanded", false], ["setStatus", "fm-calm", "idle"]]);
 writeFileSync(preference, "off\n");
 fire("session_start");
 expect("reload off", [["setToolsExpanded", true], ["setStatus", "fm-calm", null]]);
@@ -683,7 +690,7 @@ EOF
   status=$?
   expect_code 0 "$status" "omp calm extension contract: $out"
   [ -z "$out" ] || fail "omp calm extension test printed output: $out"
-  pass ".omp calm extension: silent while off, /calm persists and session_start reloads the shared preference, boat and footer report only observed run state"
+  pass ".omp calm extension: silent while off, /calm persists and session_start/session_switch reload the shared preference, boat and footer report only observed run state"
 }
 
 
