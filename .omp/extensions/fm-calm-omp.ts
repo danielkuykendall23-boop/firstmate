@@ -21,9 +21,11 @@
 //
 // The preference is the home-local config/calm file that
 // .pi/extensions/lib/fm-calm-preference.ts also serves the Pi extension from;
-// docs/configuration.md owns its contract. It is reloaded on every
-// session_start, so a choice made on another harness applies at the next omp
-// session. A worker omp launched from a Firstmate checkout loads this file too
+// docs/configuration.md owns its contract. It is reloaded on session_start
+// (process startup and extension reload) and on session_switch, which omp 18.2.1
+// emits for every in-process /new, /resume, and /fork, so a choice made on
+// another harness applies at the next omp session. A worker omp launched from a
+// Firstmate checkout loads this file too
 // but reads only its own effective home, where a crewmate worktree has no
 // config/calm. Toggling Calm off restores the tool expansion observed when it was
 // turned on. No tool is registered and no model context is injected.
@@ -142,11 +144,13 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.on?.("session_start", (_event, ctx) => {
-    animation.reset();
-    setCalm(ctx.ui, loadCalmPreference());
-    apply(ctx.ui);
-  });
+  for (const event of ["session_start", "session_switch"]) {
+    pi.on?.(event, (_event, ctx) => {
+      animation.reset();
+      setCalm(ctx.ui, loadCalmPreference());
+      apply(ctx.ui);
+    });
+  }
 
   pi.on?.("agent_start", (_event, ctx) => {
     agentRunActive = true;
