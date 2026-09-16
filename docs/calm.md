@@ -1,9 +1,9 @@
 # Calm mode
 
 Calm is Firstmate's conversation-only transcript presentation toggle.
-It is fully supported on Pi, and available on Claude Code behind that harness's default-off early-access function-hooks flag, as the [Claude Code](#claude-code) section below describes.
-It is off by default, and the last `/calm` choice persists for the effective Firstmate home across session starts and resumes on either harness, through the one shared preference file [`configuration.md`](configuration.md#calm-preference-configcalm) owns.
-Across both harnesses, Calm evaluates each settled assistant text block from a model step that stopped to call tools, or exhausted its token limit while carrying tool calls.
+It is fully supported on Pi, supported as a presentation-only toggle on omp (Oh My Pi) as the [omp](#omp) section below describes, and available on Claude Code behind that harness's default-off early-access function-hooks flag, as the [Claude Code](#claude-code) section below describes.
+It is off by default, and the last `/calm` choice persists for the effective Firstmate home across session starts and resumes on every harness, through the one shared preference file [`configuration.md`](configuration.md#calm-preference-configcalm) owns.
+On Pi and Claude Code, Calm evaluates each settled assistant text block from a model step that stopped to call tools, or exhausted its token limit while carrying tool calls.
 It hides a block only when its raw text contains no newline and its trimmed length is below `CALM_PRESERVE_MIN_CHARS` (240); a newline or at least 240 trimmed characters preserves the block as substantive captain-facing content, while streaming text and the genuine reply that ends a response remain visible.
 
 ## Pi
@@ -96,3 +96,17 @@ tests/fm-calm-claude-mod.test.sh
 tests/fm-calm-claude-mod-plugin.test.sh
 FM_CLAUDE_CALM_LIVE_E2E=1 tests/fm-calm-claude-mod-live-e2e.test.sh
 ```
+
+## omp
+
+Calm on omp is the `.omp/extensions/fm-calm-omp.ts` extension, auto-discovered when omp is launched from the Firstmate home and loadable elsewhere with `omp -e .omp/extensions/fm-calm-omp.ts`.
+`/calm` toggles the same per-home preference Pi and Claude Code use, answers with a transient notice, and collapses built-in tool rows while on; toggling off restores the tool expansion observed when Calm was turned on and omp's stock working message.
+While Calm is on and one agent run is under way, from `agent_start` through the `agent_end` whose `willContinue` is not true, the same two-row sailboat Pi draws appears above the editor with one dim state line beneath it, and the same words appear as an extension status in the footer: `working`, `waiting for you` while a tool approval is open, or `working, quiet Nm` once no tool or message event has arrived for five minutes, and `idle` once omp settles the run.
+Those words are event observations only: there is never a percent, an estimate, or a "nearly done" claim, and quiet is an age, not a stuck verdict.
+No tool is registered, no model context is injected, and widgets are inert in omp's RPC and ACP modes, so headless Firstmate workers are unaffected.
+
+Bounds of the omp support, verified on omp 18.2.1 with a real tool-using prompt in an isolated Herdr session:
+
+- omp exposes no `setWorkingVisible`, so its stock working row and spinner stay visible under the boat, and omp's own dynamic working text (for example `Running sleep then echo`) replaces the state word there while a tool runs.
+- omp exposes no renderer for built-in tool rows, so Calm collapses them through the tools-expanded toggle rather than hiding them; the collapsed one-line summary remains on screen.
+- Thinking blocks, mid-turn working notes, and operational user rows are not hidden on omp; omp's own `hideThinkingBlock` setting owns thinking visibility.
