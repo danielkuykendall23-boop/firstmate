@@ -1455,6 +1455,16 @@ families_for_changed_path() {
       printf '%s\n' pr-forge
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       ;;
+    .omp/extensions/fm-calm-omp.ts)
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' live-harness-optin
+      ;;
+    .pi/extensions/lib/fm-calm-preference.ts)
+      printf '%s\n' __script__:fm-calm-pi-extension.test.sh
+      printf '%s\n' __script__:fm-pi-primary-types.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
+      printf '%s\n' live-harness-optin
+      ;;
     .pi/extensions/fm-branch-supervision.ts|.pi/extensions/lib/fm-async-exec.ts|\
     .pi/extensions/lib/fm-branch-dispatch.ts|.pi/extensions/lib/fm-native-contract.ts)
       # The portable suites that actually load these files, named one by one.
