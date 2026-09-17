@@ -1,0 +1,131 @@
+
+## Host
+$ herdr --version; sw_vers -productVersion; uname -m; umask
+herdr 0.8.2
+26.3
+arm64
+0002
+
+## Default session and server BEFORE any lab work (read-only observation)
+[{"default":true,"name":"default","running":true,"session_dir":"/Users/danielkuykendall/.config/herdr","socket_path":"/Users/danielkuykendall/.config/herdr/herdr.sock"}]
+905 Tue Sep 15 14:09:31 2026     /Users/danielkuykendall/.local/bin/herdr server
+
+## Stage a separate copy of the stock executable (nothing is installed)
+staged=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr
+sha256=a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574
+version=0.8.2
+
+## Provision a short-label lab under umask 0002
+$ fm-herdr-lab.sh name ho
+fm-lab-ho-73707-21594
+$ fm-herdr-lab.sh provision fm-lab-ho-73707-21594
+CHECK ok   - provision exits 0
+$ stat ownership record
+-rw------- links=1 /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-herdr-lab-501/fm-lab-ho-73707-21594.fleet-state.json
+CHECK ok   - ownership record is owner-only (0600) despite umask 0002
+
+## Start a fixture in a lab pane: a shell whose foreground child acknowledges input
+pane=w1:p1
+$ fm-herdr-lab.sh run fm-lab-ho-73707-21594 pane process-info --pane w1:p1
+{"process_info":{"foreground_process_group_id":73815,"foreground_processes":[{"argv":["bash","/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/fixture.sh"],"argv0":"bash","cmdline":"bash /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/fixture.sh","cwd":"/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa","name":"bash","pid":73815}],"pane_id":"w1:p1","shell_pid":73800},"type":"pane_process_info"}
+$ fm-herdr-lab.sh run fm-lab-ho-73707-21594 pane read w1:p1 --source recent --lines 500 --format text
+FIXTURE_START pid=73815
+ACK BEFORE_HANDOFF
+fixture process: 73815 73800 ttys016  Thu Sep 17 18:02:37 2026    
+lab server: 73741 Thu Sep 17 18:02:37 2026     herdr server --session fm-lab-ho-73707-21594
+
+## Refusals: each must exit non-zero and leave the lab server process untouched
+$ fm-herdr-lab.sh handoff default /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574 0.8.2 20
+fm-herdr-lab: refusing session name 'default'
+exit=1
+CHECK ok   - the default session is refused
+$ fm-herdr-lab.sh handoff fm-lab-not-mine /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574 0.8.2 20
+fm-herdr-lab: refusing handoff: [Errno 2] No such file or directory: '/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-herdr-lab-501/fm-lab-not-mine.fleet-state.json'
+exit=1
+CHECK ok   - a lab this helper does not own is refused
+$ fm-herdr-lab.sh handoff fm-lab-ho-73707-21594 /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr 0000000000000000000000000000000000000000000000000000000000000000 0.8.2 20
+fm-herdr-lab: refusing handoff: staged executable SHA256 does not match
+exit=1
+CHECK ok   - a wrong digest is refused
+$ fm-herdr-lab.sh handoff fm-lab-ho-73707-21594 /Users/danielkuykendall/.local/bin/herdr a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574 0.8.2 20
+fm-herdr-lab: refusing handoff: staged executable must differ from the selected Herdr client
+exit=1
+CHECK ok   - the installed client itself is refused as its own replacement
+$ fm-herdr-lab.sh handoff fm-lab-ho-73707-21594 /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr a5d4f4d504d8b309c91f811050559300faba31258425f53c50852fc96f6ae574 0.8.2 20 --session=default
+Provision and operate an isolated Herdr lab session without risking the live
+default session.
+
+Usage:
+  fm-herdr-lab.sh name <label>
+  fm-herdr-lab.sh prepare <session>
+  fm-herdr-lab.sh provision <session>
+  fm-herdr-lab.sh run <session> <herdr arguments...>
+  fm-herdr-lab.sh handoff <session> <staged-executable> <sha256> <version> <protocol>
+  fm-herdr-lab.sh viewer start <session>
+  fm-herdr-lab.sh viewer stop <session>
+  fm-herdr-lab.sh stop <session>
+  fm-herdr-lab.sh teardown <session>
+
+Session names must begin with "fm-lab-" and can never be "default".
+exit=2
+CHECK ok   - an extra --session argument is refused
+$ fm-herdr-lab.sh run fm-lab-ho-73707-21594 server live-handoff --import-exe /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr
+fm-herdr-lab: run forbids server operations; use provision for the named lab server
+exit=1
+CHECK ok   - generic run still forbids server live-handoff
+
+## Guarded handoff with a deliberately wrong expected version (Herdr must refuse the import)
+$ fm-herdr-lab.sh handoff fm-lab-ho-73707-21594 <staged> <sha256> 9.9.9 20
+{"error":{"code":"handoff_failed","message":"handoff stream closed while reading line"},"id":"cli:server:live-handoff"}
+exit=1
+CHECK ok   - a mismatched expected version fails
+{"status":"running","running":true,"version":"0.8.2","protocol":20,"capabilities":{"live_handoff":true,"detached_server_daemon":false},"compatible":true,"socket":"/Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-73707-21594/herdr.sock","session":"fm-lab-ho-73707-21594","restart_needed":false}
+CHECK ok   - fixture process identity survives the refused import
+CHECK ok   - default session and default server process unchanged after the refused import
+
+## Guarded handoff with the matching version and protocol
+$ fm-herdr-lab.sh handoff fm-lab-ho-73707-21594 <staged> <sha256> 0.8.2 20
+live handoff complete; server log: /Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-73707-21594/herdr-server.log
+exit=0
+CHECK ok   - matching handoff exits 0
+$ fm-herdr-lab.sh run fm-lab-ho-73707-21594 status --json
+{"status":"running","running":true,"version":"0.8.2","protocol":20,"capabilities":{"live_handoff":true,"detached_server_daemon":true},"compatible":true,"socket":"/Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-73707-21594/herdr.sock","session":"fm-lab-ho-73707-21594","restart_needed":false}
+lab server now: 74185 Thu Sep 17 18:02:42 2026     /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/staged/herdr server --handoff-import /Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-73707-21594/herdr-handoff-73741.sock 73741-1789682562582603000
+CHECK ok   - the lab server now runs from the staged executable
+{"process_info":{"foreground_process_group_id":73815,"foreground_processes":[{"argv":["bash","/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/fixture.sh"],"argv0":"bash","cmdline":"bash /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa/fixture.sh","cwd":"/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-handoff-rehearsal.U9omAa","name":"bash","pid":73815}],"pane_id":"w1:p1","shell_pid":73800},"type":"pane_process_info"}
+CHECK ok   - pane process-info identical across the handoff
+CHECK ok   - fixture child kept its pid, parent, tty, and start time
+$ fm-herdr-lab.sh run fm-lab-ho-73707-21594 pane read w1:p1 --source recent --lines 500 --format text
+FIXTURE_START pid=73815
+BEFORE_HANDOFF
+ACK BEFORE_HANDOFFAFTER_HANDOFF
+ACK AFTER_HANDOFF
+CHECK ok   - input sent after the handoff reaches the surviving child
+CHECK ok   - ownership record retained unchanged
+CHECK ok   - default session and default server process unchanged after the committed handoff
+CHECK ok   - installed herdr executable untouched (nothing installed)
+
+## Guarded teardown of the short-label lab
+$ fm-herdr-lab.sh teardown fm-lab-ho-73707-21594
+CHECK ok   - teardown exits 0 with the tripwire intact
+
+## Long task-derived label: provisions, then the native handoff hits the macOS socket path limit
+$ fm-herdr-lab.sh name herdr-phone-guide
+fm-lab-herdr-phone-guid-74333-14713
+worst-case handoff socket path bytes: 107 (macOS limit 103)
+CHECK ok   - long-label lab provisions
+$ fm-herdr-lab.sh handoff fm-lab-herdr-phone-guid-74333-14713 <staged> <sha256> 0.8.2 20
+{"error":{"code":"handoff_failed","message":"path must be shorter than SUN_LEN"},"id":"cli:server:live-handoff"}
+exit=1
+{"status":"running","running":true,"version":"0.8.2","protocol":20,"capabilities":{"live_handoff":true,"detached_server_daemon":false},"compatible":true,"socket":"/Users/danielkuykendall/.config/herdr/sessions/fm-lab-herdr-phone-guid-74333-14713/herdr.sock","session":"fm-lab-herdr-phone-guid-74333-14713","restart_needed":false}
+$ fm-herdr-lab.sh teardown fm-lab-herdr-phone-guid-74333-14713
+CHECK ok   - long-label lab teardown exits 0
+
+## Default session and server AFTER all lab work
+[{"default":true,"name":"default","running":true,"session_dir":"/Users/danielkuykendall/.config/herdr","socket_path":"/Users/danielkuykendall/.config/herdr/herdr.sock"}]
+905 Tue Sep 15 14:09:31 2026     /Users/danielkuykendall/.local/bin/herdr server
+CHECK ok   - default session snapshot and default server pid/start time byte-identical to BEFORE
+["default","fm-lab-calm-omp-evidence","fm-remote"]
+CHECK ok   - no rehearsal lab left behind
+
+RESULT: 0 failed checks
