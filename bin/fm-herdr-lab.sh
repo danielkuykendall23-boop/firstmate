@@ -26,6 +26,7 @@
 # destructive call.
 # Provision records the running default session as a fleet-state tripwire and
 # teardown requires that record to be identical afterward.
+# The record is created owner-only whatever the caller's umask.
 # The viewer command attaches or detaches one real foreground Herdr client on
 # an owned lab session over a fixed 40-row by 120-column pty;
 # bin/fm-herdr-lab-viewer.py owns the pty mechanics.
@@ -38,7 +39,9 @@
 # server operations. It requires an owned running lab and a digest-pinned,
 # absolute, current-user-owned regular executable distinct from the selected
 # client. Neither the executable nor the ownership record may be symlinked,
-# multiply linked, or writable by another user. Python 3 verifies that identity.
+# multiply linked, or writable by another user. Python 3 verifies that identity
+# as an admission check before the call, not as a guarantee that the file is
+# unchanged when Herdr spawns it; a refusal names the offending path.
 # The default tripwire and running non-default lab are checked before and after
 # handoff, including failure. No executable is installed and no rollback is
 # implied; the caller must measure process preservation and client interruption.
@@ -119,7 +122,7 @@ fm_herdr_lab_prepare() { # <session>
     fm_herdr_lab_error "tripwire already exists for '$name'; refusing ambiguous ownership"
     return 1
   }
-  fm_herdr_lab_fleet_state "$name" > "$tripwire" || {
+  (umask 077 && fm_herdr_lab_fleet_state "$name" > "$tripwire") || {
     rm -f "$tripwire"
     return 1
   }
@@ -511,9 +514,9 @@ def owned_file(path, executable=False):
     info = os.lstat(path)
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
             or info.st_nlink != 1 or info.st_mode & 0o022):
-        raise ValueError("requires an owned, single-link regular file without group/world write access")
+        raise ValueError(path + ": requires an owned, single-link regular file without group/world write access")
     if executable and not os.access(path, os.X_OK):
-        raise ValueError("staged executable is not executable")
+        raise ValueError(path + ": staged executable is not executable")
     return info
 
 def identity(info):
@@ -551,7 +554,7 @@ fm_herdr_lab_handoff_ready() { # <session>
   fm_herdr_lab_validate_name "$name" || return 1
   tripwire=$(fm_herdr_lab_tripwire_path "$name")
   [ -f "$tripwire" ] && [ ! -L "$tripwire" ] && [ -O "$tripwire" ] || {
-    fm_herdr_lab_error "missing or unsafe ownership tripwire for '$name'; refusing handoff"
+    fm_herdr_lab_error "missing or unsafe ownership tripwire for '$name' at $tripwire; refusing handoff"
     return 1
   }
   fm_herdr_lab_check_tripwire "$name" || return 1

@@ -1218,6 +1218,52 @@ not ok - could not attach a real foreground Herdr viewer over a sized pty
 Re-run this guard after every Herdr upgrade.
 A release that changed the foreground-client contract, the window-grid requirement, or the nested-viewer refusal would fail here first, and the detached regressions would keep passing while saying nothing about it.
 
+### Lab live handoff
+
+The guarded `handoff` action of `bin/fm-herdr-lab.sh` was rehearsed only on generated non-default `fm-lab-` sessions.
+Every lab was removed through guarded teardown with an unchanged default-session tripwire, and no default-session operation was run.
+
+Measured on 2026-09-17 on macOS 26.3 aarch64, each run starting from a lab server on stock Herdr 0.8.2 protocol 20:
+
+```sh
+bin/fm-herdr-lab.sh handoff "$HERDR_LAB_SESSION" <staged-executable> <sha256> <version> <protocol>
+bin/fm-herdr-lab.sh run "$HERDR_LAB_SESSION" status --json
+bin/fm-herdr-lab.sh run "$HERDR_LAB_SESSION" pane process-info --pane <pane>
+bin/fm-herdr-lab.sh run "$HERDR_LAB_SESSION" pane read <pane> --source recent --lines 500 --format text
+```
+
+| Staged target | Expected version passed | Exit | Observed |
+| --- | --- | --- | --- |
+| 0.9.0-preview.2026-09-09-5a244caa60b0 protocol 22 | deliberately wrong | 1 | The lab server stayed on 0.8.2 protocol 20; the pane's shell and foreground child kept their process identity and tty, and new input was still echoed. |
+| 0.9.0-preview.2026-09-09-5a244caa60b0 protocol 22 | matching | 0 | `status --json` reported the server on the staged version and protocol 22; a connection held on the old API socket saw EOF and a fresh scoped client connected; shell and child process identity were unchanged and new input was echoed. |
+| 0.8.2 protocol 20 (stock-to-stock control) | matching | 0 | Same process continuity and reconnect as above. |
+
+The refused and the successful import printed, respectively:
+
+```text
+{"error":{"code":"handoff_failed","message":"handoff stream closed while reading line"},"id":"cli:server:live-handoff"}
+live handoff complete; server log: .../sessions/<lab>/herdr-server.log
+```
+
+Process continuity did not imply rendered-history continuity.
+In the stock-to-stock control a quiescent fixture had printed `FIXTURE_END` and a line break before the handoff, and its independent `script` capture retained that `CRLF`.
+`pane read` returned the same tail immediately before and immediately after the handoff, then joined the first later output onto the old final line:
+
+```text
+CRLF_THREE
+FIXTURE_ENDAFTER_HANDOFF
+ACK AFTER_HANDOFF
+```
+
+The staged preview target and a fixture writing concurrent output reproduced the same join, for example `TICK 1TICK 2`, and `--source visible` agreed with `--source recent`.
+A before/after text comparison alone therefore passes while the defect is present; a handoff rehearsal must also read the first output produced after the handoff.
+The cause was bounded to handoff replay and cursor-state reconstruction but not reduced to one code line, and no Herdr behavior was patched.
+
+One lab with a longer generated name failed the native handoff with a Unix socket path-length error naming `SUN_LEN` although provisioning had succeeded, while the two-character label `ph` succeeded.
+The exact output of that failure was not retained.
+
+Not verified: any phone client, the live default server, a maximum interruption bound, a downgrade, or a rollback after the handoff commits.
+
 ### Presentation version floor
 
 Default-on presentation projection is floored at Herdr 0.8.0.

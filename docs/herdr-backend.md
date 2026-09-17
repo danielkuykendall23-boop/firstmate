@@ -339,15 +339,11 @@ An environment-only session selection can silently reach a different running ser
 It provisions only non-default names beginning with `fm-lab-`, appends an explicit `--session` to allowed task commands, refuses caller-supplied session flags and server/session lifecycle subcommands through `run`, and performs destructive stop/delete only through its guarded lifecycle actions.
 Immediately before every destructive call it re-queries the named session and refuses empty, missing, literal `default`, or `default:true` identities.
 Its before/after tripwire requires the live default-session snapshot to remain byte-identical.
-The separate `handoff` action is restricted to an owned, running non-default lab and requires an explicit staged executable, SHA256, expected target version, and expected target protocol.
-Python 3 verifies that the executable and lab ownership record are current-user-owned regular files without symlinks, additional hard links, or group/world write access; the replacement must differ from the selected Herdr client.
-The helper installs nothing, retains ownership evidence, and checks the default tripwire and named lab immediately before and after handoff, including when the command fails.
-Handoff testing must measure actual child-process and terminal preservation plus client reconnect interruption; a successful command does not prove phone connectivity, and a failed command is not a rollback guarantee.
-This action does not authorize replacing or restarting the live default server.
-Keep macOS lab labels short: additional handoff socket-path components can exceed the Unix socket path limit even when provisioning succeeds.
-This helper does not intercept updates or certify downstream client compatibility; retaining the known-working executable and testing required client APIs, process continuity, and terminal history before a candidate leaves the lab remain explicit operator steps.
-Check the first new output after handoff as well as the old text: formatted history can look unchanged while restored cursor state places later output incorrectly.
-Stop on failed or unproved compatibility, and do not treat a retained executable or one successful pre-commit rejection as a verified post-commit rollback path.
+The separate `handoff` action rehearses a live handoff on an owned, running non-default lab with a separately staged, digest-pinned executable; the helper's header owns its admission rules.
+It installs nothing, and it does not authorize replacing or restarting the live default server.
+A successful handoff command proves neither phone connectivity nor terminal preservation, and a failed one is not a rollback guarantee, so measure child-process, terminal-history, and client-reconnect behavior in the lab before a candidate leaves it.
+The helper does not intercept Herdr updates or certify downstream client compatibility; retaining the known-working executable and running that rehearsal remain explicit operator steps.
+[Runtime backend verification](verification/runtime-backends.md#lab-live-handoff) records the measured handoff behavior.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.
