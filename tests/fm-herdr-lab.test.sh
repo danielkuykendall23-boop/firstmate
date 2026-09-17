@@ -145,7 +145,7 @@ prepare_handoff_fixture() {
 expect_handoff_refused() {
   local reason=$1 status=0
   shift
-  "$@" >/dev/null 2>&1 || status=$?
+  HANDOFF_REFUSAL=$("$@" 2>&1 >/dev/null) || status=$?
   [ "$status" -ne 0 ] || fail "$reason"
   assert_absent "$FAKE_STATE/handoff-receipts" "refused handoff still attempted a server mutation"
   assert_absent "$FAKE_STATE/target-executed" "validation executed the staged target"
@@ -168,6 +168,22 @@ test_handoff_owned_running_lab() {
   [ "$(handoff_digest "$HANDOFF_TARGET")" = "$HANDOFF_DIGEST" ] || fail "handoff modified the staged executable"
   assert_absent "$FAKE_STATE/target-executed" "the helper executed the target before guarded handoff"
   pass "fm-herdr-lab: owned running lab handoff preserves default and ownership evidence"
+}
+
+test_handoff_owned_lab_under_permissive_umask() {
+  local name="fm-lab-handoff-umask-$$" record status=0
+  record="$TRIPWIRES/$name.fleet-state.json"
+  (
+    umask 0002
+    prepare_handoff_fixture "$name"
+    run_with_fake "$ROOT/bin/fm-herdr-lab.sh" handoff "$name" "$HANDOFF_TARGET" \
+      "$HANDOFF_DIGEST" "$HANDOFF_VERSION" 22 >/dev/null
+  ) || status=$?
+  expect_code 0 "$status" "handoff of a lab provisioned under umask 0002"
+  python3 -c 'import os,sys; sys.exit(1 if os.stat(sys.argv[1]).st_mode & 0o077 else 0)' "$record" \
+    || fail "ownership record created under umask 0002 is accessible beyond its owner"
+  [ "$(cat "$FAKE_STATE/handoff-receipts")" = "$name" ] || fail "umask 0002 handoff did not reach the owned lab"
+  pass "fm-herdr-lab: the ownership record is owner-only under a permissive umask and still admits handoff"
 }
 
 test_handoff_requires_owned_running_identity() {
@@ -214,6 +230,7 @@ test_handoff_rejects_unsafe_ownership_record() {
   chmod 660 "$record"
   expect_handoff_refused "group-writable ownership accepted" run_with_fake fm_herdr_lab_handoff \
     "$name" "$HANDOFF_TARGET" "$HANDOFF_DIGEST" "$HANDOFF_VERSION" 22
+  assert_contains "$HANDOFF_REFUSAL" "$record" "unsafe ownership record refusal did not name the record"
   chmod 606 "$record"
   expect_handoff_refused "world-writable ownership accepted" run_with_fake fm_herdr_lab_handoff \
     "$name" "$HANDOFF_TARGET" "$HANDOFF_DIGEST" "$HANDOFF_VERSION" 22
@@ -240,6 +257,7 @@ test_handoff_rejects_unsafe_executable_and_digest() {
     chmod "$target" "$HANDOFF_TARGET"
     expect_handoff_refused "nonexecutable or writable target accepted" run_with_fake fm_herdr_lab_handoff \
       "$name" "$HANDOFF_TARGET" "$HANDOFF_DIGEST" "$HANDOFF_VERSION" 22
+    assert_contains "$HANDOFF_REFUSAL" "$HANDOFF_TARGET" "unsafe executable refusal did not name the executable"
   done
   chmod 700 "$HANDOFF_TARGET"
   digest=$(handoff_digest "$FAKEBIN/herdr")
@@ -789,6 +807,7 @@ test_changed_default_trips_after_teardown
 test_stopped_owned_lab_can_reprovision
 test_failed_delete_retains_tripwire
 test_handoff_owned_running_lab
+test_handoff_owned_lab_under_permissive_umask
 test_handoff_requires_owned_running_identity
 test_handoff_rejects_unsafe_ownership_record
 test_handoff_rejects_unsafe_executable_and_digest
