@@ -5,19 +5,22 @@
 // willContinue is not true), the shared SSHHIP boat is installed as an
 // above-editor widget and built-in tool rows are collapsed. The state line under
 // the boat and the footer hook status carry only what omp's own events show:
-// `working`, `waiting for you` (an open tool approval), or `working, quiet Nm`
-// when no tool or message event has arrived for a while. There is never a
-// percent, an estimate, or a "nearly done" claim, and the run is reported
-// finished only when omp settles it.
+// `working`, `waiting for you` (any open tool approval or a running built-in
+// `ask`), or `working, quiet Nm` when no tool or message event has arrived for a
+// while. There is never a percent, an estimate, or a "nearly done" claim, and the
+// run is reported finished only when omp settles it.
 //
 // Verified against omp 18.2.1: ctx.ui.setWidget(key, factory, { placement }) hands
 // the factory the live TUI (requestRender) and theme; setWidget(key, undefined)
 // disposes the component; setToolsExpanded/getToolsExpanded and setStatus(key,
 // undefined-to-clear) are exposed by the interactive controller; agent_end
 // carries willContinue; tool_approval_requested/resolved fire only when a tool
-// needs approval. omp has no setWorkingVisible and no per-row renderer for
-// built-in tools, so the stock working row stays on screen under the boat and
-// tool rows collapse rather than disappear.
+// needs approval, always as a pair carrying the same toolCallId, and several can
+// be open at once because shared-concurrency tools run in parallel;
+// tool_execution_start/end carry toolCallId and toolName and always pair, and the
+// built-in question tool is named `ask`. omp has no setWorkingVisible and no
+// per-row renderer for built-in tools, so the stock working row stays on screen
+// under the boat and tool rows collapse rather than disappear.
 //
 // The preference is the home-local config/calm file that
 // .pi/extensions/lib/fm-calm-preference.ts also serves the Pi extension from;
@@ -49,8 +52,9 @@ type ExtensionUI = {
   notify(message: string, level?: string): void;
 };
 type Context = { ui: ExtensionUI; hasUI?: boolean };
+type ObservedEvent = { willContinue?: boolean; toolCallId?: string; toolName?: string };
 type ExtensionAPI = {
-  on?: (event: string, handler: (event: unknown, ctx: Context) => unknown) => void;
+  on?: (event: string, handler: (event: ObservedEvent, ctx: Context) => unknown) => void;
   registerCommand?: (name: string, command: { description: string; handler: (args: string, ctx: Context) => unknown }) => void;
 };
 
@@ -65,7 +69,10 @@ const RESET = "\u001b[22m";
 export default function (pi: ExtensionAPI) {
   let calmActive = false;
   let agentRunActive = false;
-  let approvalPending = false;
+  // Every open wait on the captain, keyed by source and toolCallId. The source
+  // prefix matters: an `ask` under a prompt approval policy shares its toolCallId
+  // with its own approval, which resolves while the question is still open.
+  const waitingOn = new Set<string>();
   let lastEventAt = 0;
   let shipShown = false;
   let restoreToolsExpanded: boolean | undefined;
@@ -75,7 +82,7 @@ export default function (pi: ExtensionAPI) {
 
   const stateText = (): string => {
     if (!agentRunActive) return "idle";
-    if (approvalPending) return "waiting for you";
+    if (waitingOn.size > 0) return "waiting for you";
     const quietMs = Date.now() - lastEventAt;
     if (quietMs >= QUIET_AFTER_MS) return `working, quiet ${Math.floor(quietMs / 60000)}m`;
     return "working";
@@ -153,28 +160,38 @@ export default function (pi: ExtensionAPI) {
 
   pi.on?.("agent_start", (_event, ctx) => {
     agentRunActive = true;
-    approvalPending = false;
+    waitingOn.clear();
     touch(ctx.ui);
   });
 
   pi.on?.("agent_end", (event, ctx) => {
-    if (event && typeof event === "object" && "willContinue" in event && event.willContinue === true) return;
+    if (event.willContinue === true) return;
     agentRunActive = false;
-    approvalPending = false;
+    waitingOn.clear();
     apply(ctx.ui);
   });
 
-  pi.on?.("tool_approval_requested", (_event, ctx) => {
-    approvalPending = true;
+  pi.on?.("tool_approval_requested", (event, ctx) => {
+    waitingOn.add(`approval:${event.toolCallId}`);
     touch(ctx.ui);
   });
 
-  pi.on?.("tool_approval_resolved", (_event, ctx) => {
-    approvalPending = false;
+  pi.on?.("tool_approval_resolved", (event, ctx) => {
+    waitingOn.delete(`approval:${event.toolCallId}`);
     touch(ctx.ui);
   });
 
-  for (const event of ["tool_execution_start", "tool_execution_update", "tool_execution_end", "message_update"]) {
+  pi.on?.("tool_execution_start", (event, ctx) => {
+    if (event.toolName === "ask") waitingOn.add(`ask:${event.toolCallId}`);
+    if (agentRunActive) touch(ctx.ui);
+  });
+
+  pi.on?.("tool_execution_end", (event, ctx) => {
+    if (event.toolName === "ask") waitingOn.delete(`ask:${event.toolCallId}`);
+    if (agentRunActive) touch(ctx.ui);
+  });
+
+  for (const event of ["tool_execution_update", "message_update"]) {
     pi.on?.(event, (_event, ctx) => {
       if (agentRunActive) touch(ctx.ui);
     });

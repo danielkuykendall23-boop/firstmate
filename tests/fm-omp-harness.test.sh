@@ -31,7 +31,8 @@
 #      actionable close as one follow-up.
 #   8. The Calm extension touches nothing while off, persists /calm to the
 #      shared preference file and reloads it on session_start and session_switch, and reports
-#      only working, waiting-for-you, quiet-age, and idle from omp's events.
+#      only working, waiting-for-you, quiet-age, and idle from omp's events;
+#      waiting-for-you holds while any tool approval or a built-in ask is open.
 set -u
 
 # shellcheck source=tests/fixtures.sh
@@ -617,11 +618,14 @@ const stored = () => readFileSync(preference, "utf8");
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
 if (!calm) throw new Error("/calm was not registered");
-for (const name of ["session_start", "session_switch", "agent_start", "agent_end", "tool_approval_requested", "tool_approval_resolved", "tool_execution_start", "message_update", "session_shutdown"]) {
+for (const name of ["session_start", "session_switch", "agent_start", "agent_end", "tool_approval_requested", "tool_approval_resolved", "tool_execution_start", "tool_execution_update", "tool_execution_end", "message_update", "session_shutdown"]) {
   if (!handlers.has(name)) throw new Error(`${name} handler was not registered`);
 }
-// Calm off: a whole run, approval included, touches no surface and writes nothing.
-fire("session_start"); fire("agent_start"); fire("tool_execution_start"); fire("tool_approval_requested"); fire("tool_approval_resolved"); fire("agent_end");
+const bash = (toolCallId) => ({ toolName: "bash", toolCallId });
+const ask = (toolCallId) => ({ toolName: "ask", toolCallId });
+// Calm off: a whole run, approval and ask included, touches no surface and writes nothing.
+fire("session_start"); fire("agent_start"); fire("tool_execution_start", bash("off-1")); fire("tool_approval_requested", bash("off-1")); fire("tool_approval_resolved", bash("off-1")); fire("tool_execution_end", bash("off-1"));
+fire("tool_execution_start", ask("off-2")); fire("tool_execution_end", ask("off-2")); fire("agent_end");
 expect("calm-off run", []);
 if (existsSync(preference)) throw new Error("a calm-off session wrote the preference");
 // /calm persists on, collapses tool rows, and reports idle until a run starts.
@@ -633,13 +637,31 @@ if (!notices[0]?.startsWith("Calm on")) throw new Error(`unexpected notice: ${no
 fire("agent_start");
 expect("agent start", [["setWidget", KEY, "install", "aboveEditor"], ["setStatus", "fm-calm", "working"]]);
 stateLine("working", "working");
-fire("tool_approval_requested");
+fire("tool_approval_requested", bash("a"));
 expect("approval requested", [["setStatus", "fm-calm", "waiting for you"]]);
 stateLine("waiting", "waiting for you");
-fire("tool_approval_resolved");
-expect("approval resolved", [["setStatus", "fm-calm", "working"]]);
-fire("tool_execution_start"); fire("message_update");
+// Parallel tools hold several approvals open: answering one leaves the other waiting.
+fire("tool_approval_requested", bash("b"));
+expect("second approval requested", []);
+fire("tool_approval_resolved", bash("a"));
+expect("first approval resolved", []);
+stateLine("second approval still open", "waiting for you");
+fire("tool_approval_resolved", bash("b"));
+expect("last approval resolved", [["setStatus", "fm-calm", "working"]]);
+stateLine("approvals resolved", "working");
+fire("tool_execution_start", bash("c")); fire("tool_execution_update", bash("c")); fire("tool_execution_end", bash("c")); fire("message_update");
 expect("busy events", []);
+// A running built-in ask is a wait on the captain from its start to its end, and
+// its own approval, which shares its toolCallId, resolves without ending it.
+fire("tool_execution_start", ask("q"));
+expect("ask started", [["setStatus", "fm-calm", "waiting for you"]]);
+stateLine("ask open", "waiting for you");
+fire("tool_approval_requested", ask("q")); fire("tool_approval_resolved", ask("q"));
+expect("ask approval resolved", []);
+stateLine("ask still open", "waiting for you");
+fire("tool_execution_end", ask("q"));
+expect("ask ended", [["setStatus", "fm-calm", "working"]]);
+stateLine("ask answered", "working");
 // Silence is reported as an age, never a verdict, and the next event clears it.
 const realNow = Date.now;
 Date.now = () => realNow() + 6 * 60 * 1000;
@@ -652,8 +674,16 @@ Date.now = realNow;
 fire("agent_end", { willContinue: true });
 expect("continuing end", []);
 stateLine("still working", "working");
+// A wait still open when the run settles ends with it and never reaches the next run.
+fire("tool_execution_start", ask("unanswered"));
+expect("ask open at settle", [["setStatus", "fm-calm", "waiting for you"]]);
 fire("agent_end", { willContinue: false });
 expect("settled end", [["setWidget", KEY, "dispose", "aboveEditor"], ["setStatus", "fm-calm", "idle"]]);
+fire("agent_start");
+expect("next run", [["setWidget", KEY, "install", "aboveEditor"], ["setStatus", "fm-calm", "working"]]);
+stateLine("next run starts clean", "working");
+fire("agent_end");
+expect("next run settled", [["setWidget", KEY, "dispose", "aboveEditor"], ["setStatus", "fm-calm", "idle"]]);
 // /calm off persists off, restores the observed tool expansion, and clears the footer.
 calm("", ctx);
 if (stored() !== "off\n") throw new Error(`/calm off stored ${JSON.stringify(stored())}`);
@@ -690,7 +720,7 @@ EOF
   status=$?
   expect_code 0 "$status" "omp calm extension contract: $out"
   [ -z "$out" ] || fail "omp calm extension test printed output: $out"
-  pass ".omp calm extension: silent while off, /calm persists and session_start/session_switch reload the shared preference, boat and footer report only observed run state"
+  pass ".omp calm extension: silent while off, /calm persists and session_start/session_switch reload the shared preference, boat and footer report only observed run state, waiting for you holds across overlapping approvals and an open ask"
 }
 
 
