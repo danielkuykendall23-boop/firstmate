@@ -148,7 +148,6 @@ export default function (pi: ExtensionAPI) {
     pi.on?.(event, (_event, ctx) => {
       animation.reset();
       setCalm(ctx.ui, loadCalmPreference());
-      apply(ctx.ui);
     });
   }
 
