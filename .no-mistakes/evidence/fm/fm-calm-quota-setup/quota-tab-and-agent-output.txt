@@ -1,0 +1,51 @@
+Read-only observation of the captain's live Herdr and the installed quota-axi, 2026-09-17T19:10:43Z. Nothing was sent to any pane.
+
+## herdr tab list --workspace w31  (workspace label: First Mate)
+  tab 1 | First Mate | w31:t1
+  tab 3 | Claude | w31:t3
+  tab 6 | Quota | w31:t6
+
+## herdr pane process-info --pane w31:p6  (the Quota tab's only pane)
+  cmdline: node /Users/danielkuykendall/.local/bin/quota-axi --tui --refresh 1m --no-credential-refresh
+
+## herdr pane read w31:p6 --source visible  (top of the live TUI)
+  quota-axi · 2026-09-17 15:09 EDT · 3 live · 5 signed out · 2 unavailable
+
+╭─ ● claude ────────────────────── max · oauth ─╮  ╭─ ● codex ─────────────────────── pro · oauth ─╮
+│                                               │  │                                               │
+│   84% session                     on pace ✓   │  │   55% week                        on pace ✓   │
+│   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃━━╸──────   │  │   ━━━━━━━━━━━┃━━━━━━━━━━╸──────────────────   │
+│                                               │  │                                               │
+│   session ━━━━━━━━━━━━━━━━━┃╸───  84%  3h 50m │  │   week    ━━━━━━┃━━━━━──────────  55%  1d 20h │
+│   week    ━━━━━━━━━━━━━━━━━━━━━┃  97%  6d 14h │  │                                               │
+│   fable   ━━━━━━━━━━━━━━━━━━━━╸┃  94%  6d 14h │  │                                               │
+│                                               │  │                                               │
+╰───────────────────────────────────────────────╯  ╰───────────────────────────────────────────────╯
+
+## quota-axi --no-credential-refresh  (default agent TOON output, strictly read-only)
+bin: ~/.local/bin/quota-axi
+description: Report local agent-provider quota windows for routing-aware agents
+generatedAt: "2026-09-17T19:10:15.060Z"
+quota[4]{provider,scope,effectivePercentRemaining,spendPriority,runway,confidence,limitedBy,resetsAt}:
+  claude,all_models,84,0.4746,through_reset,early,five_hour,"2026-09-17T23:00:00.232929+00:00"
+  claude,"model:fable",84,0.1891,projected_exhaustion,early,five_hour,"2026-09-17T23:00:00.232929+00:00"
+  codex,all_models,55,1.4751,through_reset,established,weekly,"2026-09-19T15:27:44.000Z"
+  cursor,all_models,100,1.1856,through_reset,established,included_usage + auto_usage + api_usage,"2026-10-13T02:27:13.770Z"
+exhaustion[1]{provider,scope,usableRunwaySeconds,projectedExhaustedAt,limitingWindowId}:
+  claude,"model:fable",517232,"2026-09-23T18:50:47.349Z","model:fable"
+attention[7]{provider,scope,kind,detail,remedy}:
+  copilot,all,auth_required,GitHub Copilot sign-in required,none
+  grok,all,auth_required,Grok sign-in required (auth unusable),none
+  kimi,all,auth_required,kimi_credential_unavailable,none
+  zai,all,auth_required,zai_credential_unavailable,none
+  agy,all,unavailable,Antigravity/agy is not running,none
+  alibaba,all,unavailable,bl_cli_unavailable,none
+  opencode-go,all,auth_required,opencode_go_credential_unavailable,none
+help[1]:
+  Run `quota-axi --full` for windows, pace, reserve, and account evidence
+
+## The repo's dispatch helper choosing from that same snapshot (no second collector)
+$ bin/fm-quota-choose.sh --snapshot <snapshot> --candidate claude:fable --candidate codex:gpt-6-astra
+claude fable
+$ bin/fm-quota-choose.sh --snapshot <snapshot> --candidate codex:gpt-6-astra --candidate claude:fable
+codex gpt-6-astra

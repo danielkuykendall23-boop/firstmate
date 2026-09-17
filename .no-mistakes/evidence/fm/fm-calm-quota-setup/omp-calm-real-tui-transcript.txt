@@ -1,0 +1,128 @@
+Real omp omp/18.2.1 TUI driven in a pty (110x36, pyte screen capture), target commit fd0bd24.
+Launch: omp --no-extensions -e .omp/extensions/fm-calm-omp.ts --no-session --no-skills --no-rules --no-title --approval-mode always-ask --cwd <empty lab>
+Preference isolated with FM_CONFIG_OVERRIDE=<temp config dir>; the captain's real config/calm was never touched.
+Each frame below is the bottom of the live screen at that step.
+
+########## 1. startup, Calm off: stock footer, no fm-calm status
+ Update Available
+ New version 18.2.4 is available. Run: omp update
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+ π · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 fm-calm-e2e/lab · ◫ 5.8%/272K ⟲ · (sub)
+
+########## 2. /calm -> notice, footer status 'idle'; config/calm is exactly 'on\n' (mode 0600, no temp file left)
+ New version 18.2.4 is available. Run: omp update
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Calm on: boat while working, tool rows collapsed
+❯
+ π · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 fm-calm-e2e/lab · ◫ 5.8%/272K ⟲ · (sub)
+idle
+
+########## 3. prompt submitted (agent_start): boat installed above the editor, state 'working'
+ done.
+  ⎋ Working…
+   ◿│◣
+▁▁╲▁▁▁╱▁▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▂▂▂▃▃▃▄▄▄
+working
+❯
+ ⠼ 2s · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 fm-calm-e2e/lab · ◫ 5.8%/272K ⟲ · (sub)
+working
+
+########## 4. omp's real bash approval dialog open: 'waiting for you' under the boat and in the footer
+│ $ sleep 20; echo calm-boat-ok                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⎋ Running requested command
+                         ◿│◣
+▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄
+waiting for you
+╭─ Allow tool: bash ─────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                            │
+│ Command: sleep 20; echo calm-boat-ok                                                                       │
+│                                                                                                            │
+│  ❯ Approve                                                                                                 │
+│    Deny                                                                                                    │
+│                                                                                                            │
+│ up/down navigate  enter select  esc cancel                                                                 │
+│                                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ⠦ 22s · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 fm-calm-e2e/lab · ◫ 6.2%/272K ⟲ · S0.02
+waiting for you
+
+########## 5. approved, sleep 20 running: back to 'working', boat has sailed right
+│ $ sleep 20; echo calm-boat-ok                                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⎋ Running requested command
+                                         ◿│◣
+▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▃▃▃▂
+working
+❯
+ ⠦ 36s · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 fm-calm-e2e/lab · ◫ 6.2%/272K ⟲ · S0.02                           ⚙ 1
+working
+
+########## 6. run settled (agent_end): boat disposed, footer 'idle'
+│ ⟦Wall: 20.02s | Timeout: 300s⟧                                                                             │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ prewalk: Prewalk: target openai-codex/gpt-6-astra already matches the active model and thinking level;
+ nothing to switch.
+ done
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.2%/272K ⟲ · S0.04
+idle
+
+########## 7. omp's built-in ask tool open: 'waiting for you' (not 'working')
+  ⎋ Asking color preference
+                                                                               ◿│◣
+▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂
+waiting for you
+╭─ Ask ──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Which color?                                                                                               │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ ❯ ○ red                                                                                                    │
+│   ○ blue                                                                                                   │
+│   ○ Other (type your own)                                                                                  │
+│                                                                                                            │
+│                                                                                                            │
+│                                                                                                            │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Enter select · n note · ↑/↓ move · Esc cancel                                                              │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ⠋ 22s · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.3%/272K ⟲ · S0.06
+waiting for you
+
+########## 8. ask answered: 'working' again
+  ⎋ Asking color preference
+                                                                                ◿│◣
+▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▃▃▂▂▂▁▁▁▁▁
+working
+❯
+ ⠦ 24s · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.3%/272K ⟲ · S0.06
+working
+
+########## 9. second run settled: boat gone, 'idle'
+│  ◉ red                                                                                                     │
+│  ○ blue                                                                                                    │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ red
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.3%/272K ⟲ · S0.08
+idle
+
+########## 10. /calm -> 'Calm off: stock presentation restored', fm-calm status cleared; config/calm is exactly 'off\n'
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ red
+ Calm off: stock presentation restored
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.3%/272K ⟲ · S0.08
+
+########## 11. 'on\n' written to config/calm from outside omp (as Pi/Claude Code would); omp still off until a session event
+ red
+ Calm off: stock presentation restored
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 6.3%/272K ⟲ · S0.08
+
+########## 12. /new (omp emits session_switch): preference reloaded, footer 'idle' = Calm on
+ Tip: Please use nerdfont 😭.
+ ✔ New session started
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-e2e/lab · ◫ 5.8%/272K ⟲ · (sub)
+idle
