@@ -111,4 +111,5 @@ Bounds of the omp support, verified on omp 18.2.1 with a real tool-using prompt 
 
 - omp exposes no `setWorkingVisible`, so its stock working row, spinner, and working text stay visible under the boat.
 - omp exposes no renderer for built-in tool rows, so Calm collapses them through the tools-expanded toggle rather than hiding them; the collapsed one-line summary remains on screen.
+  omp starts a session with tool output already collapsed, so this toggle changes nothing unless the captain expanded tool output with omp's `app.tools.expand` keybinding before turning Calm on, and the shape omp gives a running tool row is omp's own.
 - Thinking blocks, mid-turn working notes, and operational user rows are not hidden on omp; omp's own `hideThinkingBlock` setting owns thinking visibility.
