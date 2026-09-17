@@ -343,7 +343,9 @@ The separate `handoff` action rehearses a live handoff on an owned, running non-
 It installs nothing, and it does not authorize replacing or restarting the live default server.
 A successful handoff command proves neither phone connectivity nor terminal preservation, and a failed one is not a rollback guarantee, so measure child-process, terminal-history, and client-reconnect behavior in the lab before a candidate leaves it.
 The helper does not intercept Herdr updates or certify downstream client compatibility; retaining the known-working executable and running that rehearsal remain explicit operator steps.
-[Runtime backend verification](verification/runtime-backends.md#lab-live-handoff) records the measured handoff behavior.
+Name a lab that will be handed off from a short label such as `ho`, which the generated `--herdr-lab` brief prescribes.
+Herdr binds the handoff socket at `herdr-handoff-<pid>.sock` inside the session directory, up to 14 bytes longer than `herdr.sock`, so on macOS, where a Unix socket path holds at most 103 bytes, a task-derived name can provision and still fail the handoff.
+[Runtime backend verification](verification/runtime-backends.md#lab-live-handoff) records the measured handoff behavior and that path budget.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.
