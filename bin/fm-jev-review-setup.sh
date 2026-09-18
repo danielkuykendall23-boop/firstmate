@@ -17,26 +17,26 @@
 #
 # Usage:
 #   fm-jev-review-setup.sh install     Register the vendored server.
-#   fm-jev-review-setup.sh uninstall   Remove exactly what install added,
-#                                      restoring the file to its prior state.
+#   fm-jev-review-setup.sh uninstall   Remove exactly the entry install added.
 #   fm-jev-review-setup.sh status      Report whether it is registered.
 #
 # The target config file can be overridden for testing with
 # FM_JEV_REVIEW_MCP_CONFIG=<path>; it defaults to ~/.omp/agent/mcp.json.
 #
-# Reversibility: install snapshots the config file's exact prior bytes (or
-# records that it was absent) into "$CONFIG.pre-jev-review-backup" before
-# writing, and only on the first install (a repeat install does not
-# overwrite an existing snapshot with already-modified content). uninstall
-# restores exactly that snapshot and removes the marker, so uninstall undoes
-# install byte-for-byte rather than merely deleting the jev-review key.
+# Reversibility: install merges one mcpServers["jev-review"] entry into the
+# current file and touches nothing else, so a repeat install is a no-op.
+# uninstall deletes only that entry, and only while it still equals what
+# install writes, so every other server - including ones added after
+# install - survives untouched; an entry somebody has since edited is left
+# in place and reported instead, because deleting it would discard their
+# change. When only an empty mcpServers object would remain, uninstall
+# removes the file, since an empty object configures nothing.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_JS="$REPO_ROOT/.omp/vendor/jev-review/dist/server.js"
-ABSENT_MARKER="__FM_JEV_REVIEW_CONFIG_WAS_ABSENT__"
 
 config_path() {
   echo "${FM_JEV_REVIEW_MCP_CONFIG:-$HOME/.omp/agent/mcp.json}"
@@ -50,42 +50,43 @@ require_server() {
   fi
 }
 
+owned_entry() {
+  jq -cn --arg server "$SERVER_JS" '{"type": "stdio", "command": "node", "args": [$server]}'
+}
+
 is_installed() {
   local config="$1"
   [[ -f "$config" ]] && jq -e '.mcpServers["jev-review"] // empty' "$config" > /dev/null 2>&1
 }
 
+owns_entry() {
+  local config="$1"
+  jq -e --argjson owned "$(owned_entry)" '.mcpServers["jev-review"] == $owned' "$config" > /dev/null 2>&1
+}
+
+write_config() {
+  local config="$1" content="$2"
+  printf '%s\n' "$content" > "$config.tmp"
+  mv "$config.tmp" "$config"
+}
+
 cmd_install() {
   require_server
-  local config backup
+  local config current updated
   config="$(config_path)"
-  backup="$config.pre-jev-review-backup"
   mkdir -p "$(dirname "$config")"
 
-  if [[ ! -e "$backup" ]]; then
-    if [[ -f "$config" ]]; then
-      cp "$config" "$backup"
-    else
-      printf '%s' "$ABSENT_MARKER" > "$backup"
-    fi
-  fi
-
-  local current
   current="$(cat "$config" 2> /dev/null || echo '{}')"
   if ! echo "$current" | jq -e . > /dev/null 2>&1; then
     echo "fm-jev-review-setup.sh: $config exists but is not valid JSON; refusing to merge" >&2
     exit 1
   fi
 
-  local updated
   updated="$(
-    echo "$current" | jq \
-      --arg cmd node \
-      --arg server "$SERVER_JS" \
-      '.mcpServers = (.mcpServers // {}) | .mcpServers["jev-review"] = {"type": "stdio", "command": $cmd, "args": [$server]}'
+    echo "$current" | jq --argjson owned "$(owned_entry)" \
+      '.mcpServers = (.mcpServers // {}) | .mcpServers["jev-review"] = $owned'
   )"
-  printf '%s\n' "$updated" > "$config.tmp"
-  mv "$config.tmp" "$config"
+  write_config "$config" "$updated"
 
   echo "fm-jev-review-setup.sh: registered jev-review (stdio) in $config"
   echo "The jev_review tool is now available on-demand; nothing calls it automatically."
@@ -93,31 +94,28 @@ cmd_install() {
 }
 
 cmd_uninstall() {
-  local config backup
+  local config updated
   config="$(config_path)"
-  backup="$config.pre-jev-review-backup"
 
-  if [[ ! -e "$backup" ]]; then
-    if is_installed "$config"; then
-      echo "fm-jev-review-setup.sh: no install snapshot found; removing just the jev-review entry from $config" >&2
-      local updated
-      updated="$(jq 'del(.mcpServers["jev-review"])' "$config")"
-      printf '%s\n' "$updated" > "$config.tmp"
-      mv "$config.tmp" "$config"
-      echo "fm-jev-review-setup.sh: removed jev-review entry from $config"
-    else
-      echo "fm-jev-review-setup.sh: not installed, nothing to do"
-    fi
+  if ! is_installed "$config"; then
+    echo "fm-jev-review-setup.sh: not installed, nothing to do"
     return 0
   fi
 
-  if [[ "$(cat "$backup")" == "$ABSENT_MARKER" ]]; then
-    rm -f "$config"
-  else
-    cp "$backup" "$config"
+  if ! owns_entry "$config"; then
+    echo "fm-jev-review-setup.sh: the jev-review entry in $config is not the one install writes; leaving it untouched" >&2
+    echo "Remove or restore it by hand if that is what you intend." >&2
+    exit 1
   fi
-  rm -f "$backup"
-  echo "fm-jev-review-setup.sh: restored $config to its state before install"
+
+  updated="$(jq 'del(.mcpServers["jev-review"])' "$config")"
+  if [[ "$(echo "$updated" | jq -c .)" == '{"mcpServers":{}}' ]]; then
+    rm -f "$config"
+    echo "fm-jev-review-setup.sh: removed jev-review; $config configured nothing else and was removed"
+  else
+    write_config "$config" "$updated"
+    echo "fm-jev-review-setup.sh: removed the jev-review entry from $config; every other entry is untouched"
+  fi
 }
 
 cmd_status() {

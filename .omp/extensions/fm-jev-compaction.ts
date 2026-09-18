@@ -49,21 +49,35 @@
 // content carries { type: "toolCall", id, name, arguments, intent } blocks
 // with a *separate* { role: "toolResult", toolCallId, toolName, content,
 // details, isError } message - not the vendored library's own Message shape.
+// The same region also carries pi's other AgentMessage kinds: an extension-
+// injected `custom` message whose content may be a bare string (this repo's
+// own turn-end guard sends one at every session start), a `!cmd`
+// bashExecution with no content at all, and branch/compaction summaries
+// carrying only `summary`; messageText below flattens each the way pi's own
+// convertToLlm does before the library ever sees it.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
-// marker there (the vendored applyDecisions' own documented behavior,
-// corrected in data/env-jev-repo-integration/report.md's second pass), but
+// marker there (the vendored applyDecisions' own documented behavior), but
 // the original journal entries themselves are untouched disk state that omp
 // already keeps regardless of method, and every decision (kept/truncated/
 // dropped, by omp tool-call id) is written to preserveData.jevCompaction for
 // audit, straight from the vendored library's own result.decisions/stats. On
-// any failure - missing key, network error, malformed Jev response, or a
-// reduction ratio below FM_JEV_MIN_REDUCTION_RATIO - this returns undefined
-// and visibly notifies a native-fallback status; it never reports Jev
-// success when Jev did not run.
+// any failure - missing key, network error, malformed Jev response, or an
+// estimated character reduction below MIN_REDUCTION_RATIO - this returns
+// undefined and visibly notifies a native-fallback status; it never reports
+// Jev success when Jev did not run.
+//
+// The key is TYPESAFE_API_KEY from the process environment, else the
+// TYPESAFE_API_KEY= line of $FM_HOME/.env read under the same rule as
+// bin/fm-env-lib.sh's fmx_env_get (environment wins, last assignment wins,
+// one layer of matching quotes stripped). The value is never logged.
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   compact,
   JevClient,
+  resolveOptions,
   type CompactOptions,
   type CompactResult,
   type Message as LibMessage,
@@ -93,14 +107,27 @@ export type OmpContentBlock =
   | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown>; intent?: string }
   | { type: string; [key: string]: unknown };
 
-export type OmpMessage =
-  | { role: "user" | "assistant"; content: OmpContentBlock[]; [key: string]: unknown }
-  | { role: "toolResult"; toolCallId: string; toolName: string; content: OmpContentBlock[]; isError?: boolean; [key: string]: unknown };
+// One entry of omp's AgentMessage union as the hook receives it. `content`
+// is block-shaped on user/assistant/toolResult messages, may be a bare
+// string on a user prompt or a `custom` message, and is absent on a
+// bashExecution (command/output) or a summary (summary) message.
+export type OmpMessage = {
+  role: string;
+  content?: string | OmpContentBlock[];
+  toolCallId?: string;
+  toolName?: string;
+  isError?: boolean;
+  command?: string;
+  output?: string;
+  summary?: string;
+  [key: string]: unknown;
+};
 
+// omp's CompactionPreparation.fileOps: three Set<string> fields.
 export type OmpFileOps = {
-  read?: Record<string, unknown>;
-  written?: Record<string, unknown>;
-  edited?: Record<string, unknown>;
+  read: Iterable<string>;
+  written: Iterable<string>;
+  edited: Iterable<string>;
 };
 
 export type OmpCompactionPreparation = {
@@ -125,7 +152,6 @@ export type OmpCompactionResult = {
   tokensBefore: number;
   fromExtension: true;
   preserveData: { jevCompaction: JevCompactionAudit };
-  details?: { readFiles?: string[]; modifiedFiles?: string[] };
 };
 
 export type JevCompactionAudit = {
@@ -137,24 +163,72 @@ export type JevCompactionAudit = {
   dropped: string[];
   requestCount: number;
   stateTokens: number;
+  charsBefore: number;
+  charsAfter: number;
   reductionRatio: number;
 };
 
-const DEFAULT_MODEL = "jev-latest";
-const DEFAULT_MIN_REDUCTION_RATIO = 0.25;
+const JEV_MODEL = "jev-latest";
+const MIN_REDUCTION_RATIO = 0.25;
+const FILES_TAG_LIMIT = 20;
 
-function envNumber(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
+const extensionFile = fileURLToPath(import.meta.url);
+const root = resolve(dirname(extensionFile), "../..");
+
+function fmHome(): string {
+  return process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
+}
+
+/**
+ * The one-key .env read of bin/fm-env-lib.sh's fmx_env_get: the last
+ * `KEY=` assignment wins, a leading `export ` and surrounding whitespace are
+ * tolerated, one layer of matching quotes is stripped, and an absent file or
+ * key yields "".
+ */
+export function envFileValue(file: string, key: string): string {
+  let text: string;
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+  const assignment = new RegExp(`^\\s*(?:export\\s+)?${key}=(.*)$`);
+  let value = "";
+  for (const line of text.split(/\r?\n/)) {
+    const match = assignment.exec(line);
+    if (match) value = match[1].trim();
+  }
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    value = value.slice(1);
+    if (value.endsWith(quote)) value = value.slice(0, -1);
+  }
+  return value;
+}
+
+function resolveApiKey(): string {
+  return process.env.TYPESAFE_API_KEY || envFileValue(`${fmHome()}/.env`, "TYPESAFE_API_KEY");
+}
+
+function contentBlocks(content: unknown): OmpContentBlock[] {
+  if (typeof content === "string") return [{ type: "text", text: content }];
+  return Array.isArray(content) ? (content as OmpContentBlock[]) : [];
 }
 
 function blockText(blocks: OmpContentBlock[]): string {
   return blocks
-    .filter((b): b is { type: "text"; text: string } => b.type === "text")
+    .filter((b): b is { type: "text"; text: string } => b.type === "text" && typeof b.text === "string")
     .map((b) => b.text)
     .join("");
+}
+
+/** The text of one omp message, flattened the way pi's convertToLlm flattens each AgentMessage kind. */
+export function messageText(message: OmpMessage): string {
+  if (message.role === "bashExecution") {
+    return `Ran \`${message.command ?? ""}\`${message.output ? `\n${message.output}` : ""}`;
+  }
+  if (message.content === undefined && typeof message.summary === "string") return message.summary;
+  return blockText(contentBlocks(message.content));
 }
 
 // ---- omp message shapes -> the vendored library's own Message shape. ----
@@ -170,8 +244,8 @@ function blockText(blocks: OmpContentBlock[]): string {
 export function toLibraryMessages(messages: readonly OmpMessage[]): LibMessage[] {
   const resultByCallId = new Map<string, { text: string; isError: boolean }>();
   for (const message of messages) {
-    if (message.role === "toolResult") {
-      resultByCallId.set(message.toolCallId, { text: blockText(message.content), isError: message.isError ?? false });
+    if (message.role === "toolResult" && message.toolCallId) {
+      resultByCallId.set(message.toolCallId, { text: messageText(message), isError: message.isError ?? false });
     }
   }
 
@@ -182,15 +256,16 @@ export function toLibraryMessages(messages: readonly OmpMessage[]): LibMessage[]
       // toolResults[] attached to *some* message. A synthetic carrier keeps
       // it at its real position, and collectToolCalls pairs by tool_use_id
       // regardless of which message carries it.
-      const result: LibToolResult = { tool_use_id: message.toolCallId, text: blockText(message.content), isError: message.isError ?? false };
+      const result: LibToolResult = { tool_use_id: message.toolCallId ?? "", text: messageText(message), isError: message.isError ?? false };
       out.push({ role: "user", text: "", toolUses: [], toolResults: [result] });
       continue;
     }
     const toolUses: LibToolUse[] = [];
-    for (const block of message.content) {
+    for (const block of contentBlocks(message.content)) {
       if (block.type !== "toolCall") continue;
-      const paired = resultByCallId.get(block.id);
-      const toolUse: LibToolUse = { tool_use_id: block.id, tool: block.name, input: block.arguments };
+      const call = block as { id: string; name: string; arguments: Record<string, unknown> };
+      const paired = resultByCallId.get(call.id);
+      const toolUse: LibToolUse = { tool_use_id: call.id, tool: call.name, input: call.arguments ?? {} };
       // "text"/"isError" mirror the paired result once the transcript holds
       // it (types.ts's own doc comment: "Claude Code attaches them") - omp's
       // toolCall block never carries them itself, so backfill from the
@@ -201,7 +276,7 @@ export function toLibraryMessages(messages: readonly OmpMessage[]): LibMessage[]
       }
       toolUses.push(toolUse);
     }
-    out.push({ role: message.role, text: blockText(message.content), toolUses });
+    out.push({ role: message.role === "assistant" ? "assistant" : "user", text: messageText(message), toolUses });
   }
   return out;
 }
@@ -232,8 +307,11 @@ export function mergeSplitTurnSummary(history: string, turnPrefix: string): stri
   return `${history}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefix}`;
 }
 
+function reduction(charsBefore: number, charsAfter: number): number {
+  return charsBefore > 0 ? 1 - charsAfter / charsBefore : 0;
+}
+
 export function auditFromResult(model: string, keepThreshold: number, result: CompactResult): JevCompactionAudit {
-  const reductionRatio = result.stats.charsBefore > 0 ? 1 - result.stats.charsAfter / result.stats.charsBefore : 0;
   const dropped = result.decisions.filter((d) => d.action === "drop_call").map((d) => d.id);
   const truncated = result.decisions.filter((d) => d.action === "drop_result").length;
   return {
@@ -245,49 +323,62 @@ export function auditFromResult(model: string, keepThreshold: number, result: Co
     dropped,
     requestCount: result.stats.requests,
     stateTokens: result.stats.stateTokens,
-    reductionRatio,
+    charsBefore: result.stats.charsBefore,
+    charsAfter: result.stats.charsAfter,
+    reductionRatio: reduction(result.stats.charsBefore, result.stats.charsAfter),
   };
 }
 
 export function mergeAudits(a: JevCompactionAudit, b: JevCompactionAudit): JevCompactionAudit {
-  const candidateCalls = a.candidateCalls + b.candidateCalls;
+  const charsBefore = a.charsBefore + b.charsBefore;
+  const charsAfter = a.charsAfter + b.charsAfter;
   return {
     model: a.model,
     keepThreshold: a.keepThreshold,
-    candidateCalls,
+    candidateCalls: a.candidateCalls + b.candidateCalls,
     kept: a.kept + b.kept,
     truncated: a.truncated + b.truncated,
     dropped: [...a.dropped, ...b.dropped],
     requestCount: a.requestCount + b.requestCount,
     stateTokens: a.stateTokens + b.stateTokens,
-    reductionRatio: candidateCalls > 0 ? (a.reductionRatio * a.candidateCalls + b.reductionRatio * b.candidateCalls) / candidateCalls : 0,
+    charsBefore,
+    charsAfter,
+    reductionRatio: reduction(charsBefore, charsAfter),
   };
 }
 
+/**
+ * The same <files> block omp's native summaries carry - one sorted
+ * "path (Read|Write)" line each, elided past 20 - built from the Set<string>
+ * fields of omp's CompactionPreparation.fileOps. omp only carries file
+ * operations forward from its own native compaction entries, so for an
+ * extension result this block in the summary text is what preserves them.
+ */
 export function buildFilesTag(fileOps: OmpFileOps): string {
-  const read = Object.keys(fileOps.read ?? {});
-  const written = new Set([...Object.keys(fileOps.written ?? {}), ...Object.keys(fileOps.edited ?? {})]);
-  const readOnly = read.filter((p) => !written.has(p));
-  const entries = [...readOnly.map((p) => `${p} (Read)`), ...[...written].map((p) => `${p} (Write)`)].slice(0, 20);
-  if (entries.length === 0) return "";
-  return `<files>\n${entries.join("\n")}\n</files>`;
+  const written = new Set<string>([...fileOps.written, ...fileOps.edited]);
+  const labels = new Map<string, string>();
+  for (const path of fileOps.read) if (!written.has(path)) labels.set(path, "Read");
+  for (const path of written) labels.set(path, "Write");
+  const paths = [...labels.keys()].sort();
+  if (paths.length === 0) return "";
+  const lines = paths.slice(0, FILES_TAG_LIMIT).map((path) => `${path} (${labels.get(path)})`);
+  if (paths.length > FILES_TAG_LIMIT) lines.push(`[…${paths.length - FILES_TAG_LIMIT} files elided…]`);
+  return `<files>\n${lines.join("\n")}\n</files>`;
 }
 
 // ---- Top-level: run the real vendored compact() against one omp region. ----
 
-export type JevRegionOptions = CompactOptions & { apiKey: string; model?: string; fetchImpl?: typeof fetch };
+export type JevRegionOptions = CompactOptions & { apiKey: string; fetchImpl?: typeof fetch };
 export type JevRegionResult = { text: string; audit: JevCompactionAudit };
 
 export async function compactOmpRegion(messages: readonly OmpMessage[], options: JevRegionOptions): Promise<JevRegionResult> {
-  const model = options.model ?? DEFAULT_MODEL;
-  const keepThreshold = options.keepThreshold ?? 0.5;
-  const asker = new JevClient({ apiKey: options.apiKey, model, fetch: options.fetchImpl });
+  const asker = new JevClient({ apiKey: options.apiKey, model: JEV_MODEL, fetch: options.fetchImpl });
   const libMessages = toLibraryMessages(messages);
   // The region omp hands the hook is already scoped to "not recent"; a
   // second preserveRecentMessages layer inside it would wrongly re-protect
   // its own tail, so this always compacts the whole given region.
   const result = await compact(libMessages, asker, { ...options, preserveRecentMessages: 0 });
-  return { text: renderLibraryMessages(result.messages), audit: auditFromResult(model, keepThreshold, result) };
+  return { text: renderLibraryMessages(result.messages), audit: auditFromResult(JEV_MODEL, resolveOptions(options).keepThreshold, result) };
 }
 
 // ---- Extension wiring. ----
@@ -312,22 +403,14 @@ export default function (pi: ExtensionAPI): void {
     if (process.env.FM_JEV_COMPACTION !== "1") return undefined;
 
     const event = rawEvent as SessionBeforeCompactEvent;
-    const apiKey = process.env.TYPESAFE_API_KEY;
+    const apiKey = resolveApiKey();
     if (!apiKey) return fallback(ctx, "TYPESAFE_API_KEY unset");
 
     const historyRegion = event.preparation.messagesToSummarize;
     const turnPrefixRegion = event.preparation.isSplitTurn ? event.preparation.turnPrefixMessages : [];
     if (historyRegion.length === 0 && turnPrefixRegion.length === 0) return undefined; // nothing to summarize: let omp handle it
 
-    const options: JevRegionOptions = {
-      apiKey,
-      model: process.env.TYPESAFE_MODEL || DEFAULT_MODEL,
-      keepThreshold: envNumber("FM_JEV_KEEP_THRESHOLD", 0.5),
-      truncateHeadChars: envNumber("FM_JEV_TRUNCATE_HEAD_CHARS", 300),
-      maxStateTokens: envNumber("FM_JEV_MAX_STATE_TOKENS", 25000),
-      maxRequestTokens: envNumber("FM_JEV_MAX_REQUEST_TOKENS", 30000),
-    };
-    const minReductionRatio = envNumber("FM_JEV_MIN_REDUCTION_RATIO", DEFAULT_MIN_REDUCTION_RATIO);
+    const options: JevRegionOptions = { apiKey };
 
     let merged: JevRegionResult;
     try {
@@ -344,7 +427,7 @@ export default function (pi: ExtensionAPI): void {
       return fallback(ctx, error instanceof Error ? error.message : "Jev request failed");
     }
 
-    if (merged.audit.candidateCalls > 0 && merged.audit.reductionRatio < minReductionRatio) {
+    if (merged.audit.reductionRatio < MIN_REDUCTION_RATIO) {
       return fallback(ctx, `reduction ${(merged.audit.reductionRatio * 100).toFixed(0)}% below minimum`);
     }
 

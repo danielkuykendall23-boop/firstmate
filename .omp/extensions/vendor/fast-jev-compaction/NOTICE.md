@@ -5,8 +5,8 @@
 - Source: <https://github.com/tamaratran/fast-jev-compaction>
 - Pinned commit: `e3f262a7f4d42bd8dd32ced30d26176f7cb545b0`
 - License: MIT (`LICENSE` in this directory, copied unmodified)
-- Pinned source archive: `tamaratran--fast-jev-compaction-e3f262a7f4d4.tar.gz`, sha256 `4b1de046ee17f93079968c0865a12bf94fa264f007b2527c0a11eb6794550e77`, listed in `/Users/danielkuykendall/.agent-reach/downloads/jev-assessment-20260918/manifest.json`
-- Vendored: 2026-09-18, as part of `data/env-jev-repo-integration/`
+- Pinned source archive: `tamaratran--fast-jev-compaction-e3f262a7f4d4.tar.gz`, sha256 `4b1de046ee17f93079968c0865a12bf94fa264f007b2527c0a11eb6794550e77`
+- Vendored: 2026-09-18
 
 ## The one patch
 

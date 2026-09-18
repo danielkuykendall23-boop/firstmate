@@ -4,7 +4,20 @@
 It is a thin omp-side adapter around the real, pinned upstream decision algorithm, not a reimplementation of it.
 `.omp/extensions/vendor/fast-jev-compaction/` is a verbatim copy of [`tamaratran/fast-jev-compaction`](https://github.com/tamaratran/fast-jev-compaction)'s own harness-agnostic `src/` library (MIT, commit `e3f262a7f4d42bd8dd32ced30d26176f7cb545b0`), with one mechanical, fully documented import-extension patch so Node's native TypeScript loader can resolve it; see `.omp/extensions/vendor/fast-jev-compaction/NOTICE.md` for the exact patch, the pinned archive's sha256, and what upstream code is deliberately not vendored (their Claude Code-only `hooks/` plugin, tests, and demo assets).
 Every actual decision - state fitting, batching, the keep/drop rule, `applyDecisions`' verbatim rendering and pairing guarantee - runs as the real vendored `compact()` export, not a port of it.
-The assessment behind this adapter, including why upstream's own Claude Code plugin cannot run under omp as-is, lives in `data/env-jev-repo-integration/report.md`.
+Upstream's own plugin cannot run under omp as-is: it is built on Claude Code's early-access `hooks.json`/`SessionMessage` function-hook API, which omp's hook and extension loader never reads, so only the library is reusable and the adapter described below supplies the omp-side translation.
+
+## Scope: the three Jev repositories
+
+This change covers the three Jev-related repositories that were assessed together, and records each one's disposition here so the reasoning stays with the code:
+
+- [`tamaratran/fast-jev-compaction`](https://github.com/tamaratran/fast-jev-compaction): adopted as the vendored library plus the omp adapter this document describes.
+- [`NiazMorshed2007/jev-review`](https://github.com/NiazMorshed2007/jev-review): adopted as a vendored, on-demand MCP server behind a reversible user-scope installer (see "Optional: Jev Review" below), never as a review gate.
+- [`lahfir/agent-desktop`](https://github.com/lahfir/agent-desktop): no repository integration.
+  It is a standalone native macOS accessibility engine plus the hosted `jev-desktop` skill, used as a plain CLI and skill from a user-scope install rather than as anything omp or this repository wires; earlier work already installed and natively smoke-tested it at user scope, so this change neither re-installs nor duplicates it.
+  Its live Jev decisions need the same `TYPESAFE_API_KEY` this extension reads.
+
+All three call the same TypeSafe endpoint, but the environment variable name is not uniform: `agent-desktop` and `fast-jev-compaction` read `TYPESAFE_API_KEY`, while `jev-review` reads `JEV_API_KEY`; a setup using more than one needs each name set to the same key.
+Both newly vendored projects are young (created the day before they were assessed, with single-author commit histories), which is a maturity flag to keep in mind, not a defect.
 
 ## Setup
 
@@ -14,20 +27,22 @@ This never writes to `~/.omp/agent/config.yml`.
 
 Requires:
 
-- `TYPESAFE_API_KEY` in the environment (same variable `agent-desktop`'s `jev-desktop` scripts and upstream `fast-jev-compaction` use).
-  Absent key: the extension returns a native-fallback result and never claims Jev ran; see "Verified against a real omp session" below.
+- `TYPESAFE_API_KEY`, either in the environment that launches omp or as a `TYPESAFE_API_KEY=` line in the home's gitignored `.env`.
+  This is the same file and the same one-key read rule as "Typed dispatch resolution" in `docs/configuration.md`: the environment wins, the last assignment in the file wins, a leading `export` and one layer of matching quotes are tolerated, and the value is never logged.
+  The extension resolves the home as `FM_HOME`, else `FM_ROOT_OVERRIDE`, else the repository root that holds `.omp/extensions/`, matching the other omp extensions here.
+  Absent in both places: the extension returns a native-fallback result and never claims Jev ran; see "Verified against a real omp session" below.
 - Node 24+ (omp's own extension loader), no build step.
 
-Optional tuning, all matching upstream's own option names:
+There is no tuning surface.
+The adapter runs the vendored library at its own defaults (`jev-latest`, keep threshold 0.5, 300 characters kept from a truncated result, 25000 state tokens, 30000 request tokens) and requires an estimated reduction of at least 25% of the region's characters before using Jev's result; anything less falls back to native compaction, so a Jev summary is never as large as the region it replaces.
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `TYPESAFE_MODEL` | `jev-latest` | Jev model name |
-| `FM_JEV_KEEP_THRESHOLD` | `0.5` | Minimum keep probability |
-| `FM_JEV_TRUNCATE_HEAD_CHARS` | `300` | Characters kept when a result is truncated, not dropped |
-| `FM_JEV_MAX_STATE_TOKENS` | `25000` | Estimated token ceiling for one Jev request's state |
-| `FM_JEV_MAX_REQUEST_TOKENS` | `30000` | Estimated ceiling for state plus one batch of questions |
-| `FM_JEV_MIN_REDUCTION_RATIO` | `0.25` | Minimum estimated reduction required to use Jev's result instead of falling back |
+### Activation in the captain environment
+
+The shared code stays opt-in on purpose: every Jev compaction sends the region's message text and tool inputs to a third-party API, so no Firstmate user's transcripts leave their machine without that user's own explicit step.
+Activating it for one home means three things: put a `TYPESAFE_API_KEY=` line in that home's `.env` (or export the variable where omp is launched), export `FM_JEV_COMPACTION=1` in the environment that launches omp, and start a new omp session.
+At the time of this change no authorized TypeSafe key with usable entitlement was provisioned for the captain environment, so the extension is wired and tested but not yet active there; the deployment is complete only once such a key exists and a real session has been observed compacting through it.
+This covers omp only.
+The Pi and Claude Code primaries this repository also runs keep their harnesses' native compaction; nothing here changes them.
 
 ## What it actually changes
 
@@ -36,12 +51,14 @@ omp's `session_before_compact` hook is boundary-plus-summary, not per-item surge
 The original journal entries for the summarized region are never deleted from disk by omp itself, regardless of method: only the rebuilt LLM context stops including them.
 
 So the adapter's job is exactly the part the vendored library cannot supply on its own: `toLibraryMessages` translates omp's real `toolCall`-block-plus-separate-`toolResult`-message wire shape into the vendored library's own `Message`/`ToolUse`/`ToolResult` shape, `compactOmpRegion` calls the real vendored `compact()` against that translation, and `renderLibraryMessages` walks the library's own pruned `Message[]` result back into the plain summary text omp's contract actually accepts.
+The region omp hands over also carries pi's other message kinds - an extension-injected `custom` message whose content may be a bare string (this repository's own turn-end guard sends one at every session start), a `!cmd` bash execution with no content at all, and branch or compaction summaries carrying only `summary` - and `messageText` flattens each of them into user-role text the way pi's own `convertToLlm` does, so a real firstmate session's first compaction does not throw before Jev is ever asked.
 For every tool call/result pair in the region omp already discards, the vendored library asks Jev two `noul` questions (keep the call, keep the result verbatim), then `applyDecisions` truncates or drops content in place; the adapter only renders what the library already decided, with no decision logic of its own.
-A dropped call/result is omitted from the rendered summary with no recall marker there, matching upstream's own documented behavior (and the corrected framing in `data/env-jev-repo-integration/report.md`'s second pass: this is "omitted from the returned summary text," not a claim about disk-level journal survival, which omp already guarantees independently of this extension).
-`auditFromResult` copies every decision - kept, truncated, or dropped, by tool-call id - straight from the vendored library's own `result.decisions`/`result.stats` into `preserveData.jevCompaction` on the compaction entry, for later audit.
-`mergeSplitTurnSummary` gives a split turn two separate Jev passes (one per region), merged with the same `**Turn Context (split turn):**` section header omp's own native split-turn summaries use.
+A dropped call/result is omitted from the rendered summary with no recall marker there, matching upstream's own documented behavior; this is "omitted from the returned summary text," not a claim about disk-level journal survival, which omp already guarantees independently of this extension.
+`auditFromResult` copies every decision - kept, truncated, or dropped, by tool-call id - plus the before/after character totals straight from the vendored library's own `result.decisions`/`result.stats` into `preserveData.jevCompaction` on the compaction entry, for later audit.
+`mergeSplitTurnSummary` gives a split turn two separate Jev passes (one per region), merged with the same `**Turn Context (split turn):**` section header omp's own native split-turn summaries use; `mergeAudits` measures the combined reduction over the summed character totals of both regions, so a large text-only history cannot be passed off by a small prefix that shrank a lot.
+`buildFilesTag` appends the same `<files>` block omp's native summaries carry (one sorted `path (Read|Write)` line each, elided past 20), built from the `Set<string>` fields of omp's `preparation.fileOps`; omp only carries file operations forward from its own native compaction entries, so this block in the summary text is what preserves them across a Jev compaction.
 
-On any failure - missing key, network error, malformed Jev response, or a reduction ratio below `FM_JEV_MIN_REDUCTION_RATIO` - the extension returns `undefined`, omp's own `compaction.methodOrder` runs unmodified, and the fallback is visibly logged (see next section).
+On any failure - missing key, network error, malformed Jev response, or an estimated reduction below 25% - the extension returns `undefined`, omp's own `compaction.methodOrder` runs unmodified, and the fallback is visibly logged (see next section).
 It never reports Jev success when Jev did not run.
 
 ## Verified against a real omp session
@@ -54,13 +71,13 @@ Every claim above about the live `session_before_compact` contract, and the fall
 - Loading the vendored-library-backed extension with `FM_JEV_COMPACTION` unset produced zero `extension_error` events and a normal `get_state` response, confirming the default-off path changes nothing about session startup.
 - Driving the same extension with `FM_JEV_COMPACTION=1` and no `TYPESAFE_API_KEY` against a real (synthetic-content) session showed the RPC `compact` command still succeeding via native `remote` compaction, with the raw combined output containing all three fallback signals: the `console.error` line on stderr, an `extension_ui_request` frame with `method: "setStatus"` and `statusText: "Jev compaction skipped (TYPESAFE_API_KEY unset) - using native compaction"`, and a second frame with `method: "notify"` and the matching message - confirming the fallback is visible on every channel this extension writes to, headlessly over RPC, with no extension error and no false claim of Jev success.
 
-No `jev_review`-equivalent live Jev inference (an actual `noul`/`choice`/`score` decision from TypeSafe) was exercised in this task: `TYPESAFE_API_KEY` was absent throughout, by design (see the ship spec in `data/env-jev-repo-integration/`).
-The decision/rendering pipeline itself is covered by `tests/fm-jev-compaction.node.test.ts` against a fake `fetch` and the real vendored `compact()`, including the end-to-end keep/truncate/drop flow and a pairing-guarantee case proving a call is never orphaned from its result.
+No live Jev inference (an actual `noul`/`choice`/`score` decision from TypeSafe) was exercised for this change: `TYPESAFE_API_KEY` was absent throughout, by design, because no private transcript leaves the machine before an authorized key exists.
+The decision/rendering pipeline itself is covered by `tests/fm-jev-compaction.node.test.ts` against a fake `fetch` and the real vendored `compact()`, including the end-to-end keep/truncate/drop flow, a pairing-guarantee case proving a call is never orphaned from its result, and the registered handler driven exactly as omp drives it: the message-shape flattening above, the zero-tool-call region falling back rather than becoming its own summary, the `.env` key read with the environment winning, the `<files>` block from `Set` file operations, and the split-turn character gate.
 
 ## Optional: Jev Review, on demand, never a gate
 
 [`NiazMorshed2007/jev-review`](https://github.com/NiazMorshed2007/jev-review) (MIT, commit `57690af54ef7d862c2483342c1e61c14dffcf727`) is a separate, local stdio MCP server exposing one `jev_review` tool: a repeated scalar code-quality score loop the *implementing agent* may call on its own diff mid-task.
-`.omp/extensions/vendor/jev-review/` is upstream's own pinned build artifact (`dist/server.js`, unmodified; see `NOTICE.md` in that directory for provenance and the archive sha256), so opting in never requires a network fetch or a local build step.
+`.omp/vendor/jev-review/` is upstream's own pinned build artifact (`dist/server.js`, unmodified; see `NOTICE.md` in that directory for provenance and the archive sha256), so opting in never requires a network fetch or a local build step.
 It is not wired into this repository's own MCP configuration and is not part of no-mistakes: `AGENTS.md` section 7 is explicit that no-mistakes alone owns review, fixes, tests, and CI, and this stays consistent with that by never becoming a second mandatory review gate.
 MCP tools are called at the agent's own discretion, never automatically, so registering the server only makes `jev_review` available; nothing invokes it.
 
@@ -69,18 +86,20 @@ A captain or crewmate who wants it as a personal, on-demand tool opts in with th
 ```sh
 bin/fm-jev-review-setup.sh install     # registers the vendored server in ~/.omp/agent/mcp.json
 bin/fm-jev-review-setup.sh status      # reports whether it is currently registered
-bin/fm-jev-review-setup.sh uninstall   # restores ~/.omp/agent/mcp.json to its exact state before install
+bin/fm-jev-review-setup.sh uninstall   # removes exactly the entry install added, nothing else
 export JEV_API_KEY=...                 # note: a different env var name than TYPESAFE_API_KEY above
 ```
 
-The installer only ever writes the user-scope `~/.omp/agent/mcp.json` (never a project's own `.omp/mcp.json`), merges into whatever is already there without disturbing other servers, and snapshots the file's exact prior bytes (or its prior absence) before the first install so `uninstall` restores that exact prior state rather than merely deleting the added key.
-`tests/fm-jev-review-setup.test.sh` covers install/uninstall/status against isolated fixture config files; no case ever touches the real `~/.omp/agent/mcp.json` on this host.
+The installer only ever writes the user-scope `~/.omp/agent/mcp.json` (never a project's own `.omp/mcp.json`) and merges one `mcpServers["jev-review"]` entry into whatever is already there without disturbing other servers, so a repeat install is a no-op.
+`uninstall` deletes only that entry, and only while it still equals what install writes, so every other server - including ones added after install, by hand or through omp's own MCP management - survives untouched; an entry somebody has since edited is left in place and reported instead, because deleting it would discard their change.
+When only an empty `mcpServers` object would remain, `uninstall` removes the file, since an empty object configures nothing.
+`tests/fm-jev-review-setup.test.sh` covers install/uninstall/status against isolated fixture config files, including a server added after install surviving uninstall and an edited entry being refused; no case ever touches the real `~/.omp/agent/mcp.json` on this host.
 
 `jev-review` has no marketplace catalog, so it is not installable through `/marketplace add`; the manual MCP entry the installer writes is the same fallback shape its own README documents for OpenCode.
 
 ### Verified: omp itself discovers the vendored server, not just a hand-rolled probe
 
-Beyond the server's own MCP handshake (a standalone stdio `initialize`/`tools/list` probe, in `data/env-jev-repo-integration/report.md`), omp's *own* MCP client was driven against the vendored server through the installer's real write target:
+Beyond the server's own MCP handshake (a standalone stdio `initialize`/`tools/list` probe against the vendored `dist/server.js`, run with no key set and no `jev_review` call), omp's *own* MCP client was driven against the vendored server through the installer's real write target:
 
 1. `bin/fm-jev-review-setup.sh install` was run with `FM_JEV_REVIEW_MCP_CONFIG` pointed at `<fake-home>/.omp/agent/mcp.json`, writing exactly the config a real `install` writes.
 2. A real `omp --mode rpc --no-session` process was launched with `HOME=<fake-home>` and `--cwd` at an isolated project directory with no `.omp/mcp.json` of its own, so the only source of the `jev-review` server was that user-scope file.
@@ -93,5 +112,5 @@ tests/fm-jev-compaction.test.sh
 tests/fm-jev-review-setup.test.sh
 ```
 
-`fm-jev-compaction.test.sh` runs `tests/fm-jev-compaction.node.test.ts` (Node's native TypeScript support, no build step - the same way omp itself loads the extension), covering the omp-message-shape translation, verbatim rendering, the split-turn merge, the audit/stats mapping, and one full run of the real vendored `compact()` against a fake `fetch` - never contacting the real TypeSafe endpoint.
-`fm-jev-review-setup.test.sh` covers the installer's install/status/uninstall reversibility against isolated fixture config files.
+`fm-jev-compaction.test.sh` runs `tests/fm-jev-compaction.node.test.ts` (Node's native TypeScript support, no build step - the same way omp itself loads the extension), covering the omp-message-shape translation and flattening, verbatim rendering, the split-turn merge and its character-based gate, the audit/stats mapping, the `.env` key read, the `Set`-based `<files>` block, and full runs of the real vendored `compact()` and of the registered handler against a fake `fetch` - never contacting the real TypeSafe endpoint.
+`fm-jev-review-setup.test.sh` covers the installer's install/status/uninstall behavior against isolated fixture config files, including preservation of servers added after install and refusal to delete an edited entry.

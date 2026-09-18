@@ -6,8 +6,8 @@ Upstream ships this exact file in its own repository (produced by their `npm run
 - Source: <https://github.com/NiazMorshed2007/jev-review>
 - Pinned commit: `57690af54ef7d862c2483342c1e61c14dffcf727`
 - License: MIT (`LICENSE` in this directory, copied unmodified)
-- Pinned source archive: `NiazMorshed2007--jev-review-57690af54ef7.tar.gz`, sha256 `d5e5988f4f925efb6cc869c87f188b72ee4e4d9289e24234b72cb20c16d5d854`, listed in `/Users/danielkuykendall/.agent-reach/downloads/jev-assessment-20260918/manifest.json`
-- Vendored: 2026-09-18, as part of `data/env-jev-repo-integration/`
+- Pinned source archive: `NiazMorshed2007--jev-review-57690af54ef7.tar.gz`, sha256 `d5e5988f4f925efb6cc869c87f188b72ee4e4d9289e24234b72cb20c16d5d854`
+- Vendored: 2026-09-18
 
 ## What is vendored and why
 

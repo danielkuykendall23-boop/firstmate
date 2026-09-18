@@ -18,6 +18,18 @@ run_setup() {
   FM_JEV_REVIEW_MCP_CONFIG="$config" "$SETUP" "$@"
 }
 
+seed_config_with_other_server() {
+  local config="$1"
+  mkdir -p "$(dirname "$config")"
+  cat > "$config" << 'EOF_CONFIG'
+{
+  "mcpServers": {
+    "some-other-server": { "type": "stdio", "command": "node", "args": ["/opt/other/server.js"] }
+  }
+}
+EOF_CONFIG
+}
+
 test_status_reports_absent_before_install() {
   local config out
   config="$TMP_ROOT/status-absent/mcp.json"
@@ -44,66 +56,74 @@ test_uninstall_after_fresh_install_removes_the_file_entirely() {
   config="$TMP_ROOT/fresh-roundtrip/mcp.json"
   run_setup "$config" install > /dev/null
   run_setup "$config" uninstall > /dev/null
-  assert_absent "$config" "uninstall must remove a config file that did not exist before install"
-  assert_absent "$config.pre-jev-review-backup" "uninstall must clean up its own backup marker"
-  pass "uninstalling a fresh install leaves no config file behind, exactly as before install"
+  assert_absent "$config" "uninstall must remove a config file that would otherwise hold only an empty mcpServers object"
+  assert_absent "$config.tmp" "uninstall must not leave its scratch file behind"
+  pass "uninstalling a fresh install leaves no config file behind"
 }
 
 test_install_preserves_an_unrelated_existing_server_entry() {
   local config
   config="$TMP_ROOT/preserve/mcp.json"
-  mkdir -p "$(dirname "$config")"
-  cat > "$config" << 'EOF'
-{
-  "mcpServers": {
-    "some-other-server": { "type": "stdio", "command": "node", "args": ["/opt/other/server.js"] }
-  }
-}
-EOF
+  seed_config_with_other_server "$config"
   run_setup "$config" install > /dev/null
   assert_equals '"/opt/other/server.js"' "$(jq -c '.mcpServers["some-other-server"].args[0]' "$config")" "install must not disturb an unrelated existing server entry"
   assert_equals stdio "$(jq -r '.mcpServers["jev-review"].type' "$config")" "install must still add its own entry alongside the existing one"
   pass "install merges into an existing config without disturbing other servers"
 }
 
-test_uninstall_restores_a_preexisting_config_byte_for_byte() {
+test_uninstall_removes_only_the_jev_review_entry() {
   local config before after
-  config="$TMP_ROOT/restore/mcp.json"
-  mkdir -p "$(dirname "$config")"
-  cat > "$config" << 'EOF'
-{
-  "mcpServers": {
-    "some-other-server": { "type": "stdio", "command": "node", "args": ["/opt/other/server.js"] }
-  }
-}
-EOF
+  config="$TMP_ROOT/surgical/mcp.json"
+  seed_config_with_other_server "$config"
   before=$(jq -S . "$config")
   run_setup "$config" install > /dev/null
   run_setup "$config" uninstall > /dev/null
   after=$(jq -S . "$config")
-  assert_equals "$before" "$after" "uninstall must restore a config that pre-existed install to its exact prior content"
-  assert_absent "$config.pre-jev-review-backup" "uninstall must clean up its own backup marker after restoring"
-  pass "uninstall restores a pre-existing config to its exact prior content"
+  assert_equals "$before" "$after" "uninstall must leave a pre-existing config holding exactly what it held before install"
+  pass "uninstall removes only the jev-review entry and leaves the pre-existing server alone"
 }
 
-test_repeat_install_does_not_clobber_the_reversibility_snapshot() {
+test_uninstall_preserves_a_server_added_after_install() {
+  local config
+  config="$TMP_ROOT/added-later/mcp.json"
+  seed_config_with_other_server "$config"
+  run_setup "$config" install > /dev/null
+  jq '.mcpServers["added-later"] = {"type": "stdio", "command": "node", "args": ["/opt/later/server.js"]}' "$config" > "$config.edit"
+  mv "$config.edit" "$config"
+  run_setup "$config" uninstall > /dev/null
+  assert_equals '"/opt/later/server.js"' "$(jq -c '.mcpServers["added-later"].args[0]' "$config")" "a server the user added after install must survive uninstall"
+  assert_equals '"/opt/other/server.js"' "$(jq -c '.mcpServers["some-other-server"].args[0]' "$config")" "the pre-existing server must survive uninstall too"
+  assert_equals null "$(jq -c '.mcpServers["jev-review"]' "$config")" "the jev-review entry itself must be gone"
+  pass "uninstall keeps servers added after install instead of restoring a stale snapshot"
+}
+
+test_repeat_install_is_idempotent_and_uninstall_still_removes_only_its_entry() {
   local config before after
   config="$TMP_ROOT/repeat-install/mcp.json"
-  mkdir -p "$(dirname "$config")"
-  cat > "$config" << 'EOF'
-{
-  "mcpServers": {
-    "some-other-server": { "type": "stdio", "command": "node", "args": ["/opt/other/server.js"] }
-  }
-}
-EOF
+  seed_config_with_other_server "$config"
   before=$(jq -S . "$config")
   run_setup "$config" install > /dev/null
   run_setup "$config" install > /dev/null
+  assert_equals 2 "$(jq '.mcpServers | length' "$config")" "installing twice must leave exactly one jev-review entry beside the existing server"
   run_setup "$config" uninstall > /dev/null
   after=$(jq -S . "$config")
-  assert_equals "$before" "$after" "installing twice must still uninstall back to the original pre-install content, not the once-modified state"
-  pass "a repeat install does not overwrite the original reversibility snapshot"
+  assert_equals "$before" "$after" "installing twice then uninstalling must leave the original content, not a modified state"
+  pass "a repeat install is a no-op and a later uninstall still removes only the jev-review entry"
+}
+
+test_uninstall_refuses_a_jev_review_entry_somebody_edited() {
+  local config
+  config="$TMP_ROOT/edited-entry/mcp.json"
+  seed_config_with_other_server "$config"
+  run_setup "$config" install > /dev/null
+  jq '.mcpServers["jev-review"].args += ["--verbose"]' "$config" > "$config.edit"
+  mv "$config.edit" "$config"
+  if run_setup "$config" uninstall > /dev/null 2>&1; then
+    fail "uninstall must refuse to delete a jev-review entry that no longer matches what install wrote"
+  fi
+  assert_equals '"--verbose"' "$(jq -c '.mcpServers["jev-review"].args[1]' "$config")" "a refused uninstall must leave the edited entry exactly as it was"
+  assert_equals '"/opt/other/server.js"' "$(jq -c '.mcpServers["some-other-server"].args[0]' "$config")" "a refused uninstall must leave every other entry as it was"
+  pass "uninstall refuses rather than discarding a jev-review entry the user has edited"
 }
 
 test_status_reflects_current_state() {
@@ -153,8 +173,10 @@ test_status_reports_absent_before_install
 test_install_creates_config_pointing_at_the_vendored_server
 test_uninstall_after_fresh_install_removes_the_file_entirely
 test_install_preserves_an_unrelated_existing_server_entry
-test_uninstall_restores_a_preexisting_config_byte_for_byte
-test_repeat_install_does_not_clobber_the_reversibility_snapshot
+test_uninstall_removes_only_the_jev_review_entry
+test_uninstall_preserves_a_server_added_after_install
+test_repeat_install_is_idempotent_and_uninstall_still_removes_only_its_entry
+test_uninstall_refuses_a_jev_review_entry_somebody_edited
 test_status_reflects_current_state
 test_uninstall_without_prior_install_is_a_silent_no_op
 test_install_refuses_a_config_file_that_is_not_valid_json
