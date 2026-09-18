@@ -1,26 +1,47 @@
 #!/usr/bin/env bash
 # Retire stale restored-shell Herdr presentation children at locked session start.
 #
-# Usage: fm-herdr-session-cleanup.sh
+# Usage: fm-herdr-session-cleanup.sh [--dry-run]
 #
 # The caller must already own this Firstmate home's session lock. This script is
 # home-local and considers only the current named Herdr session and ordinary
 # state/*.herdr-presentation journals in the effective FM_HOME. Each candidate
 # is additionally serialized by the existing state/.spawn-<task>.lock and the
-# shared named-session Herdr presentation lock, in that order.
+# shared named-session Herdr presentation lock, in that order, plus the task's
+# state/.meta-<task>.lock when its metadata still names the pane.
 #
 # A visible title is discovery only. Cleanup requires the exact current
 # "└ <concise-task> · p:<22-char-token>" grammar, one token occurrence across
 # the named-session snapshot, exactly one matching home-local journal, one tab,
-# one pane, absent task metadata, no registered agent, and a process proof that
-# the pane contains only one idle recognized shell with no child process. A
-# version 2 journal must also bind the exact workspace, tab, and pane.
+# one pane, no registered agent, and a process proof that the pane contains
+# only one idle recognized shell with no child process. A version 2 journal
+# must also bind the exact workspace, tab, and pane.
+# The task's ordinary metadata must either be absent (the projection outlived
+# its task) or name exactly this session, workspace, tab, and pane as the
+# task's endpoint while that pane's shell started after the metadata's recorded
+# spawn_gen launch second (a server-restored husk: the Herdr server restarted,
+# the worker process died with it, and the shell now in the pane is not the
+# one firstmate launched the worker into). The shell firstmate launched into
+# always predates spawn_gen, so an exited or parked worker's pane, which still
+# holds its transcript and is the pane bin/fm-control.sh relaunch adopts, is
+# never closed here; a task whose metadata names some other endpoint keeps its
+# projection untouched as well. bin/fm-spawn.sh --relaunch recreates a Herdr
+# endpoint this cleanup has retired, so the task record, local copy, branch,
+# and steering inbox stay exactly as they were.
 # Topology is first checked from one locked API snapshot, then every mutation
 # prerequisite is immediately rechecked before the existing exact-pane
 # focus-preserving close helper is called.
-# The script never closes a workspace. It removes only the matching journal,
-# and only after the exact pane is confirmed gone. Every error warns and returns
-# success so session startup continues conservatively.
+# The script never closes a workspace and never edits task metadata. It removes
+# only the matching journal, and only after the exact pane is confirmed gone.
+# Every error warns and returns success so session startup continues
+# conservatively.
+#
+# --dry-run takes no lock and mutates nothing: it prints one tab-separated line
+# per workspace carrying the projection title grammar in the named session -
+# "close|keep <workspace-id> <task-id|-> <pane-id|-> <reason>" - so an operator
+# can inspect exactly which spaces the locked run would retire and why every
+# other one stays. The locked run re-derives every verdict under its locks;
+# the preview is evidence, never authority.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,6 +56,12 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 fm_backend_source herdr
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
+
+# A restored shell must have started this many seconds after the recorded
+# launch second before it counts as restored: ps elapsed time has second
+# granularity and the launch shell is created only moments before spawn_gen is
+# minted, so the margin keeps a launch shell on the preserve side of the line.
+FM_HERDR_CLEANUP_RESTORED_MARGIN=${FM_HERDR_CLEANUP_RESTORED_MARGIN:-5}
 
 fm_herdr_cleanup_warn() {
   printf 'warning: herdr session-start projection cleanup: %s\n' "$*" >&2
@@ -151,11 +178,76 @@ fm_herdr_cleanup_snapshot_candidate() { # <snapshot> <workspace> <title> <token>
   [ -n "$FM_HERDR_CLEANUP_TAB" ] && [ -n "$FM_HERDR_CLEANUP_PANE" ]
 }
 
-fm_herdr_cleanup_revalidate() { # <session> <workspace> <tab> <pane> <title> <token> <home-real> <journal> <task-id> <version> <bound-workspace> <bound-tab> <bound-pane>
+# fm_herdr_cleanup_meta_binding: classify the task's ordinary metadata against
+# one exact candidate. Sets FM_HERDR_CLEANUP_META to "absent" (no metadata),
+# "endpoint" (every recorded Herdr identity field names exactly this session,
+# workspace, tab, and pane, and spawn_gen carries a parseable launch second,
+# stored in FM_HERDR_CLEANUP_LAUNCH_EPOCH), or "other" (present but naming a
+# different endpoint, a different backend, or unreadable), which never
+# qualifies. Each field must occur exactly once so a doubled or edited record
+# reads as "other" rather than as whichever copy grep found first.
+fm_herdr_cleanup_meta_binding() { # <task-id> <session> <workspace> <tab> <pane>
+  local id=$1 session=$2 workspace=$3 tab=$4 pane=$5 meta value gen
+  FM_HERDR_CLEANUP_META=other
+  FM_HERDR_CLEANUP_LAUNCH_EPOCH=
+  meta="$STATE/$id.meta"
+  if [ ! -e "$meta" ] && [ ! -L "$meta" ]; then
+    FM_HERDR_CLEANUP_META=absent
+    return 0
+  fi
+  [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
+  [ "$(fm_backend_of_meta "$meta")" = herdr ] || return 0
+  value=$(fm_backend_meta_exact_value "$meta" window) || return 0
+  [ "$value" = "$session:$pane" ] || return 0
+  value=$(fm_backend_meta_exact_value "$meta" herdr_session) || return 0
+  [ "$value" = "$session" ] || return 0
+  value=$(fm_backend_meta_exact_value "$meta" herdr_workspace_id) || return 0
+  [ "$value" = "$workspace" ] || return 0
+  value=$(fm_backend_meta_exact_value "$meta" herdr_tab_id) || return 0
+  [ "$value" = "$tab" ] || return 0
+  value=$(fm_backend_meta_exact_value "$meta" herdr_pane_id) || return 0
+  [ "$value" = "$pane" ] || return 0
+  gen=$(fm_backend_meta_exact_value "$meta" spawn_gen) || return 0
+  case "$gen" in s[0-9]*.*) ;; *) return 0 ;; esac
+  gen=${gen#s}
+  gen=${gen%%.*}
+  case "$gen" in ''|*[!0-9]*) return 0 ;; esac
+  FM_HERDR_CLEANUP_LAUNCH_EPOCH=$gen
+  FM_HERDR_CLEANUP_META=endpoint
+}
+
+# fm_herdr_cleanup_restored_shell: succeed only when the exact pane passes the
+# lone idle-shell proof AND that shell started more than the margin after the
+# recorded launch second, which is the server-restored shape. Any unreadable
+# process fact fails, so the pane is preserved.
+fm_herdr_cleanup_restored_shell() { # <session> <pane> <launch-epoch>
+  local session=$1 pane=$2 launch_epoch=$3 shell_pid started
+  case "$launch_epoch" in ''|*[!0-9]*) return 1 ;; esac
+  shell_pid=$(fm_backend_herdr_pane_idle_shell_pid "$session" "$pane") || return 1
+  started=$(fm_backend_herdr_pid_start_epoch "${FM_HERDR_PS_BIN:-ps}" "$shell_pid") || return 1
+  [ $((started - launch_epoch)) -gt "$FM_HERDR_CLEANUP_RESTORED_MARGIN" ]
+}
+
+# fm_herdr_cleanup_meta_allows: the metadata verdict a close may proceed under,
+# given the binding recorded when the candidate was first classified. The
+# binding must read identically now, and an endpoint binding must still pass
+# the restored-shell proof.
+fm_herdr_cleanup_meta_allows() { # <task-id> <session> <workspace> <tab> <pane> <expected-binding>
+  local id=$1 session=$2 workspace=$3 tab=$4 pane=$5 expected=$6
+  fm_herdr_cleanup_meta_binding "$id" "$session" "$workspace" "$tab" "$pane"
+  [ "$FM_HERDR_CLEANUP_META" = "$expected" ] || return 1
+  case "$expected" in
+    absent) return 0 ;;
+    endpoint) fm_herdr_cleanup_restored_shell "$session" "$pane" "$FM_HERDR_CLEANUP_LAUNCH_EPOCH" ;;
+    *) return 1 ;;
+  esac
+}
+
+fm_herdr_cleanup_revalidate() { # <session> <workspace> <tab> <pane> <title> <token> <home-real> <journal> <task-id> <version> <bound-workspace> <bound-tab> <bound-pane> <meta-binding>
   local session=$1 workspace=$2 tab=$3 pane=$4 title=$5 token=$6 home_real=$7
   local journal=$8 id=$9 version=${10} bound_workspace=${11} bound_tab=${12} bound_pane=${13}
-  local workspaces workspace_info tabs panes focus
-  [ ! -e "$STATE/$id.meta" ] && [ ! -L "$STATE/$id.meta" ] || return 1
+  local meta_binding=${14} workspaces workspace_info tabs panes focus
+  fm_herdr_cleanup_meta_allows "$id" "$session" "$workspace" "$tab" "$pane" "$meta_binding" || return 1
   fm_herdr_cleanup_unique_match "$title" "$session" "$home_real" || return 1
   [ "$FM_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
     && [ "$FM_HERDR_CLEANUP_ID" = "$id" ] \
@@ -199,10 +291,18 @@ fm_herdr_cleanup_revalidate() { # <session> <workspace> <tab> <pane> <title> <to
   [ "${focus#*$'\t'}" != "$tab" ]
 }
 
+fm_herdr_cleanup_release() { # <lock>...
+  local lock
+  for lock in "$@"; do
+    [ -n "$lock" ] || continue
+    fm_lock_release "$lock" || true
+  done
+}
+
 fm_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
   local session=$1 workspace=$2 title=$3 home_real=$4 token journal id task_lock
   local version bound_workspace bound_tab bound_pane presentation_lock snapshot
-  local tab pane state close_status=0
+  local tab pane state close_status=0 meta_binding meta_lock=
   token=$(fm_herdr_cleanup_title_token "$title") || return 0
   if ! fm_herdr_cleanup_unique_match "$title" "$session" "$home_real"; then
     return 0
@@ -220,46 +320,72 @@ fm_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
     return 0
   fi
   presentation_lock=$(fm_backend_herdr_presentation_session_lock_path "$session" 2>/dev/null) || {
-    fm_lock_release "$task_lock" || true
+    fm_herdr_cleanup_release "$task_lock"
     fm_herdr_cleanup_warn "$id skipped because the shared presentation lock is unavailable"
     return 0
   }
   if ! fm_lock_try_acquire "$presentation_lock"; then
-    fm_lock_release "$task_lock" || true
+    fm_herdr_cleanup_release "$task_lock"
     fm_herdr_cleanup_warn "$id skipped because the shared presentation lock is busy"
     return 0
   fi
 
-  if [ -e "$STATE/$id.meta" ] || [ -L "$STATE/$id.meta" ]; then
-    fm_lock_release "$presentation_lock" || true
-    fm_lock_release "$task_lock" || true
-    return 0
-  fi
   snapshot=$(fm_backend_herdr_cli "$session" api snapshot 2>/dev/null) || snapshot=
   if [ -z "$snapshot" ] \
     || ! fm_herdr_cleanup_snapshot_candidate \
       "$snapshot" "$workspace" "$title" "$token" \
       "$bound_workspace" "$bound_tab" "$bound_pane"; then
     fm_herdr_cleanup_warn "$id preserved because its locked candidate snapshot was ambiguous"
-    fm_lock_release "$presentation_lock" || true
-    fm_lock_release "$task_lock" || true
+    fm_herdr_cleanup_release "$presentation_lock" "$task_lock"
     return 0
   fi
   tab=$FM_HERDR_CLEANUP_TAB
   pane=$FM_HERDR_CLEANUP_PANE
+  fm_herdr_cleanup_meta_binding "$id" "$session" "$workspace" "$tab" "$pane"
+  meta_binding=$FM_HERDR_CLEANUP_META
+  case "$meta_binding" in
+    absent) ;;
+    endpoint)
+      # The task record still names this pane, so a relaunch or teardown could
+      # be acting on it: serialize on the same record lock they take.
+      meta_lock=$(fm_meta_lock_path "$STATE/$id.meta") || {
+        fm_herdr_cleanup_release "$presentation_lock" "$task_lock"
+        return 0
+      }
+      if ! fm_lock_try_acquire "$meta_lock"; then
+        fm_herdr_cleanup_warn "$id skipped because its task record lock is busy"
+        fm_herdr_cleanup_release "$presentation_lock" "$task_lock"
+        return 0
+      fi
+      ;;
+    *)
+      fm_herdr_cleanup_release "$presentation_lock" "$task_lock"
+      return 0
+      ;;
+  esac
   if [ "$(fm_backend_herdr_pane_agent_state "$session" "$pane")" != no-agent ] \
     || ! fm_backend_herdr_pane_idle_shell_pid "$session" "$pane" >/dev/null; then
-    fm_herdr_cleanup_warn "$id preserved because its pane is not a provably idle childless shell"
-    fm_lock_release "$presentation_lock" || true
-    fm_lock_release "$task_lock" || true
+    # A live worker, or a parked one whose pane still holds its own shell, is
+    # the ordinary in-flight state when the task record names the pane; only a
+    # record-less projection is worth a warning here.
+    [ "$meta_binding" = endpoint ] \
+      || fm_herdr_cleanup_warn "$id preserved because its pane is not a provably idle childless shell"
+    fm_herdr_cleanup_release "$meta_lock" "$presentation_lock" "$task_lock"
+    return 0
+  fi
+  if [ "$meta_binding" = endpoint ] \
+    && ! fm_herdr_cleanup_restored_shell "$session" "$pane" "$FM_HERDR_CLEANUP_LAUNCH_EPOCH"; then
+    # The pane still holds the shell firstmate launched the worker into: a
+    # parked or exited worker, silently preserved with its transcript.
+    fm_herdr_cleanup_release "$meta_lock" "$presentation_lock" "$task_lock"
     return 0
   fi
   if ! fm_herdr_cleanup_revalidate \
     "$session" "$workspace" "$tab" "$pane" "$title" "$token" "$home_real" \
-    "$journal" "$id" "$version" "$bound_workspace" "$bound_tab" "$bound_pane"; then
+    "$journal" "$id" "$version" "$bound_workspace" "$bound_tab" "$bound_pane" \
+    "$meta_binding"; then
     fm_herdr_cleanup_warn "$id preserved because immediate revalidation changed or was unreadable"
-    fm_lock_release "$presentation_lock" || true
-    fm_lock_release "$task_lock" || true
+    fm_herdr_cleanup_release "$meta_lock" "$presentation_lock" "$task_lock"
     return 0
   fi
 
@@ -269,6 +395,7 @@ fm_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
     "$session" "$pane" no-agent || close_status=$?
   state=$(fm_backend_herdr_pane_agent_state "$session" "$pane")
   if [ "$state" = dead ]; then
+    fm_herdr_cleanup_meta_binding "$id" "$session" "$workspace" "$tab" "$pane"
     if [ -f "$journal" ] && [ ! -L "$journal" ] \
       && fm_herdr_cleanup_unique_match "$title" "$session" "$home_real" \
       && [ "$FM_HERDR_CLEANUP_JOURNAL" = "$journal" ] \
@@ -277,23 +404,78 @@ fm_herdr_cleanup_one() { # <session> <workspace> <title> <home-real>
       && [ "$FM_HERDR_CLEANUP_BOUND_WORKSPACE" = "$bound_workspace" ] \
       && [ "$FM_HERDR_CLEANUP_BOUND_TAB" = "$bound_tab" ] \
       && [ "$FM_HERDR_CLEANUP_BOUND_PANE" = "$bound_pane" ] \
-      && [ ! -e "$STATE/$id.meta" ] && [ ! -L "$STATE/$id.meta" ]; then
+      && [ "$FM_HERDR_CLEANUP_META" = "$meta_binding" ]; then
       rm -f -- "$journal" || fm_herdr_cleanup_warn "$id pane closed but its journal could not be retired"
     else
       fm_herdr_cleanup_warn "$id pane closed but its journal changed and was preserved"
+    fi
+    if [ "$meta_binding" = endpoint ]; then
+      fm_herdr_cleanup_warn "$id retired its server-restored space; the task record still names the closed pane, and a relaunch recreates its endpoint"
     fi
   elif [ "$close_status" -ne 0 ]; then
     fm_herdr_cleanup_warn "$id preserved because exact focus-safe pane closure was refused or unconfirmed"
   else
     fm_herdr_cleanup_warn "$id preserved because exact pane closure could not be confirmed"
   fi
-  fm_lock_release "$presentation_lock" || true
-  fm_lock_release "$task_lock" || true
+  fm_herdr_cleanup_release "$meta_lock" "$presentation_lock" "$task_lock"
   return 0
 }
 
-fm_herdr_session_cleanup() {
-  local session home_real list candidates workspace title journal found=0
+# fm_herdr_cleanup_preview: the lock-free, mutation-free verdict for one
+# workspace, printed as one "close|keep <workspace> <task|-> <pane|-> <reason>"
+# line. It walks the same proofs the locked path applies, minus the locks and
+# the immediate pre-close revalidation.
+fm_herdr_cleanup_preview() { # <session> <workspace> <title> <home-real>
+  local session=$1 workspace=$2 title=$3 home_real=$4 token id tabs panes tab pane state
+  token=$(fm_herdr_cleanup_title_token "$title") || return 0
+  if ! fm_herdr_cleanup_unique_match "$title" "$session" "$home_real"; then
+    printf 'keep\t%s\t-\t-\t%s\n' "$workspace" 'no unique home-local journal correlates this token'
+    return 0
+  fi
+  id=$FM_HERDR_CLEANUP_ID
+  if ! tabs=$(fm_backend_herdr_cli "$session" tab list --workspace "$workspace" 2>/dev/null) \
+    || ! panes=$(fm_backend_herdr_cli "$session" pane list --workspace "$workspace" 2>/dev/null); then
+    printf 'keep\t%s\t%s\t-\t%s\n' "$workspace" "$id" 'workspace topology is unreadable'
+    return 0
+  fi
+  tab=$(printf '%s' "$tabs" | jq -er 'select((.result.tabs | length) == 1) | .result.tabs[0].tab_id' 2>/dev/null) || tab=
+  pane=$(printf '%s' "$panes" | jq -er --arg tab "$tab" \
+    'select((.result.panes | length) == 1) | .result.panes[0] | select(.tab_id == $tab) | .pane_id' 2>/dev/null) || pane=
+  if [ -z "$tab" ] || [ -z "$pane" ]; then
+    printf 'keep\t%s\t%s\t-\t%s\n' "$workspace" "$id" 'not exactly one tab holding one pane'
+    return 0
+  fi
+  fm_herdr_cleanup_meta_binding "$id" "$session" "$workspace" "$tab" "$pane"
+  case "$FM_HERDR_CLEANUP_META" in
+    absent|endpoint) ;;
+    *)
+      printf 'keep\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" 'task record names a different endpoint or is unreadable'
+      return 0
+      ;;
+  esac
+  state=$(fm_backend_herdr_pane_agent_state "$session" "$pane")
+  if [ "$state" != no-agent ]; then
+    printf 'keep\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" "pane agent state is $state"
+    return 0
+  fi
+  if ! fm_backend_herdr_pane_idle_shell_pid "$session" "$pane" >/dev/null; then
+    printf 'keep\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" 'pane is not a provably idle childless shell'
+    return 0
+  fi
+  if [ "$FM_HERDR_CLEANUP_META" = endpoint ]; then
+    if fm_herdr_cleanup_restored_shell "$session" "$pane" "$FM_HERDR_CLEANUP_LAUNCH_EPOCH"; then
+      printf 'close\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" 'task record names this pane and its shell was restored after the recorded launch'
+    else
+      printf 'keep\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" 'task record names this pane and its shell is the launch shell (parked or exited worker)'
+    fi
+    return 0
+  fi
+  printf 'close\t%s\t%s\t%s\t%s\n' "$workspace" "$id" "$pane" 'no task record remains for this projection'
+}
+
+fm_herdr_session_cleanup() { # [--dry-run]
+  local dry_run=0 session home_real list candidates workspace title journal found=0
+  [ "${1:-}" != --dry-run ] || dry_run=1
   [ -d "$STATE" ] && [ ! -L "$STATE" ] || return 0
   for journal in "$STATE"/*"$FM_BACKEND_HERDR_PRESENTATION_JOURNAL_SUFFIX"; do
     if [ -f "$journal" ] && [ ! -L "$journal" ]; then
@@ -326,12 +508,23 @@ fm_herdr_session_cleanup() {
   }
   while IFS=$'\t' read -r workspace title; do
     [ -n "$workspace" ] && [ -n "$title" ] || continue
-    fm_herdr_cleanup_one "$session" "$workspace" "$title" "$home_real"
+    if [ "$dry_run" -eq 1 ]; then
+      fm_herdr_cleanup_preview "$session" "$workspace" "$title" "$home_real"
+    else
+      fm_herdr_cleanup_one "$session" "$workspace" "$title" "$home_real"
+    fi
   done <<< "$candidates"
   return 0
 }
 
 if [ "${FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY:-0}" != 1 ]; then
-  fm_herdr_session_cleanup
+  case "${1:-}" in
+    '') fm_herdr_session_cleanup ;;
+    --dry-run) fm_herdr_session_cleanup --dry-run ;;
+    *)
+      echo "usage: fm-herdr-session-cleanup.sh [--dry-run]" >&2
+      exit 2
+      ;;
+  esac
   exit 0
 fi

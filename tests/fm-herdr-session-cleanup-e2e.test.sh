@@ -91,9 +91,77 @@ PANE=$(printf '%s' "$CANDIDATE" | jq -r '.result.root_pane.pane_id')
   printf 'projection_id=%s\n' "$TOKEN"
 } > "$HOME_DIR/state/$ID.herdr-presentation"
 
+# A projected child whose task record still names its pane: the in-flight task
+# shape a Herdr server restart leaves behind. Its journal, record, and the pane
+# are all created before the restart, so spawn_gen predates the restored shell.
+write_journal() { # <id> <token>
+  {
+    printf 'version=1\n'
+    printf 'task_id=%s\n' "$1"
+    printf 'projection_id=%s\n' "$2"
+  } > "$HOME_DIR/state/$1.herdr-presentation"
+}
+write_meta() { # <id> <workspace> <tab> <pane> <spawn-epoch>
+  {
+    printf 'window=%s:%s\n' "$HERDR_LAB_SESSION" "$4"
+    printf 'endpoint_task_id=%s\n' "$1"
+    printf 'worktree=%s\n' "$ROOT"
+    printf 'project=%s\n' "$ROOT"
+    printf 'harness=claude\nkind=ship\nmode=no-mistakes\nyolo=off\n'
+    printf 'model=default\neffort=default\n'
+    printf 'spawn_gen=s%s.1.1\n' "$5"
+    printf 'backend=herdr\n'
+    printf 'herdr_session=%s\n' "$HERDR_LAB_SESSION"
+    printf 'herdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$2" "$3" "$4"
+  } > "$HOME_DIR/state/$1.meta"
+}
+create_child() { # <title>
+  lab workspace create --cwd "$ROOT" --label "$1" --no-focus
+}
+HUSK_TOKEN=BcDeFgHiJkLmNoPqRsTuVw
+HUSK_ID=restored-husk
+HUSK_TITLE="└ $HUSK_ID · p:$HUSK_TOKEN"
+HUSK=$(create_child "$HUSK_TITLE") || fail 'could not create metadata-backed husk fixture'
+HUSK_WS=$(printf '%s' "$HUSK" | jq -r '.result.workspace.workspace_id')
+HUSK_TAB=$(printf '%s' "$HUSK" | jq -r '.result.tab.tab_id')
+HUSK_PANE=$(printf '%s' "$HUSK" | jq -r '.result.root_pane.pane_id')
+write_journal "$HUSK_ID" "$HUSK_TOKEN"
+write_meta "$HUSK_ID" "$HUSK_WS" "$HUSK_TAB" "$HUSK_PANE" "$(date +%s)"
+HUSK_META_BEFORE=$(cat "$HOME_DIR/state/$HUSK_ID.meta")
+
+# A projected child whose task record names a DIFFERENT pane (the task moved
+# elsewhere): never a cleanup candidate, restored shell or not.
+MOVED_TOKEN=CdEfGhIjKlMnOpQrStUvWx
+MOVED_ID=moved-elsewhere
+MOVED_TITLE="└ $MOVED_ID · p:$MOVED_TOKEN"
+MOVED=$(create_child "$MOVED_TITLE") || fail 'could not create moved-record fixture'
+MOVED_WS=$(printf '%s' "$MOVED" | jq -r '.result.workspace.workspace_id')
+MOVED_TAB=$(printf '%s' "$MOVED" | jq -r '.result.tab.tab_id')
+MOVED_PANE=$(printf '%s' "$MOVED" | jq -r '.result.root_pane.pane_id')
+write_journal "$MOVED_ID" "$MOVED_TOKEN"
+write_meta "$MOVED_ID" "$MOVED_WS" "$MOVED_TAB" "$(printf '%s' "$ANCHOR" | jq -r '.result.root_pane.pane_id')" "$(date +%s)"
+# The restored shell must start more than the cleanup's restored-shell margin
+# after the husk's recorded launch second.
+sleep 6
+
 "$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null || fail 'could not stop named lab for restored-shell reproduction'
 "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not restore named lab layout'
 lab tab focus "$ANCHOR_TAB" >/dev/null || fail 'could not restore the anchor focus after lab restart'
+
+# A projected child created AFTER the restart whose record was minted after
+# its shell started: the shell firstmate launched into, exactly what a parked
+# or exited worker's pane looks like. It must survive even though it is an
+# agent-free idle shell too.
+PARKED_TOKEN=DeFgHiJkLmNoPqRsTuVwXy
+PARKED_ID=parked-launch-shell
+PARKED_TITLE="└ $PARKED_ID · p:$PARKED_TOKEN"
+PARKED=$(create_child "$PARKED_TITLE") || fail 'could not create parked launch-shell fixture'
+PARKED_WS=$(printf '%s' "$PARKED" | jq -r '.result.workspace.workspace_id')
+PARKED_TAB=$(printf '%s' "$PARKED" | jq -r '.result.tab.tab_id')
+PARKED_PANE=$(printf '%s' "$PARKED" | jq -r '.result.root_pane.pane_id')
+write_journal "$PARKED_ID" "$PARKED_TOKEN"
+sleep 2
+write_meta "$PARKED_ID" "$PARKED_WS" "$PARKED_TAB" "$PARKED_PANE" "$(date +%s)"
 BEFORE_FOCUS=$(focus_snapshot) || fail 'could not capture exact pre-cleanup focus'
 [ "$BEFORE_FOCUS" = "$(printf '%s\t%s' "$(printf '%s' "$ANCHOR" | jq -r '.result.workspace.workspace_id')" "$ANCHOR_TAB")" ] \
   || fail 'anchor focus does not match the exact intended workspace and tab'
@@ -119,6 +187,29 @@ done
 [ "$attempt" -lt 50 ] || fail 'restored child did not converge to the exact childless idle-shell process-group shape'
 pass 'real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape'
 
+run_cleanup() { # [--dry-run]
+  FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
+    PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" "$ROOT/bin/fm-herdr-session-cleanup.sh" "$@"
+}
+verdict_for() { # <inventory> <workspace>
+  printf '%s\n' "$1" | awk -F'\t' -v ws="$2" '$2 == ws { print $1; exit }'
+}
+INVENTORY=$(run_cleanup --dry-run 2>/dev/null) || fail 'dry-run inventory command failed'
+[ "$(verdict_for "$INVENTORY" "$WS")" = close ] || fail "dry run did not mark the record-less stale projection close: $INVENTORY"
+[ "$(verdict_for "$INVENTORY" "$HUSK_WS")" = close ] || fail "dry run did not mark the metadata-backed restored husk close: $INVENTORY"
+[ "$(verdict_for "$INVENTORY" "$PARKED_WS")" = keep ] || fail "dry run did not keep the parked launch-shell pane: $INVENTORY"
+[ "$(verdict_for "$INVENTORY" "$MOVED_WS")" = keep ] || fail "dry run did not keep the moved-record projection: $INVENTORY"
+[ -z "$(verdict_for "$INVENTORY" "$(printf '%s' "$ANCHOR" | jq -r '.result.workspace.workspace_id')")" ] \
+  || fail 'dry run listed the captain anchor, which carries no projection title'
+for fixture_id in "$ID" "$HUSK_ID" "$MOVED_ID" "$PARKED_ID"; do
+  [ -e "$HOME_DIR/state/$fixture_id.herdr-presentation" ] || fail "dry run retired the $fixture_id journal"
+done
+for fixture_pane in "$PANE" "$HUSK_PANE" "$MOVED_PANE" "$PARKED_PANE"; do
+  lab pane get "$fixture_pane" >/dev/null 2>&1 || fail "dry run closed pane $fixture_pane"
+done
+[ "$(focus_snapshot)" = "$BEFORE_FOCUS" ] || fail 'dry run changed focus'
+pass 'real named lab dry run inventories every owned projection with the verdict the locked run applies and mutates nothing'
+
 FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
   PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" "$ROOT/bin/fm-herdr-session-cleanup.sh" \
   || fail 'session-start cleanup command failed'
@@ -132,6 +223,19 @@ if lab workspace get "$WS" >/dev/null 2>&1; then
 fi
 [ ! -e "$HOME_DIR/state/$ID.herdr-presentation" ] || fail 'matching journal survived confirmed exact pane closure'
 pass 'real named lab cleanup closes only the exact stale pane and preserves exact focus'
+if lab pane get "$HUSK_PANE" >/dev/null 2>&1; then
+  fail 'metadata-backed restored husk pane survived cleanup'
+fi
+if lab workspace get "$HUSK_WS" >/dev/null 2>&1; then
+  fail 'metadata-backed restored husk workspace survived cleanup'
+fi
+[ ! -e "$HOME_DIR/state/$HUSK_ID.herdr-presentation" ] || fail 'restored husk journal survived confirmed exact pane closure'
+[ "$(cat "$HOME_DIR/state/$HUSK_ID.meta")" = "$HUSK_META_BEFORE" ] || fail 'cleanup edited the restored husk task record'
+lab pane get "$PARKED_PANE" >/dev/null 2>&1 || fail 'parked launch-shell pane was closed'
+[ -e "$HOME_DIR/state/$PARKED_ID.herdr-presentation" ] || fail 'parked launch-shell journal was retired'
+lab pane get "$MOVED_PANE" >/dev/null 2>&1 || fail 'moved-record projection pane was closed'
+[ -e "$HOME_DIR/state/$MOVED_ID.herdr-presentation" ] || fail 'moved-record journal was retired'
+pass 'real named lab cleanup retires a metadata-backed server-restored husk, keeps its task record, and preserves the launch-shell and moved-record panes'
 
 FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
   PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" "$ROOT/bin/fm-herdr-session-cleanup.sh" \

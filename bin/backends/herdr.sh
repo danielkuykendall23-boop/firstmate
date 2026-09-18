@@ -1378,11 +1378,42 @@ fm_backend_herdr_pid_is_bare_shell() {  # <ps-bin> <pid>
   return 1
 }
 
+# fm_backend_herdr_pid_start_epoch: print the epoch second at which <pid>
+# started, derived from <ps-bin>'s elapsed-time column ("[[dd-]hh:]mm:ss"),
+# which both BSD and procps ps render identically; a missing or malformed
+# column fails. Second granularity: callers compare against a recorded epoch
+# with their own margin rather than for equality.
+# The session-start projection cleanup uses it to tell a shell the Herdr server
+# restored after a restart (started after the task's recorded launch) from the
+# shell firstmate launched the worker into (started before it).
+fm_backend_herdr_pid_start_epoch() {  # <ps-bin> <pid>
+  local etime days=0 hours minutes seconds first second third now
+  case "$2" in ''|*[!0-9]*) return 1 ;; esac
+  etime=$("$1" -p "$2" -o etime= 2>/dev/null) || return 1
+  etime=$(printf '%s' "$etime" | tr -d '[:space:]')
+  [ -n "$etime" ] || return 1
+  case "$etime" in
+    *-*) days=${etime%%-*}; etime=${etime#*-} ;;
+  esac
+  IFS=: read -r first second third <<EOF
+$etime
+EOF
+  if [ -n "$third" ]; then
+    hours=$first; minutes=$second; seconds=$third
+  else
+    hours=0; minutes=$first; seconds=$second
+  fi
+  case "$days$hours$minutes$seconds" in ''|*[!0-9]*) return 1 ;; esac
+  [ -n "$minutes" ] && [ -n "$seconds" ] || return 1
+  now=$(date +%s) || return 1
+  printf '%s\n' "$((now - (10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds)))"
+}
+
 # fm_backend_herdr_pane_idle_shell_pid: print the shell pid of <pane-id> only
 # when the exact pane provably holds one lone idle recognized shell: pane
 # process-info agrees on the pane id, the shell pid is both the foreground
 # process group and the sole foreground process, the foreground process name
-# and argv0 resolve to the same recognized shell, the operating-system
+# and argv0 each resolve to a recognized shell, the operating-system
 # process table shows exactly that one shell row with no child process, and
 # the shell sits in a sleeping or idle state.
 # An idle interactive shell transiently hosts short-lived prompt helpers
@@ -1437,8 +1468,12 @@ fm_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
   shell_name=${name##*/}
   argv0=${argv0#-}
   argv0=${argv0##*/}
-  [ "$argv0" = "$shell_name" ] || return 1
+  # Both identities must be recognized shells, but need not be the same one:
+  # a pane launched as /bin/sh carries argv0 "sh" while Herdr 0.9.0 reports
+  # the executable name (bash on macOS, dash on Debian), and a pane whose
+  # foreground is anything but a shell under either name still refuses.
   case "$shell_name" in sh|bash|zsh|dash|ksh|fish) ;; *) return 1 ;; esac
+  case "$argv0" in sh|bash|zsh|dash|ksh|fish) ;; *) return 1 ;; esac
 
   ps_bin=${FM_HERDR_PS_BIN:-ps}
   command -v "$ps_bin" >/dev/null 2>&1 || return 1
