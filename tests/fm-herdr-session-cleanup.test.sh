@@ -383,6 +383,27 @@ reset_fixture; rm -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation"; write_v1 other
   || fail "dry run did not keep a projection no home-local journal correlates"
 pass "dry run reports close/keep with task and pane identity and mutates nothing"
 
+# The preview and the locked run share one classifier: every boundary the
+# locked run enforces from its snapshot must read keep in the preview too, and
+# the locked run must then preserve the same candidate.
+dry_run_verdict() { fm_herdr_session_cleanup --dry-run 2>/dev/null | awk -F'\t' -v ws="$WS" '$2 == ws { print $1 }'; }
+assert_agreed_keep() { # <case>
+  [ "$(dry_run_verdict)" = keep ] || fail "dry run did not keep $1"
+  assert_preserved "$1 (locked run agrees with the preview and)"
+}
+reset_fixture; write_v2 "$FM_HOME" "$WS" "$TAB" w9:p1; assert_agreed_keep "a v2 journal whose pane binding mismatches"
+reset_fixture; write_v2 "$FM_HOME" w9 "$TAB" "$PANE"; assert_agreed_keep "a v2 journal whose workspace binding mismatches"
+reset_fixture; : > "$FIXTURE_DIR/duplicate-token"; assert_agreed_keep "a token that occurs twice in the snapshot"
+reset_fixture; printf '%s\n' "$TAB" > "$FIXTURE_DIR/active-tab"; assert_agreed_keep "the active target tab"
+reset_fixture; : > "$FIXTURE_DIR/error-api-snapshot"; assert_agreed_keep "an unreadable snapshot"
+reset_fixture; printf '2\n' > "$FIXTURE_DIR/panes"; assert_agreed_keep "a second pane"
+restored_fixture; write_meta "$PANE" w9:p1; assert_agreed_keep "a record with inconsistent pane identity"
+reset_fixture; write_v2 "$FM_HOME" "$WS" "$TAB" "$PANE"
+[ "$(dry_run_verdict)" = close ] || fail "dry run did not mark an exactly bound v2 journal close"
+fm_herdr_session_cleanup >/dev/null 2>&1
+[ "$(wc -l < "$CLOSE_LOG" | tr -d ' ')" = 1 ] || fail "locked run did not close the exactly bound v2 journal the preview marked close"
+pass "the preview and the locked run read one classifier and agree on every snapshot, binding, token, and focus boundary"
+
 INTEGRATION_ROOT="$TMP_ROOT/bootstrap-integration"
 mkdir -p "$INTEGRATION_ROOT/home/state" "$INTEGRATION_ROOT/home/data" "$INTEGRATION_ROOT/home/config"
 cp -R "$ROOT/bin" "$INTEGRATION_ROOT/bin"
