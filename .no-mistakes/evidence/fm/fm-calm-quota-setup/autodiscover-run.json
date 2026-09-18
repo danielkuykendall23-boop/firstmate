@@ -1,0 +1,15 @@
+[
+  {"sleep": 5},
+  {"snap": "a0-startup-autodiscovered"},
+  {"type": "/calm"},
+  {"sleep": 0.8},
+  {"key": "enter"},
+  {"wait": "Calm on", "timeout": 20},
+  {"snap": "a1-calm-on-autodiscovered"},
+  {"expect": "idle"},
+  {"type": "/calm"},
+  {"sleep": 0.8},
+  {"key": "enter"},
+  {"wait": "Calm off", "timeout": 20},
+  {"snap": "a2-calm-off-autodiscovered"}
+]

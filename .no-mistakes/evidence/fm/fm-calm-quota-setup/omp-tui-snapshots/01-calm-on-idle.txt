@@ -1,0 +1,34 @@
+                                                                                                              
+╭─── omp v18.2.5 ──────────────────────────────────────────────────────────────────────────────────╮          
+│                          │ Tips                                                                  │          
+│      Welcome back!       │ # for prompt actions                                                  │          
+│                          │ / for commands                                                        │          
+│       ████████████       │ ! to run bash                                                         │          
+│          ██  ██          │ $ to run python                                                       │          
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │          
+│          ▒▒  ██          │ LSP Servers                                                           │          
+│              ██          │ No LSP servers                                                        │          
+│                          │                                                                       │          
+│     Claude Fable 5.1     │                                                                       │          
+│        anthropic         │                                                                       │          
+│                          │ ───────────────────────────────────────────────────────────────────── │          
+│                          │ Recent sessions                                                       │          
+│                          │ • Use the bash tool to run exactly this command: sleep 15;… (just now)│          
+│                          │ • Use the bash tool to run exactly this command: sleep 15; e… (1m ago)│          
+│                          │                                                                       │          
+│                          │                                                                       │          
+│                          │                                                                       │          
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯          
+ Tip: No native tool_calling? Inference provider botches parsing them?                                        
+      `PI_DIALECT=glm|kimi|anthropic…` rolls it locally for them!                                             
+                                                                                                              
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available                                                                                             
+ New version 18.2.6 is available. Run: omp update                                                             
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                              
+ Calm on: boat while working, tool rows collapsed                                                             
+                                                                                                              
+❯                                                                                                             
+ π · ◔ Fable 5.1 · 🌳 6ada68ffd386/01M2V831VFFPK9REM9MRSVRYJH · ⑂ detached · ◫ 5.3%/1M ⟲ · (sub)              
+idle                                                                                                          

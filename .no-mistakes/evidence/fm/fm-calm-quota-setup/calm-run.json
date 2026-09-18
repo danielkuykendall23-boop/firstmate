@@ -1,0 +1,160 @@
+[
+ {
+  "sleep": 3
+ },
+ {
+  "snap": "00-startup-calm-off"
+ },
+ {
+  "type": "/calm"
+ },
+ {
+  "sleep": 0.8
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "wait": "Calm on",
+  "timeout": 20
+ },
+ {
+  "snap": "01-calm-on-idle"
+ },
+ {
+  "expect": "idle"
+ },
+ {
+  "type": "Use the bash tool to run exactly this command: sleep 15; echo calm-check-ok . After it finishes, use the ask tool to ask me exactly one question whose full text is the word Ahoy, a space, then the word captain followed by a question mark. Then reply with only the bash command's output."
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "wait": "Allow tool: bash",
+  "timeout": 120
+ },
+ {
+  "snap": "02-bash-approval-waiting-for-you"
+ },
+ {
+  "expect": "waiting for you"
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "sleep": 4
+ },
+ {
+  "snap": "03-bash-running-working"
+ },
+ {
+  "expect": "working"
+ },
+ {
+  "wait": "Allow tool: ask|Ahoy captain",
+  "timeout": 120
+ },
+ {
+  "if": "Allow tool: ask",
+  "then": [
+   {
+    "snap": "04-ask-approval-waiting-for-you"
+   },
+   {
+    "key": "enter"
+   },
+   {
+    "wait": "Ahoy captain",
+    "timeout": 60
+   }
+  ]
+ },
+ {
+  "sleep": 1
+ },
+ {
+  "snap": "05-ask-open-waiting-for-you"
+ },
+ {
+  "expect": "waiting for you"
+ },
+ {
+  "type": "yes"
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "wait": "\\bidle\\b",
+  "timeout": 180
+ },
+ {
+  "snap": "06-settled-idle"
+ },
+ {
+  "shell": "cp /tmp/omp-calm-lab/config/calm /Users/danielkuykendall/.no-mistakes/evidence/01M2V831VFFPK9REM9MRSVRYJH/config-calm-after-calm-on.txt"
+ },
+ {
+  "shell": "printf 'off\\n' > /tmp/omp-calm-lab/config/calm"
+ },
+ {
+  "type": "/new"
+ },
+ {
+  "sleep": 0.8
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "sleep": 4
+ },
+ {
+  "snap": "07-after-new-with-preference-off"
+ },
+ {
+  "expect": "\\A(?![\\s\\S]*\\bidle\\b)"
+ },
+ {
+  "shell": "printf 'on\\n' > /tmp/omp-calm-lab/config/calm"
+ },
+ {
+  "type": "/new"
+ },
+ {
+  "sleep": 0.8
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "sleep": 4
+ },
+ {
+  "snap": "08-after-new-with-preference-on"
+ },
+ {
+  "expect": "idle"
+ },
+ {
+  "type": "/calm"
+ },
+ {
+  "sleep": 0.8
+ },
+ {
+  "key": "enter"
+ },
+ {
+  "wait": "Calm off",
+  "timeout": 20
+ },
+ {
+  "snap": "09-calm-off-notice"
+ },
+ {
+  "shell": "cp /tmp/omp-calm-lab/config/calm /Users/danielkuykendall/.no-mistakes/evidence/01M2V831VFFPK9REM9MRSVRYJH/config-calm-after-calm-off.txt"
+ }
+]

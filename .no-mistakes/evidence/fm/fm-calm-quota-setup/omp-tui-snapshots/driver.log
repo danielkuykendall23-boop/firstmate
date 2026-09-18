@@ -1,0 +1,47 @@
+[18:32:00] sleep 3
+[18:32:04] snapshot 00-startup-calm-off
+[18:32:04] type '/calm'
+[18:32:04] sleep 0.8
+[18:32:05] key enter
+[18:32:06] wait /Calm on/
+[18:32:06] snapshot 01-calm-on-idle
+[18:32:06] expect ok /idle/
+[18:32:06] type "Use the bash tool to run exactly this command: sleep 15; echo calm-check-ok . After it finishes, use the ask tool to ask me exactly one question whose full text is the word Ahoy, a space, then the word captain followed by a question mark. Then reply with only the bash command's output."
+[18:32:17] key enter
+[18:32:17] wait /Allow tool: bash/
+[18:32:21] snapshot 02-bash-approval-waiting-for-you
+[18:32:21] expect ok /waiting for you/
+[18:32:21] key enter
+[18:32:22] sleep 4
+[18:32:26] snapshot 03-bash-running-working
+[18:32:26] expect ok /working/
+[18:32:26] wait /Allow tool: ask|Ahoy captain/
+[18:32:38] if /Allow tool: ask/ not matched
+[18:32:38] sleep 1
+[18:32:40] snapshot 05-ask-open-waiting-for-you
+[18:32:40] expect ok /waiting for you/
+[18:32:40] type 'yes'
+[18:32:40] key enter
+[18:32:41] wait /\bidle\b/
+[18:32:43] snapshot 06-settled-idle
+[18:32:43] shell cp /tmp/omp-calm-lab/config/calm /Users/danielkuykendall/.no-mistakes/evidence/01M2V831VFFPK9REM9MRSVRYJH/config-calm-after-calm-on.txt
+[18:32:43] shell printf 'off\n' > /tmp/omp-calm-lab/config/calm
+[18:32:43] type '/new'
+[18:32:43] sleep 0.8
+[18:32:44] key enter
+[18:32:45] sleep 4
+[18:32:49] snapshot 07-after-new-with-preference-off
+[18:32:49] expect ok /\A(?![\s\S]*\bidle\b)/
+[18:32:49] shell printf 'on\n' > /tmp/omp-calm-lab/config/calm
+[18:32:49] type '/new'
+[18:32:50] sleep 0.8
+[18:32:50] key enter
+[18:32:51] sleep 4
+[18:32:55] snapshot 08-after-new-with-preference-on
+[18:32:55] expect ok /idle/
+[18:32:55] type '/calm'
+[18:32:56] sleep 0.8
+[18:32:57] key enter
+[18:32:57] wait /Calm off/
+[18:32:58] snapshot 09-calm-off-notice
+[18:32:58] shell cp /tmp/omp-calm-lab/config/calm /Users/danielkuykendall/.no-mistakes/evidence/01M2V831VFFPK9REM9MRSVRYJH/config-calm-after-calm-off.txt

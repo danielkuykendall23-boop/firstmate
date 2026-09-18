@@ -1,0 +1,6 @@
+[
+  {"sleep": 4},
+  {"snap": "00-startup"},
+  {"sleep": 4},
+  {"snap": "01-startup-later"}
+]
