@@ -51,10 +51,15 @@
 // details, isError } message - not the vendored library's own Message shape.
 // The same region also carries pi's other AgentMessage kinds: an extension-
 // injected `custom` message whose content may be a bare string (this repo's
-// own turn-end guard sends one at every session start), a `!cmd`
-// bashExecution with no content at all, and branch/compaction summaries
-// carrying only `summary`; messageText below flattens each the way pi's own
-// convertToLlm does before the library ever sees it.
+// own turn-end guard sends one at every session start), `!cmd` bash and
+// python executions with no content at all, and branch summaries carrying
+// only `summary`; toLibraryMessages below flattens each the way pi's own
+// convertToLlm does before the library ever sees it, and drops an execution
+// flagged excludeFromContext (`!!cmd`) exactly as that conversion does, so
+// nothing omp keeps out of the model's context reaches Jev or the summary.
+// An earlier compaction's summary never sits in the region: omp passes it
+// as preparation.previousSummary, and the handler prepends it verbatim so a
+// second compaction never discards what the first one kept.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
 // marker there (the vendored applyDecisions' own documented behavior), but
@@ -75,6 +80,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  collectToolCalls,
   compact,
   JevClient,
   resolveOptions,
@@ -109,8 +115,9 @@ export type OmpContentBlock =
 
 // One entry of omp's AgentMessage union as the hook receives it. `content`
 // is block-shaped on user/assistant/toolResult messages, may be a bare
-// string on a user prompt or a `custom` message, and is absent on a
-// bashExecution (command/output) or a summary (summary) message.
+// string on a user prompt or a `custom` message, and is absent on a bash
+// (command/output) or python (code/output) execution or a summary (summary)
+// message.
 export type OmpMessage = {
   role: string;
   content?: string | OmpContentBlock[];
@@ -118,7 +125,9 @@ export type OmpMessage = {
   toolName?: string;
   isError?: boolean;
   command?: string;
+  code?: string;
   output?: string;
+  excludeFromContext?: boolean;
   summary?: string;
   [key: string]: unknown;
 };
@@ -137,6 +146,7 @@ export type OmpCompactionPreparation = {
   recentMessages: OmpMessage[];
   isSplitTurn: boolean;
   tokensBefore: number;
+  previousSummary?: string;
   fileOps: OmpFileOps;
   settings: Record<string, unknown>;
 };
@@ -227,8 +237,16 @@ export function messageText(message: OmpMessage): string {
   if (message.role === "bashExecution") {
     return `Ran \`${message.command ?? ""}\`${message.output ? `\n${message.output}` : ""}`;
   }
+  if (message.role === "pythonExecution") {
+    return `Ran Python:\n${message.code ?? ""}${message.output ? `\nOutput:\n${message.output}` : ""}`;
+  }
   if (message.content === undefined && typeof message.summary === "string") return message.summary;
   return blockText(contentBlocks(message.content));
+}
+
+/** omp's own LLM conversion returns nothing for an execution flagged excludeFromContext (`!!cmd`); so does this adapter. */
+function excludedFromContext(message: OmpMessage): boolean {
+  return (message.role === "bashExecution" || message.role === "pythonExecution") && message.excludeFromContext === true;
 }
 
 // ---- omp message shapes -> the vendored library's own Message shape. ----
@@ -251,6 +269,7 @@ export function toLibraryMessages(messages: readonly OmpMessage[]): LibMessage[]
 
   const out: LibMessage[] = [];
   for (const message of messages) {
+    if (excludedFromContext(message)) continue;
     if (message.role === "toolResult") {
       // omp represents a tool result as its own message; the library expects
       // toolResults[] attached to *some* message. A synthetic carrier keeps
@@ -307,12 +326,29 @@ export function mergeSplitTurnSummary(history: string, turnPrefix: string): stri
   return `${history}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefix}`;
 }
 
+/**
+ * omp never places an earlier compaction's summary in the region; it arrives
+ * as preparation.previousSummary, and buildSessionContext afterwards reads
+ * only the newest compaction entry, so it must lead the new summary or be
+ * lost. Kept verbatim, so Jev summaries accumulate across compactions; the
+ * reduction gate only ever measures the newly compacted region.
+ */
+export function mergePreviousSummary(previous: string | undefined, current: string): string {
+  if (!previous) return current;
+  return `${previous}\n\n---\n\n**Later history:**\n\n${current}`;
+}
+
 function reduction(charsBefore: number, charsAfter: number): number {
   return charsBefore > 0 ? 1 - charsAfter / charsBefore : 0;
 }
 
-export function auditFromResult(model: string, keepThreshold: number, result: CompactResult): JevCompactionAudit {
-  const dropped = result.decisions.filter((d) => d.action === "drop_call").map((d) => d.id);
+/** The library's per-run `t1`, `t2`, ... ids back to omp's own toolCall ids; collectToolCalls is deterministic for the same messages. */
+export function toolCallIdsByLibraryId(libMessages: readonly LibMessage[]): Map<string, string> {
+  return new Map(collectToolCalls(libMessages, 0).map((call) => [call.id, call.tool_use_id]));
+}
+
+export function auditFromResult(model: string, keepThreshold: number, result: CompactResult, toolCallIds: ReadonlyMap<string, string>): JevCompactionAudit {
+  const dropped = result.decisions.filter((d) => d.action === "drop_call").map((d) => toolCallIds.get(d.id) ?? d.id);
   const truncated = result.decisions.filter((d) => d.action === "drop_result").length;
   return {
     model,
@@ -378,7 +414,10 @@ export async function compactOmpRegion(messages: readonly OmpMessage[], options:
   // second preserveRecentMessages layer inside it would wrongly re-protect
   // its own tail, so this always compacts the whole given region.
   const result = await compact(libMessages, asker, { ...options, preserveRecentMessages: 0 });
-  return { text: renderLibraryMessages(result.messages), audit: auditFromResult(JEV_MODEL, resolveOptions(options).keepThreshold, result) };
+  return {
+    text: renderLibraryMessages(result.messages),
+    audit: auditFromResult(JEV_MODEL, resolveOptions(options).keepThreshold, result, toolCallIdsByLibraryId(libMessages)),
+  };
 }
 
 // ---- Extension wiring. ----
@@ -432,7 +471,8 @@ export default function (pi: ExtensionAPI): void {
     }
 
     const filesTag = buildFilesTag(event.preparation.fileOps);
-    const summary = filesTag ? `${merged.text}\n\n${filesTag}` : merged.text;
+    const text = mergePreviousSummary(event.preparation.previousSummary, merged.text);
+    const summary = filesTag ? `${text}\n\n${filesTag}` : text;
 
     const statusText = `Jev compaction: kept ${merged.audit.kept}, truncated ${merged.audit.truncated}, dropped ${merged.audit.dropped.length} of ${merged.audit.candidateCalls} calls (${(merged.audit.reductionRatio * 100).toFixed(0)}% reduction)`;
     console.error(`[fm-jev-compaction] ${statusText}`);

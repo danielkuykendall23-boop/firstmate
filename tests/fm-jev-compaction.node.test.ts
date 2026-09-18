@@ -20,6 +20,7 @@ import registerJevCompaction, {
   compactOmpRegion,
   envFileValue,
   mergeAudits,
+  mergePreviousSummary,
   mergeSplitTurnSummary,
   renderLibraryMessages,
   toLibraryMessages,
@@ -65,9 +66,10 @@ function audit(overrides: Partial<JevCompactionAudit>): JevCompactionAudit {
 }
 
 // Jev answers keep for the first collected call (t1) and drop for every other.
-function keepFirstDropRestFetch(seen: { headers: string[] }): typeof fetch {
+function keepFirstDropRestFetch(seen: { headers: string[]; bodies: string[] }): typeof fetch {
   return async (_url, init) => {
     seen.headers.push(JSON.stringify(init?.headers ?? {}));
+    seen.bodies.push(String(init?.body));
     const body = JSON.parse(String(init?.body));
     const answers: Record<string, unknown> = {};
     for (const name of Object.keys(body.questions)) {
@@ -159,14 +161,21 @@ function homeWithEnvFile(lines: string): string {
 }
 
 // A region omp really hands the hook in a firstmate session: a `custom`
-// nudge with bare-string content, a bare-string user prompt, a `!cmd`
-// bashExecution with no content, and a compaction summary with only `summary`.
+// nudge with bare-string content, a bare-string user prompt, `!cmd` bash and
+// python executions with no content (one of each flagged excludeFromContext,
+// the `!!cmd` form omp keeps out of the model), and a branch summary with
+// only `summary`. An earlier compaction's summary is never in the region;
+// omp passes it as preparation.previousSummary instead.
 const realWorldRegion: OmpMessage[] = [
   { role: "custom", customType: "firstmate-sessionstart-nudge", content: "nudge text", display: false, timestamp: 1 },
   { role: "user", content: "plain string prompt", timestamp: 2 },
   { role: "bashExecution", command: "git status", output: "clean", exitCode: 0, cancelled: false, truncated: false, timestamp: 3 },
-  { role: "compactionSummary", summary: "earlier summary", tokensBefore: 10, timestamp: 4 },
+  { role: "bashExecution", command: "cat ~/.aws/credentials", output: "aws_secret_access_key=EXCLUDED-BASH", exitCode: 0, cancelled: false, truncated: false, excludeFromContext: true, timestamp: 4 },
+  { role: "pythonExecution", code: "print(6 * 7)", output: "42", exitCode: 0, cancelled: false, truncated: false, timestamp: 5 },
+  { role: "pythonExecution", code: "open('/etc/shadow').read()", output: "EXCLUDED-PYTHON", exitCode: 0, cancelled: false, truncated: false, excludeFromContext: true, timestamp: 6 },
+  { role: "branchSummary", summary: "branch summary text", fromId: "b1", timestamp: 7 },
 ];
+const excludedText = /EXCLUDED-BASH|credentials|EXCLUDED-PYTHON|shadow/;
 
 test("toLibraryMessages pairs an omp toolCall block with its separate toolResult message", () => {
   const messages: OmpMessage[] = [userText("do it"), assistantToolCall("c1", "read", { path: "a.ts" }), toolResult("c1", "file contents")];
@@ -191,16 +200,25 @@ test("toLibraryMessages leaves an unresulted toolCall's text/isError unset, not 
   assert.equal(lib[0].toolUses[0].isError, undefined);
 });
 
-test("toLibraryMessages flattens the non-block message kinds omp really injects instead of throwing on them", () => {
+test("toLibraryMessages flattens the non-block message kinds omp really injects and omits excluded executions exactly as omp's own LLM conversion does", () => {
   const lib = toLibraryMessages(realWorldRegion);
-  assert.equal(lib.length, 4);
-  assert.deepEqual(lib.map((m) => m.role), ["user", "user", "user", "user"]);
+  assert.equal(lib.length, 5, "the two excludeFromContext executions must not become messages at all");
+  assert.deepEqual(lib.map((m) => m.role), ["user", "user", "user", "user", "user"]);
   assert.equal(lib[0].text, "nudge text");
   assert.equal(lib[1].text, "plain string prompt");
   assert.match(lib[2].text, /git status/);
   assert.match(lib[2].text, /clean/);
-  assert.equal(lib[3].text, "earlier summary");
-  assert.deepEqual(lib.map((m) => m.toolUses), [[], [], [], []]);
+  assert.match(lib[3].text, /print\(6 \* 7\)/);
+  assert.match(lib[3].text, /42/);
+  assert.equal(lib[4].text, "branch summary text");
+  assert.doesNotMatch(lib.map((m) => m.text).join("\n"), excludedText);
+  assert.deepEqual(lib.map((m) => m.toolUses), [[], [], [], [], []]);
+});
+
+test("mergePreviousSummary leaves a first compaction alone and prepends an earlier summary verbatim ahead of a later one", () => {
+  assert.equal(mergePreviousSummary(undefined, "new"), "new");
+  assert.equal(mergePreviousSummary("", "new"), "new");
+  assert.equal(mergePreviousSummary("old", "new"), "old\n\n---\n\n**Later history:**\n\nnew");
 });
 
 test("renderLibraryMessages walks a kept Message[] verbatim, including an applyDecisions truncation note", () => {
@@ -230,10 +248,10 @@ test("mergeAudits sums counts, combines dropped ids, and measures the merged red
   // turn prefix whose two results Jev dropped: the real reduction is ~2.4% of
   // 103k characters, however good the prefix's own ratio looks.
   const history = audit({ candidateCalls: 0, charsBefore: 100_000, charsAfter: 100_000, reductionRatio: 0 });
-  const prefix = audit({ candidateCalls: 2, kept: 0, dropped: ["t1", "t2"], requestCount: 1, stateTokens: 200, charsBefore: 3_000, charsAfter: 500, reductionRatio: 1 - 500 / 3_000 });
+  const prefix = audit({ candidateCalls: 2, kept: 0, dropped: ["call-a", "call-b"], requestCount: 1, stateTokens: 200, charsBefore: 3_000, charsAfter: 500, reductionRatio: 1 - 500 / 3_000 });
   const merged = mergeAudits(history, prefix);
   assert.equal(merged.candidateCalls, 2);
-  assert.deepEqual(merged.dropped, ["t1", "t2"]);
+  assert.deepEqual(merged.dropped, ["call-a", "call-b"]);
   assert.equal(merged.requestCount, 1);
   assert.equal(merged.stateTokens, 200);
   assert.equal(merged.charsBefore, 103_000);
@@ -255,7 +273,7 @@ test("buildFilesTag elides past twenty paths and returns an empty string when no
   assert.equal(buildFilesTag({ read: new Set(), written: new Set(), edited: new Set() }), "");
 });
 
-test("auditFromResult reads counts and character totals straight from the vendored library's own CompactResult.stats/decisions", () => {
+test("auditFromResult reads counts and character totals straight from the vendored library's own CompactResult.stats/decisions and records dropped calls by omp's tool-call id", () => {
   const result: CompactResult = {
     messages: [],
     decisions: [
@@ -265,11 +283,12 @@ test("auditFromResult reads counts and character totals straight from the vendor
     ],
     stats: { messagesBefore: 5, messagesAfter: 3, charsBefore: 1000, charsAfter: 400, calls: 3, kept: 1, resultsDropped: 1, callsDropped: 1, pinned: 0, stateTokens: 200, stateStage: "full", requests: 1, ms: 5 },
   };
-  const a = auditFromResult("jev-latest", 0.5, result);
+  const ids = new Map([["t1", "call-read-1"], ["t2", "call-bash-2"], ["t3", "call-bash-3"]]);
+  const a = auditFromResult("jev-latest", 0.5, result, ids);
   assert.equal(a.candidateCalls, 3);
   assert.equal(a.kept, 1);
   assert.equal(a.truncated, 1);
-  assert.deepEqual(a.dropped, ["t3"]);
+  assert.deepEqual(a.dropped, ["call-bash-3"], "dropped ids are omp's own tool-call ids, not the library's per-run t-numbers");
   assert.equal(a.requestCount, 1);
   assert.equal(a.stateTokens, 200);
   assert.equal(a.charsBefore, 1000);
@@ -294,14 +313,13 @@ test("compactOmpRegion runs the real vendored compact() end to end against a fak
     assistantToolCall("drop1", "bash", { command: "ls -la" }),
     toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(20)),
   ];
-  const seen = { headers: [] as string[] };
+  const seen = { headers: [] as string[], bodies: [] as string[] };
   const result = await compactOmpRegion(messages, { apiKey: "test-key", fetchImpl: keepFirstDropRestFetch(seen), maxRequestTokens: 100000 });
 
   assert.equal(seen.headers.length, 1);
   assert.equal(result.audit.candidateCalls, 2);
   assert.equal(result.audit.kept, 1);
-  assert.equal(result.audit.dropped.length, 1);
-  assert.equal(result.audit.dropped[0], "t2");
+  assert.deepEqual(result.audit.dropped, ["drop1"], "the dropped id is omp's toolCall id, resolvable against the journal");
   assert.equal(result.audit.keepThreshold, 0.5, "the audit records the vendored library's own resolved default threshold");
   assert.match(result.text, /important content Jev should keep/);
   assert.doesNotMatch(result.text, /drwxr-xr-x/, "dropped tool output must not appear in the rendered summary");
@@ -361,7 +379,7 @@ test("the handler reads TYPESAFE_API_KEY from $FM_HOME/.env when the environment
   assert.match(found.notes[0], /below minimum/, "and then reach the ordinary reduction gate");
 });
 
-test("the handler returns omp's compaction result with the Jev-pruned summary, the <files> block from Set fileOps, and the audit; the environment key wins over .env", async () => {
+test("the handler returns omp's compaction result with the previous summary leading the Jev-pruned summary, the <files> block from Set fileOps, and the audit; the environment key wins over .env", async () => {
   const handler = loadHandler();
   const region: OmpMessage[] = [
     ...realWorldRegion,
@@ -372,9 +390,12 @@ test("the handler returns omp's compaction result with the Jev-pruned summary, t
     toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(20)),
   ];
   const home = homeWithEnvFile('TYPESAFE_API_KEY="from-dot-env"\n');
-  const seen = { headers: [] as string[] };
+  const seen = { headers: [] as string[], bodies: [] as string[] };
   const { notes, ctx } = uiCapture();
-  const event = compactEvent(region, { fileOps: { read: new Set(["important.ts", "notes.md"]), written: new Set(["notes.md"]), edited: new Set() } });
+  const event = compactEvent(region, {
+    previousSummary: "EARLIER SUMMARY kept verbatim by compaction #1\n\n<files>\nold.ts (Read)\n</files>",
+    fileOps: { read: new Set(["important.ts", "notes.md"]), written: new Set(["notes.md"]), edited: new Set() },
+  });
 
   const result = await quietStderr(() =>
     withGlobalFetch(keepFirstDropRestFetch(seen), () =>
@@ -384,18 +405,24 @@ test("the handler returns omp's compaction result with the Jev-pruned summary, t
   assert.equal(seen.headers.length, 1);
   assert.match(seen.headers[0], /from-process-env/);
   assert.doesNotMatch(seen.headers[0], /from-dot-env/);
+  assert.match(seen.bodies[0], /git status/, "included history reaches the Jev state");
+  assert.doesNotMatch(seen.bodies[0], excludedText, "an excluded execution must never be POSTed to Jev");
   assert.ok(result, "the handler must return a compaction result");
   const compaction = result.compaction;
   assert.equal(compaction.fromExtension, true);
   assert.equal(compaction.firstKeptEntryId, "entry-9");
   assert.equal(compaction.tokensBefore, 1000);
-  assert.match(compaction.summary, /nudge text/);
+  assert.ok(compaction.summary.startsWith("EARLIER SUMMARY kept verbatim by compaction #1"), "the previous compaction's summary must lead the new one, never be discarded");
+  assert.match(compaction.summary, /old\.ts \(Read\)/, "the earlier summary's own <files> block survives, since omp does not carry extension file ops forward");
+  assert.match(compaction.summary, /\*\*Later history:\*\*\n\nuser: nudge text/);
   assert.match(compaction.summary, /git status/);
+  assert.match(compaction.summary, /print\(6 \* 7\)/);
+  assert.doesNotMatch(compaction.summary, excludedText, "an excluded execution must never be installed as model context");
   assert.match(compaction.summary, /important content Jev should keep/);
   assert.doesNotMatch(compaction.summary, /drwxr-xr-x/);
   assert.match(compaction.summary, /<files>\nimportant\.ts \(Read\)\nnotes\.md \(Write\)\n<\/files>$/);
   assert.equal(compaction.preserveData.jevCompaction.candidateCalls, 2);
-  assert.deepEqual(compaction.preserveData.jevCompaction.dropped, ["t2"]);
+  assert.deepEqual(compaction.preserveData.jevCompaction.dropped, ["drop1"]);
   assert.ok(compaction.preserveData.jevCompaction.reductionRatio >= 0.25);
 });
 
@@ -409,7 +436,7 @@ test("the handler gives a split turn two separate Jev passes and gates on their 
     assistantToolCall("d", "bash", { command: "ls" }),
     toolResult("d", "x".repeat(2500)),
   ];
-  const seen = { headers: [] as string[] };
+  const seen = { headers: [] as string[], bodies: [] as string[] };
   const { notes, ctx } = uiCapture();
   const event = compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix });
   const result = await quietStderr(() =>
