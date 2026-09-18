@@ -102,7 +102,14 @@ fm_lock_try_acquire() {
   mkdir "$1" 2>/dev/null
 }
 fm_lock_release() { rm -rf -- "$1"; }
-fm_backend_herdr_pane_idle_shell_pid() { [ ! -e "$FIXTURE_DIR/process-unsafe" ] && printf '67\n'; }
+# The settle-retry proof is the expensive read; the log records every call so a
+# case can assert a protected pane never paid for it.
+PROOF_LOG="$TMP_ROOT/proofs.log"
+fm_backend_herdr_pane_idle_shell_pid() {
+  printf 'strict\n' >> "$PROOF_LOG"
+  [ ! -e "$FIXTURE_DIR/process-unsafe" ] && printf '67\n'
+}
+fm_backend_herdr_pane_shell_pid() { [ ! -e "$FIXTURE_DIR/shell-pid-unreadable" ] && printf '67\n'; }
 # The metadata-backed proof reads the proved shell's start second; the fixture
 # file names it, and an absent file makes the read fail like an exited pid.
 fm_backend_herdr_pid_start_epoch() { cat "$FIXTURE_DIR/shell-start" 2>/dev/null; }
@@ -253,7 +260,7 @@ write_cross_home_v2() {
 reset_fixture() {
   rm -rf "$FIXTURE_DIR" "$TMP_ROOT"/*.lock "${FM_STATE_OVERRIDE:?}/"*
   mkdir -p "$FIXTURE_DIR"
-  : > "$LOCK_LOG"; : > "$CLOSE_LOG"
+  : > "$LOCK_LOG"; : > "$CLOSE_LOG"; : > "$PROOF_LOG"
   printf '%s\n' "$TITLE" > "$FIXTURE_DIR/title"
   printf '1\n' > "$FIXTURE_DIR/tabs"
   printf '1\n' > "$FIXTURE_DIR/panes"
@@ -347,7 +354,13 @@ WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
 [ ! -s "$CLOSE_LOG" ] || fail "launch shell was closed"
 [ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "launch shell cleanup retired the journal"
 [ -z "$WARNINGS" ] || fail "a parked launch-shell pane must be preserved silently, got: $WARNINGS"
-pass "the shell firstmate launched into (parked or exited worker) is preserved silently"
+[ ! -s "$PROOF_LOG" ] || fail "a launch shell paid for the settle-retry idle-shell proof"
+pass "the shell firstmate launched into (parked or exited worker) is preserved silently without the settle-retry proof"
+restored_fixture; : > "$FIXTURE_DIR/shell-pid-unreadable"
+WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
+[ ! -s "$CLOSE_LOG" ] || fail "a pane whose shell could not be read was closed"
+[ -z "$WARNINGS" ] || fail "an unreadable pane shell on a record-backed pane must be preserved silently, got: $WARNINGS"
+pass "an unreadable pane shell keeps a record-backed projection"
 restored_fixture; printf '%s\n' "$((LAUNCH_EPOCH + FM_HERDR_CLEANUP_RESTORED_MARGIN))" > "$FIXTURE_DIR/shell-start"
 assert_preserved "shell started inside the restored-shell margin"
 restored_fixture; rm -f "$FIXTURE_DIR/shell-start"; assert_preserved "unreadable shell start"
@@ -355,7 +368,8 @@ restored_fixture; printf 'live\n' > "$FIXTURE_DIR/agent"
 WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
 [ ! -s "$CLOSE_LOG" ] || fail "live worker pane was closed"
 [ -z "$WARNINGS" ] || fail "an in-flight live worker must be preserved silently, got: $WARNINGS"
-pass "a live worker whose record names the pane is preserved silently"
+[ ! -s "$PROOF_LOG" ] || fail "a live worker paid for the idle-shell proof"
+pass "a live worker whose record names the pane is preserved silently without a process probe"
 restored_fixture; write_meta w9:p1 w9:p1; assert_preserved "record naming another endpoint"
 restored_fixture; write_meta "$PANE" w9:p1; assert_preserved "record with inconsistent pane identity"
 restored_fixture; printf 'window=test:%s\n' "$PANE" >> "$FM_STATE_OVERRIDE/$ID.meta"; assert_preserved "record with a doubled endpoint field"
@@ -447,5 +461,81 @@ FM_HOME="$INTEGRATION_ROOT/home" FM_ROOT_OVERRIDE="$INTEGRATION_ROOT" \
   || fail "read-only session start failed"
 [ ! -s "$TRACE" ] || fail "read-only session start ran stale projection cleanup"
 pass "session start runs cleanup only after acquiring its home lock"
+
+# --- the watcher runs the same locked entry point on its slow-check cadence ------
+# The copied bin's stub records every invocation and warns like a real
+# preserve, so the assertions read the watcher's observable effects: the trace,
+# the triage log, the wake queue, and the watcher staying alive.
+cat > "$INTEGRATION_ROOT/bin/fm-herdr-session-cleanup.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${FM_HOME:?}" >> "${FM_HERDR_CLEANUP_TRACE:?}"
+printf 'warning: herdr projection cleanup: fixture preserved because its pane is not a provably idle childless shell\n' >&2
+SH
+chmod +x "$INTEGRATION_ROOT/bin/fm-herdr-session-cleanup.sh"
+WATCH_FAKEBIN="$INTEGRATION_ROOT/watch-fakebin"
+mkdir -p "$WATCH_FAKEBIN"
+cat > "$WATCH_FAKEBIN/tmux" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+chmod +x "$WATCH_FAKEBIN/tmux"
+file_mtime() {
+  if [ "$(uname)" = Darwin ]; then stat -f %m "$1" 2>/dev/null; else stat -c %Y "$1" 2>/dev/null; fi
+}
+# Run the copied watcher against <home> until <cycles> poll cycles have completed
+# (the liveness beacon is touched at the top of every poll), then stop it.
+# WATCHER_EXITED reports whether it exited on its own first.
+run_watcher_cycles() { # <home> <cycles> <check-interval>
+  local home=$1 cycles=$2 interval=$3 pid beat first='' now tops=0 i=0
+  WATCHER_EXITED=0
+  beat="$home/state/.last-watcher-beat"
+  rm -f "$beat"
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$INTEGRATION_ROOT" FM_STATE_OVERRIDE="$home/state" \
+    FM_HERDR_CLEANUP_TRACE="$TRACE" PATH="$WATCH_FAKEBIN:$PATH" \
+    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_HEARTBEAT=999999 FM_CHECK_INTERVAL="$interval" \
+    "$INTEGRATION_ROOT/bin/fm-watch.sh" > "$home/watch.out" 2> "$home/watch.err" &
+  pid=$!
+  while [ "$i" -lt 400 ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      WATCHER_EXITED=1
+      break
+    fi
+    now=$(file_mtime "$beat")
+    if [ -n "$now" ] && [ "$now" != "$first" ]; then
+      first=$now
+      tops=$((tops + 1))
+    fi
+    [ "$tops" -le "$cycles" ] || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+}
+watch_home() { # <name>
+  local home="$INTEGRATION_ROOT/$1"
+  mkdir -p "$home/state" "$home/data" "$home/config"
+  printf '%s\n' manual > "$home/config/backlog-backend"
+  printf '%s' "$home"
+}
+
+HOME_A=$(watch_home watch-home-quiet)
+: > "$TRACE"
+touch "$HOME_A/state/.last-check"
+run_watcher_cycles "$HOME_A" 2 999999
+[ "$WATCHER_EXITED" -eq 0 ] || fail "watcher exited during the quiet cadence case: $(cat "$HOME_A/watch.out" "$HOME_A/watch.err")"
+[ ! -s "$TRACE" ] || fail "watcher ran the projection sweep before its slow-check interval elapsed: $(cat "$TRACE")"
+
+HOME_B=$(watch_home watch-home-due)
+: > "$TRACE"
+run_watcher_cycles "$HOME_B" 3 999999
+[ "$WATCHER_EXITED" -eq 0 ] || fail "watcher exited during the due cadence case: $(cat "$HOME_B/watch.out" "$HOME_B/watch.err")"
+[ "$(cat "$TRACE")" = "$HOME_B" ] \
+  || fail "watcher did not run the projection sweep exactly once for its exact home when the slow check came due: $(cat "$TRACE")"
+grep -q 'herdr projection sweep: warning: herdr projection cleanup: fixture preserved' "$HOME_B/state/.watch-triage.log" \
+  || fail "the sweep's warning was not carried to the watcher triage log: $(cat "$HOME_B/state/.watch-triage.log" 2>/dev/null)"
+[ ! -s "$HOME_B/state/.wake-queue" ] || fail "the projection sweep woke firstmate: $(cat "$HOME_B/state/.wake-queue")"
+[ ! -s "$HOME_B/watch.out" ] || fail "the projection sweep printed a wake reason: $(cat "$HOME_B/watch.out")"
+pass "the watcher runs the locked projection cleanup once per slow-check interval for its exact home, logs its warnings, and never wakes"
 
 printf 'all fm-herdr-session-cleanup tests passed\n'

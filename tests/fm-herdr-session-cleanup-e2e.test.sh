@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Real restored-shell E2E for home-local session-start Herdr projection cleanup.
+# Real restored-shell E2E for home-local Herdr projection cleanup, at session
+# start and as the watcher's mid-session housekeeping run.
 # Every CLI operation is routed through one guarded named non-default lab, and
 # lab teardown verifies that the default fleet session is byte-identical.
 set -u
@@ -61,11 +62,22 @@ SH
 chmod +x "$FAKEBIN/herdr"
 
 lab() { env PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" "$@"; }
-production_process_proof() {
+production_process_proof() { # [pane]
   FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
     FM_HERDR_SESSION_CLEANUP_SOURCE_ONLY=1 PATH="$FAKEBIN:$HERDR_ORIGINAL_PATH" \
     bash -c '. "$1"; fm_backend_herdr_pane_idle_shell_pid "$2" "$3" >/dev/null' \
-      _ "$ROOT/bin/fm-herdr-session-cleanup.sh" "$HERDR_LAB_SESSION" "$PANE"
+      _ "$ROOT/bin/fm-herdr-session-cleanup.sh" "$HERDR_LAB_SESSION" "${1:-$PANE}"
+}
+wait_idle_shell() { # <pane>
+  local attempt=0
+  while [ "$attempt" -lt 50 ]; do
+    if production_process_proof "$1"; then
+      return 0
+    fi
+    sleep 0.1
+    attempt=$((attempt + 1))
+  done
+  return 1
 }
 focus_snapshot() {
   local list workspace tab tabs
@@ -176,15 +188,7 @@ PANES=$(lab pane list --workspace "$WS") || fail 'could not inspect restored pan
 if lab agent get "$PANE" >/dev/null 2>&1; then
   fail 'restored child unexpectedly retained a registered agent'
 fi
-attempt=0
-while [ "$attempt" -lt 50 ]; do
-  if production_process_proof; then
-    break
-  fi
-  sleep 0.1
-  attempt=$((attempt + 1))
-done
-[ "$attempt" -lt 50 ] || fail 'restored child did not converge to the exact childless idle-shell process-group shape'
+wait_idle_shell "$PANE" || fail 'restored child did not converge to the exact childless idle-shell process-group shape'
 pass 'real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape'
 
 run_cleanup() { # [--dry-run]
@@ -243,8 +247,59 @@ FM_HOME="$HOME_DIR" FM_BACKEND=herdr HERDR_SESSION="$HERDR_LAB_SESSION" \
 [ "$(focus_snapshot)" = "$BEFORE_FOCUS" ] || fail 'idempotent repeat changed focus'
 lab pane get "$(printf '%s' "$ANCHOR" | jq -r '.result.root_pane.pane_id')" >/dev/null \
   || fail 'anchor pane was touched by cleanup'
+pass 'real named lab cleanup is idempotent'
+
+# A task projected after session start whose server restarts later must
+# disappear without a new session: bin/fm-watch.sh runs this exact locked entry
+# point on its slow-check cadence. Reproduce that shape - a new record-backed
+# child, a second server restart, one housekeeping run - and prove the husk
+# retires while a pane whose record was minted after its shell started (a
+# parked worker) survives. The earlier parked pane's shell died with the
+# server too, so this run retires it on the same proof.
+LATE_TOKEN=EfGhIjKlMnOpQrStUvWxYz
+LATE_ID=late-restored-husk
+LATE_TITLE="└ $LATE_ID · p:$LATE_TOKEN"
+LATE=$(create_child "$LATE_TITLE") || fail 'could not create the mid-session husk fixture'
+LATE_WS=$(printf '%s' "$LATE" | jq -r '.result.workspace.workspace_id')
+LATE_TAB=$(printf '%s' "$LATE" | jq -r '.result.tab.tab_id')
+LATE_PANE=$(printf '%s' "$LATE" | jq -r '.result.root_pane.pane_id')
+write_journal "$LATE_ID" "$LATE_TOKEN"
+write_meta "$LATE_ID" "$LATE_WS" "$LATE_TAB" "$LATE_PANE" "$(date +%s)"
+LATE_META_BEFORE=$(cat "$HOME_DIR/state/$LATE_ID.meta")
+sleep 6
+"$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION" >/dev/null || fail 'could not stop named lab for the mid-session restart'
+"$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail 'could not restore named lab layout after the mid-session restart'
+lab tab focus "$ANCHOR_TAB" >/dev/null || fail 'could not restore the anchor focus after the mid-session restart'
+LATE_PARKED_TOKEN=FgHiJkLmNoPqRsTuVwXyZa
+LATE_PARKED_ID=late-parked-launch-shell
+LATE_PARKED_TITLE="└ $LATE_PARKED_ID · p:$LATE_PARKED_TOKEN"
+LATE_PARKED=$(create_child "$LATE_PARKED_TITLE") || fail 'could not create the mid-session parked fixture'
+LATE_PARKED_WS=$(printf '%s' "$LATE_PARKED" | jq -r '.result.workspace.workspace_id')
+LATE_PARKED_TAB=$(printf '%s' "$LATE_PARKED" | jq -r '.result.tab.tab_id')
+LATE_PARKED_PANE=$(printf '%s' "$LATE_PARKED" | jq -r '.result.root_pane.pane_id')
+write_journal "$LATE_PARKED_ID" "$LATE_PARKED_TOKEN"
+sleep 2
+write_meta "$LATE_PARKED_ID" "$LATE_PARKED_WS" "$LATE_PARKED_TAB" "$LATE_PARKED_PANE" "$(date +%s)"
+[ "$(focus_snapshot)" = "$BEFORE_FOCUS" ] || fail 'anchor focus did not survive the mid-session restart'
+wait_idle_shell "$LATE_PANE" || fail 'mid-session husk did not converge to the childless idle-shell shape'
+INVENTORY=$(run_cleanup --dry-run 2>/dev/null) || fail 'mid-session dry-run inventory command failed'
+[ "$(verdict_for "$INVENTORY" "$LATE_WS")" = close ] || fail "mid-session dry run did not mark the new husk close: $INVENTORY"
+[ "$(verdict_for "$INVENTORY" "$LATE_PARKED_WS")" = keep ] || fail "mid-session dry run did not keep the new parked pane: $INVENTORY"
+run_cleanup || fail 'mid-session housekeeping run failed'
+if lab pane get "$LATE_PANE" >/dev/null 2>&1; then
+  fail 'mid-session restored husk pane survived the housekeeping run'
+fi
+[ ! -e "$HOME_DIR/state/$LATE_ID.herdr-presentation" ] || fail 'mid-session husk journal survived the housekeeping run'
+[ "$(cat "$HOME_DIR/state/$LATE_ID.meta")" = "$LATE_META_BEFORE" ] || fail 'housekeeping run edited the mid-session husk task record'
+if lab pane get "$PARKED_PANE" >/dev/null 2>&1; then
+  fail 'the earlier parked pane, whose shell the second restart replaced, survived the housekeeping run'
+fi
+lab pane get "$LATE_PARKED_PANE" >/dev/null 2>&1 || fail 'mid-session parked launch-shell pane was closed'
+[ -e "$HOME_DIR/state/$LATE_PARKED_ID.herdr-presentation" ] || fail 'mid-session parked journal was retired'
+lab pane get "$MOVED_PANE" >/dev/null 2>&1 || fail 'moved-record projection pane was closed by the housekeeping run'
+[ "$(focus_snapshot)" = "$BEFORE_FOCUS" ] || fail 'housekeeping run changed focus'
 STATUS=$(lab status --json) || fail 'could not read final named-lab version evidence'
-pass 'real named lab cleanup is idempotent and leaves the default fleet session to the teardown tripwire'
+pass 'real named lab housekeeping run retires a husk that appeared mid-session, preserves a parked launch shell, and leaves the default fleet session to the teardown tripwire'
 printf 'evidence: herdr=%s protocol=%s default-session-tripwire=armed\n' \
   "$(printf '%s' "$STATUS" | jq -r '.client.version')" \
   "$(printf '%s' "$STATUS" | jq -r '.server.protocol')"

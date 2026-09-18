@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
-# Retire stale restored-shell Herdr presentation children at locked session start.
+# Retire stale restored-shell Herdr presentation children inside the lock-owning
+# session.
 #
 # Usage: fm-herdr-session-cleanup.sh [--dry-run]
 #
-# The caller must already own this Firstmate home's session lock. This script is
-# home-local and considers only the current named Herdr session and ordinary
-# state/*.herdr-presentation journals in the effective FM_HOME. Each candidate
+# The caller must already own this Firstmate home's session lock. It runs at
+# locked session start (bin/fm-session-start.sh) and again on the watcher's
+# bounded slow-check cadence (bin/fm-watch.sh, FM_CHECK_INTERVAL) for the rest
+# of that session, so a space that becomes provably unused mid-session
+# disappears without a new session; it has no daemon or per-poll sweep of its
+# own, and the watcher only carries its warnings to the triage log. This
+# script is home-local and considers only the current named Herdr session and
+# ordinary state/*.herdr-presentation journals in the effective FM_HOME. Each
+# candidate
 # is additionally serialized by the existing state/.spawn-<task>.lock and the
 # shared named-session Herdr presentation lock, in that order, plus the task's
 # state/.meta-<task>.lock when its metadata still names the pane.
@@ -33,8 +40,8 @@
 # focus-preserving close helper is called.
 # The script never closes a workspace and never edits task metadata. It removes
 # only the matching journal, and only after the exact pane is confirmed gone.
-# Every error warns and returns success so session startup continues
-# conservatively.
+# Every error warns and returns success so session startup, or the watcher's
+# cycle, continues conservatively.
 #
 # --dry-run takes no lock and mutates nothing: it prints one tab-separated line
 # per workspace carrying the projection title grammar in the named session -
@@ -63,10 +70,10 @@ fm_backend_source herdr
 # launch second before it counts as restored: ps elapsed time has second
 # granularity and the launch shell is created only moments before spawn_gen is
 # minted, so the margin keeps a launch shell on the preserve side of the line.
-FM_HERDR_CLEANUP_RESTORED_MARGIN=${FM_HERDR_CLEANUP_RESTORED_MARGIN:-5}
+FM_HERDR_CLEANUP_RESTORED_MARGIN=5
 
 fm_herdr_cleanup_warn() {
-  printf 'warning: herdr session-start projection cleanup: %s\n' "$*" >&2
+  printf 'warning: herdr projection cleanup: %s\n' "$*" >&2
 }
 
 fm_herdr_cleanup_title_token() { # <workspace-title>
@@ -237,11 +244,15 @@ fm_herdr_cleanup_shell_restored() { # <shell-pid> <launch-epoch>
 # FM_HERDR_CLEANUP_REASON to why; FM_HERDR_CLEANUP_QUIET is 1 when the keep is
 # an ordinary in-flight task state (a live, parked, or exited worker, or a
 # record naming another endpoint) that the locked run does not warn about.
+# A record that names the pane is compared against the pane's current shell
+# start second from one process-info read before the settle-retry idle proof
+# runs, so a launch shell is preserved on every cadence without paying for
+# that proof; only a restored shell or a record-less projection pays for it.
 # On close, the identity globals left by fm_herdr_cleanup_unique_match,
 # fm_herdr_cleanup_snapshot_candidate, and fm_herdr_cleanup_meta_binding
 # describe the exact candidate.
 fm_herdr_cleanup_classify() { # <session> <workspace> <title> <home-real>
-  local session=$1 workspace=$2 title=$3 home_real=$4 token snapshot state shell_pid
+  local session=$1 workspace=$2 title=$3 home_real=$4 token snapshot state shell_pid proved_pid
   FM_HERDR_CLEANUP_VERDICT=keep
   FM_HERDR_CLEANUP_REASON=
   FM_HERDR_CLEANUP_QUIET=0
@@ -279,15 +290,27 @@ fm_herdr_cleanup_classify() { # <session> <workspace> <title> <home-real>
     FM_HERDR_CLEANUP_REASON="its pane agent state is $state"
     return 0
   fi
-  if ! shell_pid=$(fm_backend_herdr_pane_idle_shell_pid "$session" "$FM_HERDR_CLEANUP_PANE"); then
+  shell_pid=
+  if [ "$FM_HERDR_CLEANUP_META" = endpoint ]; then
+    if ! shell_pid=$(fm_backend_herdr_pane_shell_pid "$session" "$FM_HERDR_CLEANUP_PANE"); then
+      FM_HERDR_CLEANUP_QUIET=1
+      FM_HERDR_CLEANUP_REASON='its pane shell could not be read'
+      return 0
+    fi
+    if ! fm_herdr_cleanup_shell_restored "$shell_pid" "$FM_HERDR_CLEANUP_LAUNCH_EPOCH"; then
+      FM_HERDR_CLEANUP_QUIET=1
+      FM_HERDR_CLEANUP_REASON='its task record names this pane and its shell is not proven restored after the recorded launch (parked or exited worker)'
+      return 0
+    fi
+  fi
+  if ! proved_pid=$(fm_backend_herdr_pane_idle_shell_pid "$session" "$FM_HERDR_CLEANUP_PANE"); then
     [ "$FM_HERDR_CLEANUP_META" != endpoint ] || FM_HERDR_CLEANUP_QUIET=1
     FM_HERDR_CLEANUP_REASON='its pane is not a provably idle childless shell'
     return 0
   fi
   if [ "$FM_HERDR_CLEANUP_META" = endpoint ]; then
-    if ! fm_herdr_cleanup_shell_restored "$shell_pid" "$FM_HERDR_CLEANUP_LAUNCH_EPOCH"; then
-      FM_HERDR_CLEANUP_QUIET=1
-      FM_HERDR_CLEANUP_REASON='its task record names this pane and its shell is the launch shell (parked or exited worker)'
+    if [ "$proved_pid" != "$shell_pid" ]; then
+      FM_HERDR_CLEANUP_REASON='its pane shell changed while it was being proved'
       return 0
     fi
     FM_HERDR_CLEANUP_REASON='its task record names this pane and its shell was restored after the recorded launch'

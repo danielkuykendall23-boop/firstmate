@@ -1409,6 +1409,20 @@ EOF
   printf '%s\n' "$((now - (10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds)))"
 }
 
+# fm_backend_herdr_pane_shell_pid: print the shell pid Herdr reports for the
+# exact <pane-id> from one process-info read, with no idle or childless proof.
+# A caller that only needs to know WHICH shell sits in the pane - to compare
+# its start second against a recorded launch - reads this before paying for
+# fm_backend_herdr_pane_idle_shell_pid's settle retries.
+fm_backend_herdr_pane_shell_pid() {  # <session> <pane-id>
+  local info
+  info=$(fm_backend_herdr_cli "$1" pane process-info --pane "$2" 2>/dev/null) || return 1
+  printf '%s' "$info" | jq -er --arg pane "$2" '
+    select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
+    | .result.process_info.shell_pid | select(type == "number" and . > 1) | floor
+  ' 2>/dev/null
+}
+
 # fm_backend_herdr_pane_idle_shell_pid: print the shell pid of <pane-id> only
 # when the exact pane provably holds one lone idle recognized shell: pane
 # process-info agrees on the pane id, the shell pid is both the foreground
@@ -1422,8 +1436,8 @@ EOF
 # samples), so the proof retries strict single samples for a bounded settle
 # window and succeeds on the first fully clean one; a genuinely busy pane
 # fails every sample and still refuses.
-# This is the single owner of the idle-shell proof; the session-start
-# projection cleanup and every pane-death close path both rely on it.
+# This is the single owner of the idle-shell proof; the projection cleanup
+# and every pane-death close path both rely on it.
 fm_backend_herdr_pane_idle_shell_pid() {  # <session> <pane-id>
   local attempt=0 max_attempts=${FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS:-10}
   while :; do
