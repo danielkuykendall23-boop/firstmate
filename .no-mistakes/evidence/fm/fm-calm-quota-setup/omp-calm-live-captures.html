@@ -1,0 +1,191 @@
+<!doctype html><meta charset='utf-8'><title>omp Calm live capture</title><body style='background:#111;color:#eee;font-family:system-ui;margin:20px'><h1>omp 18.2.5 Calm extension, live captures from an isolated Herdr lab pane (120x40)</h1><section><h2>1. omp launched from the lab project, Calm off (stock presentation)</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'>
+<span style="color:#6b7280">╭───</span><span style="color:#9ca3b0"> omp v18.2.5 </span><span style="color:#6b7280">─────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">Tips</span>                                                         <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>      <span style="font-weight:bold">Welcome back!</span>       <span style="color:#6b7280">│</span> <span style="color:#6b7280">#</span><span style="color:#9ca3b0"> for prompt actions</span>                                         <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">/</span><span style="color:#9ca3b0"> for commands</span>                                               <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#f84fcc">█</span><span style="color:#ef51d0">█</span><span style="color:#e652d3">█</span><span style="color:#dc54d7">█</span><span style="color:#d356db">█</span><span style="color:#ca58de">█</span><span style="color:#c159e2">█</span><span style="color:#b85be5">█</span><span style="color:#af5de9">█</span><span style="color:#a55fed">█</span><span style="color:#9c60f0">█</span><span style="color:#9362f4">█</span>       <span style="color:#6b7280">│</span> <span style="color:#6b7280">!</span><span style="color:#9ca3b0"> to run bash</span>                                                <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#c359e1">█</span><span style="color:#ba5be5">█</span>  <span style="color:#9e60ef">█</span><span style="color:#9562f3">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">$</span><span style="color:#9ca3b0"> to run python</span>                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#aa5eeb">█</span><span style="color:#a15fef">█</span>  <span style="color:#7f73f2">█</span><span style="color:#727ef0">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">────────────────────────────────────────────────────────────</span> <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#9065f4">▒</span><span style="color:#8270f2">▒</span>  <span style="color:#5a91ee">█</span><span style="color:#4d9cec">█</span>          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">LSP Servers</span>                                                  <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>              <span style="color:#35afea">█</span><span style="color:#28bae8">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">No LSP servers</span>                                               <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#9ca3b0">GPT-6-Astra</span>        <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#1f252d">openai-codex</span>       <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">────────────────────────────────────────────────────────────</span> <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">Recent sessions</span>                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">No recent sessions</span>                                           <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">╰──────────────────────────┴──────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+❯                                                                                            
+ <span style="color:#6b7280">π</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">🏃 Prewalk</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 fm-calm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">5.9%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">(sub)</span> </pre></section><section><h2>2. after /calm: transient notice, footer status idle, config/calm = on</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'>
+<span style="color:#6b7280">╭───</span><span style="color:#9ca3b0"> omp v18.2.5 </span><span style="color:#6b7280">─────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">Tips</span>                                                         <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>      <span style="font-weight:bold">Welcome back!</span>       <span style="color:#6b7280">│</span> <span style="color:#6b7280">#</span><span style="color:#9ca3b0"> for prompt actions</span>                                         <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">/</span><span style="color:#9ca3b0"> for commands</span>                                               <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#f84fcc">█</span><span style="color:#ef51d0">█</span><span style="color:#e652d3">█</span><span style="color:#dc54d7">█</span><span style="color:#d356db">█</span><span style="color:#ca58de">█</span><span style="color:#c159e2">█</span><span style="color:#b85be5">█</span><span style="color:#af5de9">█</span><span style="color:#a55fed">█</span><span style="color:#9c60f0">█</span><span style="color:#9362f4">█</span>       <span style="color:#6b7280">│</span> <span style="color:#6b7280">!</span><span style="color:#9ca3b0"> to run bash</span>                                                <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#c359e1">█</span><span style="color:#ba5be5">█</span>  <span style="color:#9e60ef">█</span><span style="color:#9562f3">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">$</span><span style="color:#9ca3b0"> to run python</span>                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#aa5eeb">█</span><span style="color:#a15fef">█</span>  <span style="color:#7f72f2">█</span><span style="color:#727ef0">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">────────────────────────────────────────────────────────────</span> <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>          <span style="color:#9065f4">▒</span><span style="color:#8270f2">▒</span>  <span style="color:#5a91ee">█</span><span style="color:#4d9cec">█</span>          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">LSP Servers</span>                                                  <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>              <span style="color:#35afea">█</span><span style="color:#28bae8">█</span>          <span style="color:#6b7280">│</span> <span style="color:#6b7280">No LSP servers</span>                                               <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#9ca3b0">GPT-6-Astra</span>        <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>       <span style="color:#1f252d">openai-codex</span>       <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">────────────────────────────────────────────────────────────</span> <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#00b4ff;font-weight:bold">Recent sessions</span>                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span> <span style="color:#6b7280">No recent sessions</span>                                           <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">╰──────────────────────────┴──────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+ <span style="color:#6b7280">Calm on: boat while working, tool rows collapsed</span>                                            
+
+❯                                                                                            
+ <span style="color:#6b7280">π</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">🏃 Prewalk</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 fm-calm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">5.9%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">(sub)</span> 
+idle</pre></section><section><h2>3. bash tool awaiting approval (always-ask): boat above editor, state line and footer read waiting for you</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'><span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">╰──────────────────────────┴──────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+ <span style="color:#6b7280">Calm on: boat while working, tool rows collapsed</span>                                            
+
+<span style="background:#0f1216">                                                                                             </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,  </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">reply with only the word finished.</span><span style="background:#0f1216">                                                          </span>
+<span style="background:#0f1216">                                                                                             </span>
+
+<span style="color:#00b4ff;background:#0f1216">╭───────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#00b4ff;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">$ </span><span style="color:#00ff88;background:#0f1216">sleep 25</span><span style="color:#00b4ff;background:#0f1216">;</span><span style="background:#0f1216"> </span><span style="color:#00ff88;background:#0f1216">echo lab-done</span><span style="background:#0f1216">                                                                 </span><span style="color:#00b4ff;background:#0f1216">│</span>
+<span style="color:#00b4ff;background:#0f1216">╰───────────────────────────────────────────────────────────────────────────────────────────╯</span>
+
+ <span style="color:#9ca3b0"> ⎋</span> <span style="color:#6b7280">Running requested command</span>                                                                
+
+      <span style="color:#e5e510">◿│◣</span>
+<span style="color:#2472c8">▁▁▁▁▁</span><span style="color:#e5e510">╲▁▁▁╱</span><span style="color:#2472c8">▁▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄</span>
+<span style="opacity:0.55">waiting for you</span>
+<span style="color:#2a3038">╭─</span><span style="color:#00b4ff;font-weight:bold"> Allow tool: bash </span><span style="color:#2a3038">────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#2a3038">│</span>                                                                                           <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span> <span style="color:#00b4ff">Command: sleep 25; echo lab-done</span>                                                          <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span>                                                                                           <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span> <span style="background:#0082b3"> </span><span style="color:#00b4ff;background:#0082b3">❯ Approve</span><span style="background:#0082b3">                                                                               </span> <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span>    Deny                                                                                   <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span>                                                                                           <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span> <span style="color:#6b7280">up/down navigate  enter select  esc cancel</span>                                                <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">│</span>                                                                                           <span style="color:#2a3038">│</span>
+<span style="color:#2a3038">╰───────────────────────────────────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#00b4ff">⠦ 5s</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">🏃 Prewalk</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 …calm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">6.3%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">S0.17</span> 
+waiting for you</pre></section><section><h2>4. tool approved and running (sleep 25): boat, state line and footer read working; stock spinner row stays visible</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'><span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">╰──────────────────────────┴──────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+ <span style="color:#6b7280">Calm on: boat while working, tool rows collapsed</span>                                            
+
+<span style="background:#0f1216">                                                                                             </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,  </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">reply with only the word finished.</span><span style="background:#0f1216">                                                          </span>
+<span style="background:#0f1216">                                                                                             </span>
+
+<span style="color:#00b4ff;background:#0f1216">╭───────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#00b4ff;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">$ </span><span style="color:#00ff88;background:#0f1216">sleep 25</span><span style="color:#00b4ff;background:#0f1216">;</span><span style="background:#0f1216"> </span><span style="color:#00ff88;background:#0f1216">echo lab-done</span><span style="background:#0f1216">                                                                 </span><span style="color:#00b4ff;background:#0f1216">│</span>
+<span style="color:#00b4ff;background:#0f1216">╰───────────────────────────────────────────────────────────────────────────────────────────╯</span>
+
+ <span style="color:#9ca3b0"> ⎋</span> <span style="color:#6b7280">Running requested command</span>                                                                
+
+                                               <span style="color:#e5e510">◿│◣</span>
+<span style="color:#2472c8">▁▁▁▁▁▂▂▃▃▄▄▄▄▄▃▃▂▂▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁</span><span style="color:#e5e510">╲▁▁▁╱</span><span style="color:#2472c8">▁▁▁▁▁▂▂▂▃▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▄▄▃▃▃</span>
+<span style="opacity:0.55">working</span>
+❯                                                                                            
+ <span style="color:#00b4ff">⠴ 41s</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">🏃 Prewalk</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 …alm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">6.3%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">S0.17</span> 
+working</pre></section><section><h2>5. run settled: boat removed, footer reads idle, reply finished</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'><span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">│</span>                          <span style="color:#6b7280">│</span>                                                              <span style="color:#6b7280">│</span>
+<span style="color:#6b7280">╰──────────────────────────┴──────────────────────────────────────────────────────────────╯</span>
+ <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+ <span style="color:#6b7280">Calm on: boat while working, tool rows collapsed</span>                                            
+
+<span style="background:#0f1216">                                                                                             </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,  </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">reply with only the word finished.</span><span style="background:#0f1216">                                                          </span>
+<span style="background:#0f1216">                                                                                             </span>
+
+<span style="color:#6b7280;background:#0f1216">╭───────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">$ </span><span style="color:#00ff88;background:#0f1216">sleep 25</span><span style="color:#00b4ff;background:#0f1216">;</span><span style="background:#0f1216"> </span><span style="color:#00ff88;background:#0f1216">echo lab-done</span><span style="background:#0f1216">                                                                 </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">├───</span><span style="background:#0f1216"> Output </span><span style="color:#6b7280;background:#0f1216">────────────────────────────────────────────────────────────────────────────────┤</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#9ca3b0;background:#0f1216">lab-done</span><span style="background:#0f1216">                                                                                  </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">⟦Wall: 25.02s | Timeout: 300s⟧</span><span style="background:#0f1216">                                                            </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">╰───────────────────────────────────────────────────────────────────────────────────────────╯</span>
+
+ <span style="color:#6b7280">prewalk: Prewalk: target openai-codex/gpt-6-astra already matches the active model and      </span>
+ <span style="color:#6b7280">thinking level; nothing to switch.</span>                                                          
+
+ finished                                                                                    
+
+❯                                                                                            
+ <span style="color:#6b7280">π</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 fm-calm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">6.4%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">S0.19</span> 
+idle</pre></section><section><h2>6. after /calm again: Calm off notice, footer status cleared, config/calm = off</h2><pre style='background:#1e1e1e;color:#d4d4d4;padding:12px;font:13px/1.25 Menlo,Monaco,monospace;white-space:pre;overflow-x:auto'> <span style="color:#d4c090;font-style:italic">Tip: </span><span style="color:#9ca3b0;font-style:italic">Try task isolation to create CoW worktrees</span>
+
+
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:#ffb347;font-weight:bold">Update Available</span>                                                                            
+ <span style="color:#9ca3b0">New version 18.2.7 is available. Run: </span><span style="color:#00b4ff">omp update</span>                                            
+<span style="color:#ffb347">─────────────────────────────────────────────────────────────────────────────────────────────</span>
+
+ <span style="color:#6b7280">Calm on: boat while working, tool rows collapsed</span>                                            
+
+<span style="background:#0f1216">                                                                                             </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,  </span>
+<span style="background:#0f1216"> </span><span style="color:#e5e5e7;background:#0f1216">reply with only the word finished.</span><span style="background:#0f1216">                                                          </span>
+<span style="background:#0f1216">                                                                                             </span>
+
+<span style="color:#6b7280;background:#0f1216">╭───────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">$ </span><span style="color:#00ff88;background:#0f1216">sleep 25</span><span style="color:#00b4ff;background:#0f1216">;</span><span style="background:#0f1216"> </span><span style="color:#00ff88;background:#0f1216">echo lab-done</span><span style="background:#0f1216">                                                                 </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">├───</span><span style="background:#0f1216"> Output </span><span style="color:#6b7280;background:#0f1216">────────────────────────────────────────────────────────────────────────────────┤</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#9ca3b0;background:#0f1216">lab-done</span><span style="background:#0f1216">                                                                                  </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">│</span><span style="background:#0f1216"> </span><span style="color:#6b7280;background:#0f1216">⟦Wall: 25.02s | Timeout: 300s⟧</span><span style="background:#0f1216">                                                            </span><span style="color:#6b7280;background:#0f1216">│</span>
+<span style="color:#6b7280;background:#0f1216">╰───────────────────────────────────────────────────────────────────────────────────────────╯</span>
+
+ <span style="color:#6b7280">prewalk: Prewalk: target openai-codex/gpt-6-astra already matches the active model and      </span>
+ <span style="color:#6b7280">thinking level; nothing to switch.</span>                                                          
+
+ finished                                                                                    
+
+ <span style="color:#6b7280">Calm off: stock presentation restored</span>                                                       
+
+❯                                                                                            
+ <span style="color:#6b7280">π</span> <span style="color:#2a3038">·</span> <span style="color:#00b4ff">◑ GPT-6-Astra</span> <span style="color:#2a3038">·</span> <span style="color:#e8ecf4">🗑 fm-calm-omp-live.Qe6S7Z/project</span> <span style="color:#2a3038">·</span> ◫ <span style="color:#9ca3b0">6.4%/272K</span> <span style="color:#9ca3b0">⟲</span> <span style="color:#2a3038">·</span> <span style="color:#d4c090">S0.19</span> </pre></section></body>

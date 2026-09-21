@@ -1,0 +1,39 @@
+│                          │                                                              │
+│                          │                                                              │
+╰──────────────────────────┴──────────────────────────────────────────────────────────────╯
+ Tip: Try task isolation to create CoW worktrees
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.2.7 is available. Run: omp update
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+ Calm on: boat while working, tool rows collapsed
+
+
+ Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,
+ reply with only the word finished.
+
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 25; echo lab-done                                                                 │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+  ⎋ Running requested command
+
+      ◿│◣
+▁▁▁▁▁╲▁▁▁╱▁▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄
+waiting for you
+╭─ Allow tool: bash ────────────────────────────────────────────────────────────────────────╮
+│                                                                                           │
+│ Command: sleep 25; echo lab-done                                                          │
+│                                                                                           │
+│  ❯ Approve                                                                                │
+│    Deny                                                                                   │
+│                                                                                           │
+│ up/down navigate  enter select  esc cancel                                                │
+│                                                                                           │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+ ⠴ 5s · ◑ GPT-6-Astra · 🏃 Prewalk · 🗑 …calm-omp-live.Qe6S7Z/project · ◫ 6.3%/272K ⟲ · S0.17
+waiting for you

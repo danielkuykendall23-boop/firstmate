@@ -1,0 +1,31 @@
+ Tip: Try task isolation to create CoW worktrees
+
+
+─────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.2.7 is available. Run: omp update
+─────────────────────────────────────────────────────────────────────────────────────────────
+
+ Calm on: boat while working, tool rows collapsed
+
+
+ Use the bash tool to run exactly this command: sleep 25; echo lab-done. After it finishes,
+ reply with only the word finished.
+
+
+╭───────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ sleep 25; echo lab-done                                                                 │
+├─── Output ────────────────────────────────────────────────────────────────────────────────┤
+│ lab-done                                                                                  │
+│ ⟦Wall: 25.02s | Timeout: 300s⟧                                                            │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+ prewalk: Prewalk: target openai-codex/gpt-6-astra already matches the active model and
+ thinking level; nothing to switch.
+
+ finished
+
+ Calm off: stock presentation restored
+
+❯
+ π · ◑ GPT-6-Astra · 🗑 fm-calm-omp-live.Qe6S7Z/project · ◫ 6.4%/272K ⟲ · S0.19
