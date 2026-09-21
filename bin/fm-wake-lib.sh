@@ -265,7 +265,7 @@ fm_pi_extension_owns_supervision() {
 }
 
 # fm_omp_extension_owns_supervision <state> <root>
-# The omp (Oh My Pi) primary's proof, keyed on its own two tracked extensions
+# The omp (Oh My Pi) primary's proof, keyed on its own two tracked primary extensions
 # under .omp/extensions/ and their own state markers. It is a separate proof on
 # purpose: omp must never inherit the Pi tolerance by accident, and a Pi home
 # never satisfies the omp markers. Both proofs bind to the pid in state/.lock,

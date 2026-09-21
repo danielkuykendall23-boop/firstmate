@@ -9,8 +9,8 @@
 // captain-facing contract and docs/calm-mode-feasibility.md the version-scoped evidence.
 //
 // This file is the only place the engine interface `$` is touched: the geometry lives
-// in ../lib/fm-calm-working-ship-sprite.ts (shared with the Pi extension), the Raster
-// packing in ../lib/fm-calm-ship-raster.ts, and every visibility decision in
+// in ../lib/fm-calm-working-ship-sprite.ts (shared with the Pi and omp extensions), the
+// Raster packing in ../lib/fm-calm-ship-raster.ts, and every visibility decision in
 // ../lib/fm-calm-presentation.ts, so the policy is testable under Node and the engine
 // glue under `claude plugin test`. Nothing here rewrites a message: `ui.render` changes
 // drawings and leaves the stored transcript, model context, and session storage alone.

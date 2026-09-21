@@ -41,8 +41,9 @@ export function calmCodeRootFromPluginRoot(pluginRoot: string): string {
 }
 
 /**
- * The per-home `config/calm` path, resolved exactly as the Pi extension resolves it:
- * `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root, with
+ * The per-home `config/calm` path, resolved exactly as
+ * `.pi/extensions/lib/fm-calm-preference.ts` resolves it for the Pi and omp
+ * extensions: `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root, with
  * `FM_CONFIG_OVERRIDE` naming the config directory outright when present.
  */
 export function calmPreferencePath(env: CalmHomeEnvironment, pluginRoot: string): string {
