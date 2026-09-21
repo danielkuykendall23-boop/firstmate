@@ -1,0 +1,34 @@
+│              ██          │ No LSP servers                                                        │
+│                          │                                                                       │
+│Scripted Calm omp fixture │                                                                       │
+│         calm-e2e         │                                                                       │
+│                          │ ───────────────────────────────────────────────────────────────────── │
+│                          │ Recent sessions                                                       │
+│                          │ No recent sessions                                                    │
+│                          │                                                                       │
+│                          │                                                                       │
+│                          │                                                                       │
+│                          │                                                                       │
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯
+ Tip: Spaghetti code? Try complaining with /omfg
+
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.2.7 is available. Run: omp update
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ Calm on: boat while working, tool rows collapsed
+
+
+ Run the scripted command.
+
+
+  ⎋ Working…
+
+ ◿│◣
+╲▁▁▁╱▁▁▁▁▁▁▂▂▃▃▄▄▄▄▄▄▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▃▄▄▄▄▄▄▃▃▃▂▂▂▁▁▁▁▁▁▂▂▃▃▃▄▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄▃▃▃▂▂▁▁▁▁▁▂▂▂▃▃▃▄▄▄▄▄
+working
+ ⠙ 0s > ⬢ Scripted Calm omp fixture > 🗑 …-calm-omp-lab/project2 > ⑂ fm/fm-calm-fork-delivery *2 ?1 ▶─9%─┃400K─
+╰─
+working

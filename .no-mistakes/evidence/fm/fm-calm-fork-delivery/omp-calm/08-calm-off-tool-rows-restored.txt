@@ -1,0 +1,34 @@
+│ CALM_OMP_E2E_OUTPUT line 16                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 17                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 18                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 19                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 20                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 21                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 22                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 23                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 24                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 25                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 26                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 27                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 28                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 29                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 30                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 31                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 32                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 33                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 34                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 35                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 36                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 37                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 38                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 39                                                                                │
+│ CALM_OMP_E2E_OUTPUT line 40                                                                                │
+│ ⟦Wall: 10.01s | Timeout: 300s⟧                                                                             │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ CALM_OMP_E2E_DONE: the scripted command finished.
+
+ Calm off: stock presentation restored
+
+ π > ⬢ Scripted Calm omp fixture > 🗑 fm-calm-omp-lab/project2 > ⑂ fm/fm-calm-fork-delivery *2 ?1 ▶─9%──╎┃400K─
+╰─
