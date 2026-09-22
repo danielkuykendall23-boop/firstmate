@@ -1,0 +1,43 @@
+{
+  "case": "review-no-key",
+  "kind": "review",
+  "model": {
+    "id": "proof",
+    "contextWindow": 272000
+  },
+  "proof": {
+    "errors": [],
+    "hooks": 0,
+    "tools": [],
+    "keyExported": false,
+    "parentToolsIncludeJevReview": false,
+    "baselineCorrectness": null,
+    "baselinePriorities": [],
+    "rescoreCorrectness": null,
+    "rescoreComparisonCorrectness": null
+  },
+  "endpoint": {
+    "jevHits": 0,
+    "markerLeaked": false,
+    "modelRequests": 10,
+    "statesSentTask": [],
+    "statesResubmitPreviousEvaluation": []
+  },
+  "reviewEvidence": {
+    "childTools": [
+      "read",
+      "grep",
+      "glob",
+      "bash",
+      "web_search",
+      "yield",
+      "task",
+      "hub"
+    ],
+    "childEvaluationCorrectness": null,
+    "childError": null,
+    "missingTool": null,
+    "parentResult": "Parent received reviewer result: <task-result id=\"AssistantWren\" agent=\"reviewer\" status=\"completed\" duration=\"78ms\">\n<meta lines=\"9\" size=\"277B\" />\n<output>\n{\n  \"jev_evaluation\": {\n    \"unavailable\": true,\n    \"reason\": \"jev_review tool absent\"\n  },\n  \"overall_correctness\": \"correct\",\n  \"explanation\": \"Synthetic transport proof: Jev unavailable; ordinary agent-led review continued without claiming Jev ran.\",\n  \"confidence\": 0.91\n}\n</output>\n</task-result>"
+  },
+  "durationMs": 2040
+}

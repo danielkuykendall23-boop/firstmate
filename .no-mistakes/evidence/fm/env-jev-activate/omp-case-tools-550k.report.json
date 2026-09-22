@@ -1,0 +1,1991 @@
+{
+  "case": "tools-550k",
+  "kind": "tools",
+  "sessionChars": 2204760,
+  "approxTokens": 551190,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "preserveData"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction: kept 0, truncated 0, dropped 106 of 107 calls (99% reduction of the whole context, ~8454 of 115699 budget tokens)"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] Jev compaction: kept 0, truncated 0, dropped 106 of 107 calls (99% reduction of the whole context, ~8454 of 115699 budget tokens)"
+  ],
+  "endpoint": {
+    "hits": 1,
+    "markerLeaked": false,
+    "questions": 212,
+    "states": [
+      {
+        "context": "A coding assistant conversation is being compacted to free context. `history` is the whole conversation so far, oldest first; tool outputs are replaced by a short `result` note and long texts may be abridged. Each question asks whether one tool call, or the full output of that call, still needs to stay in the history verbatim. Whatever is not kept is deleted permanently, but the assistant can always re-run a tool or re-read a file.",
+        "goal": "",
+        "history": [
+          {
+            "i": 0,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t1",
+                "tool": "bash",
+                "input": "{\"command\":\"keep important tool output\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 2,
+            "role": "assistant",
+            "text": "Listing 0 noted."
+          },
+          {
+            "i": 3,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t2",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir1\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 5,
+            "role": "assistant",
+            "text": "Listing 1 noted."
+          },
+          {
+            "i": 6,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t3",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir2\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 8,
+            "role": "assistant",
+            "text": "Listing 2 noted."
+          },
+          {
+            "i": 9,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t4",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir3\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 11,
+            "role": "assistant",
+            "text": "Listing 3 noted."
+          },
+          {
+            "i": 12,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t5",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir4\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 14,
+            "role": "assistant",
+            "text": "Listing 4 noted."
+          },
+          {
+            "i": 15,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t6",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir5\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 17,
+            "role": "assistant",
+            "text": "Listing 5 noted."
+          },
+          {
+            "i": 18,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t7",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir6\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 20,
+            "role": "assistant",
+            "text": "Listing 6 noted."
+          },
+          {
+            "i": 21,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t8",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir7\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 23,
+            "role": "assistant",
+            "text": "Listing 7 noted."
+          },
+          {
+            "i": 24,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t9",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir8\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 26,
+            "role": "assistant",
+            "text": "Listing 8 noted."
+          },
+          {
+            "i": 27,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t10",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir9\"}",
+                "result": "ok, 20034 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 29,
+            "role": "assistant",
+            "text": "Listing 9 noted."
+          },
+          {
+            "i": 30,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t11",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir10\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 32,
+            "role": "assistant",
+            "text": "Listing 10 noted."
+          },
+          {
+            "i": 33,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t12",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir11\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 35,
+            "role": "assistant",
+            "text": "Listing 11 noted."
+          },
+          {
+            "i": 36,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t13",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir12\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 38,
+            "role": "assistant",
+            "text": "Listing 12 noted."
+          },
+          {
+            "i": 39,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t14",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir13\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 41,
+            "role": "assistant",
+            "text": "Listing 13 noted."
+          },
+          {
+            "i": 42,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t15",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir14\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 44,
+            "role": "assistant",
+            "text": "Listing 14 noted."
+          },
+          {
+            "i": 45,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t16",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir15\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 47,
+            "role": "assistant",
+            "text": "Listing 15 noted."
+          },
+          {
+            "i": 48,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t17",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir16\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 50,
+            "role": "assistant",
+            "text": "Listing 16 noted."
+          },
+          {
+            "i": 51,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t18",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir17\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 53,
+            "role": "assistant",
+            "text": "Listing 17 noted."
+          },
+          {
+            "i": 54,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t19",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir18\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 56,
+            "role": "assistant",
+            "text": "Listing 18 noted."
+          },
+          {
+            "i": 57,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t20",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir19\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 59,
+            "role": "assistant",
+            "text": "Listing 19 noted."
+          },
+          {
+            "i": 60,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t21",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir20\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 62,
+            "role": "assistant",
+            "text": "Listing 20 noted."
+          },
+          {
+            "i": 63,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t22",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir21\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 65,
+            "role": "assistant",
+            "text": "Listing 21 noted."
+          },
+          {
+            "i": 66,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t23",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir22\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 68,
+            "role": "assistant",
+            "text": "Listing 22 noted."
+          },
+          {
+            "i": 69,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t24",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir23\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 71,
+            "role": "assistant",
+            "text": "Listing 23 noted."
+          },
+          {
+            "i": 72,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t25",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir24\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 74,
+            "role": "assistant",
+            "text": "Listing 24 noted."
+          },
+          {
+            "i": 75,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t26",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir25\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 77,
+            "role": "assistant",
+            "text": "Listing 25 noted."
+          },
+          {
+            "i": 78,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t27",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir26\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 80,
+            "role": "assistant",
+            "text": "Listing 26 noted."
+          },
+          {
+            "i": 81,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t28",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir27\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 83,
+            "role": "assistant",
+            "text": "Listing 27 noted."
+          },
+          {
+            "i": 84,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t29",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir28\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 86,
+            "role": "assistant",
+            "text": "Listing 28 noted."
+          },
+          {
+            "i": 87,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t30",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir29\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 89,
+            "role": "assistant",
+            "text": "Listing 29 noted."
+          },
+          {
+            "i": 90,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t31",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir30\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 92,
+            "role": "assistant",
+            "text": "Listing 30 noted."
+          },
+          {
+            "i": 93,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t32",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir31\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 95,
+            "role": "assistant",
+            "text": "Listing 31 noted."
+          },
+          {
+            "i": 96,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t33",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir32\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 98,
+            "role": "assistant",
+            "text": "Listing 32 noted."
+          },
+          {
+            "i": 99,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t34",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir33\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 101,
+            "role": "assistant",
+            "text": "Listing 33 noted."
+          },
+          {
+            "i": 102,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t35",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir34\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 104,
+            "role": "assistant",
+            "text": "Listing 34 noted."
+          },
+          {
+            "i": 105,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t36",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir35\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 107,
+            "role": "assistant",
+            "text": "Listing 35 noted."
+          },
+          {
+            "i": 108,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t37",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir36\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 110,
+            "role": "assistant",
+            "text": "Listing 36 noted."
+          },
+          {
+            "i": 111,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t38",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir37\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 113,
+            "role": "assistant",
+            "text": "Listing 37 noted."
+          },
+          {
+            "i": 114,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t39",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir38\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 116,
+            "role": "assistant",
+            "text": "Listing 38 noted."
+          },
+          {
+            "i": 117,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t40",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir39\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 119,
+            "role": "assistant",
+            "text": "Listing 39 noted."
+          },
+          {
+            "i": 120,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t41",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir40\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 122,
+            "role": "assistant",
+            "text": "Listing 40 noted."
+          },
+          {
+            "i": 123,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t42",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir41\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 125,
+            "role": "assistant",
+            "text": "Listing 41 noted."
+          },
+          {
+            "i": 126,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t43",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir42\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 128,
+            "role": "assistant",
+            "text": "Listing 42 noted."
+          },
+          {
+            "i": 129,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t44",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir43\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 131,
+            "role": "assistant",
+            "text": "Listing 43 noted."
+          },
+          {
+            "i": 132,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t45",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir44\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 134,
+            "role": "assistant",
+            "text": "Listing 44 noted."
+          },
+          {
+            "i": 135,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t46",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir45\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 137,
+            "role": "assistant",
+            "text": "Listing 45 noted."
+          },
+          {
+            "i": 138,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t47",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir46\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 140,
+            "role": "assistant",
+            "text": "Listing 46 noted."
+          },
+          {
+            "i": 141,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t48",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir47\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 143,
+            "role": "assistant",
+            "text": "Listing 47 noted."
+          },
+          {
+            "i": 144,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t49",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir48\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 146,
+            "role": "assistant",
+            "text": "Listing 48 noted."
+          },
+          {
+            "i": 147,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t50",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir49\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 149,
+            "role": "assistant",
+            "text": "Listing 49 noted."
+          },
+          {
+            "i": 150,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t51",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir50\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 152,
+            "role": "assistant",
+            "text": "Listing 50 noted."
+          },
+          {
+            "i": 153,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t52",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir51\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 155,
+            "role": "assistant",
+            "text": "Listing 51 noted."
+          },
+          {
+            "i": 156,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t53",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir52\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 158,
+            "role": "assistant",
+            "text": "Listing 52 noted."
+          },
+          {
+            "i": 159,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t54",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir53\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 161,
+            "role": "assistant",
+            "text": "Listing 53 noted."
+          },
+          {
+            "i": 162,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t55",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir54\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 164,
+            "role": "assistant",
+            "text": "Listing 54 noted."
+          },
+          {
+            "i": 165,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t56",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir55\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 167,
+            "role": "assistant",
+            "text": "Listing 55 noted."
+          },
+          {
+            "i": 168,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t57",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir56\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 170,
+            "role": "assistant",
+            "text": "Listing 56 noted."
+          },
+          {
+            "i": 171,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t58",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir57\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 173,
+            "role": "assistant",
+            "text": "Listing 57 noted."
+          },
+          {
+            "i": 174,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t59",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir58\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 176,
+            "role": "assistant",
+            "text": "Listing 58 noted."
+          },
+          {
+            "i": 177,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t60",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir59\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 179,
+            "role": "assistant",
+            "text": "Listing 59 noted."
+          },
+          {
+            "i": 180,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t61",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir60\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 182,
+            "role": "assistant",
+            "text": "Listing 60 noted."
+          },
+          {
+            "i": 183,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t62",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir61\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 185,
+            "role": "assistant",
+            "text": "Listing 61 noted."
+          },
+          {
+            "i": 186,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t63",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir62\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 188,
+            "role": "assistant",
+            "text": "Listing 62 noted."
+          },
+          {
+            "i": 189,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t64",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir63\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 191,
+            "role": "assistant",
+            "text": "Listing 63 noted."
+          },
+          {
+            "i": 192,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t65",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir64\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 194,
+            "role": "assistant",
+            "text": "Listing 64 noted."
+          },
+          {
+            "i": 195,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t66",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir65\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 197,
+            "role": "assistant",
+            "text": "Listing 65 noted."
+          },
+          {
+            "i": 198,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t67",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir66\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 200,
+            "role": "assistant",
+            "text": "Listing 66 noted."
+          },
+          {
+            "i": 201,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t68",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir67\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 203,
+            "role": "assistant",
+            "text": "Listing 67 noted."
+          },
+          {
+            "i": 204,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t69",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir68\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 206,
+            "role": "assistant",
+            "text": "Listing 68 noted."
+          },
+          {
+            "i": 207,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t70",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir69\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 209,
+            "role": "assistant",
+            "text": "Listing 69 noted."
+          },
+          {
+            "i": 210,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t71",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir70\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 212,
+            "role": "assistant",
+            "text": "Listing 70 noted."
+          },
+          {
+            "i": 213,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t72",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir71\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 215,
+            "role": "assistant",
+            "text": "Listing 71 noted."
+          },
+          {
+            "i": 216,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t73",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir72\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 218,
+            "role": "assistant",
+            "text": "Listing 72 noted."
+          },
+          {
+            "i": 219,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t74",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir73\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 221,
+            "role": "assistant",
+            "text": "Listing 73 noted."
+          },
+          {
+            "i": 222,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t75",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir74\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 224,
+            "role": "assistant",
+            "text": "Listing 74 noted."
+          },
+          {
+            "i": 225,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t76",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir75\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 227,
+            "role": "assistant",
+            "text": "Listing 75 noted."
+          },
+          {
+            "i": 228,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t77",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir76\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 230,
+            "role": "assistant",
+            "text": "Listing 76 noted."
+          },
+          {
+            "i": 231,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t78",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir77\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 233,
+            "role": "assistant",
+            "text": "Listing 77 noted."
+          },
+          {
+            "i": 234,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t79",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir78\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 236,
+            "role": "assistant",
+            "text": "Listing 78 noted."
+          },
+          {
+            "i": 237,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t80",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir79\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 239,
+            "role": "assistant",
+            "text": "Listing 79 noted."
+          },
+          {
+            "i": 240,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t81",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir80\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 242,
+            "role": "assistant",
+            "text": "Listing 80 noted."
+          },
+          {
+            "i": 243,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t82",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir81\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 245,
+            "role": "assistant",
+            "text": "Listing 81 noted."
+          },
+          {
+            "i": 246,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t83",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir82\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 248,
+            "role": "assistant",
+            "text": "Listing 82 noted."
+          },
+          {
+            "i": 249,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t84",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir83\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 251,
+            "role": "assistant",
+            "text": "Listing 83 noted."
+          },
+          {
+            "i": 252,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t85",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir84\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 254,
+            "role": "assistant",
+            "text": "Listing 84 noted."
+          },
+          {
+            "i": 255,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t86",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir85\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 257,
+            "role": "assistant",
+            "text": "Listing 85 noted."
+          },
+          {
+            "i": 258,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t87",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir86\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 260,
+            "role": "assistant",
+            "text": "Listing 86 noted."
+          },
+          {
+            "i": 261,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t88",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir87\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 263,
+            "role": "assistant",
+            "text": "Listing 87 noted."
+          },
+          {
+            "i": 264,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t89",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir88\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 266,
+            "role": "assistant",
+            "text": "Listing 88 noted."
+          },
+          {
+            "i": 267,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t90",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir89\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 269,
+            "role": "assistant",
+            "text": "Listing 89 noted."
+          },
+          {
+            "i": 270,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t91",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir90\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 272,
+            "role": "assistant",
+            "text": "Listing 90 noted."
+          },
+          {
+            "i": 273,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t92",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir91\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 275,
+            "role": "assistant",
+            "text": "Listing 91 noted."
+          },
+          {
+            "i": 276,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t93",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir92\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 278,
+            "role": "assistant",
+            "text": "Listing 92 noted."
+          },
+          {
+            "i": 279,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t94",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir93\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 281,
+            "role": "assistant",
+            "text": "Listing 93 noted."
+          },
+          {
+            "i": 282,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t95",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir94\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 284,
+            "role": "assistant",
+            "text": "Listing 94 noted."
+          },
+          {
+            "i": 285,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t96",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir95\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 287,
+            "role": "assistant",
+            "text": "Listing 95 noted."
+          },
+          {
+            "i": 288,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t97",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir96\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 290,
+            "role": "assistant",
+            "text": "Listing 96 noted."
+          },
+          {
+            "i": 291,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t98",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir97\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 293,
+            "role": "assistant",
+            "text": "Listing 97 noted."
+          },
+          {
+            "i": 294,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t99",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir98\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 296,
+            "role": "assistant",
+            "text": "Listing 98 noted."
+          },
+          {
+            "i": 297,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t100",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir99\"}",
+                "result": "ok, 20048 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 299,
+            "role": "assistant",
+            "text": "Listing 99 noted."
+          },
+          {
+            "i": 300,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t101",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir100\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 302,
+            "role": "assistant",
+            "text": "Listing 100 noted."
+          },
+          {
+            "i": 303,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t102",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir101\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 305,
+            "role": "assistant",
+            "text": "Listing 101 noted."
+          },
+          {
+            "i": 306,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t103",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir102\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 308,
+            "role": "assistant",
+            "text": "Listing 102 noted."
+          },
+          {
+            "i": 309,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t104",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir103\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 311,
+            "role": "assistant",
+            "text": "Listing 103 noted."
+          },
+          {
+            "i": 312,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t105",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir104\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 314,
+            "role": "assistant",
+            "text": "Listing 104 noted."
+          },
+          {
+            "i": 315,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t106",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir105\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 317,
+            "role": "assistant",
+            "text": "Listing 105 noted."
+          },
+          {
+            "i": 318,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t107",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir106\"}",
+                "result": "ok, 20010 chars (omitted)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "modelRequests": []
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-tools-550k.jsonl",
+      "fromExtension": true,
+      "method": null,
+      "summaryChars": 23325,
+      "summaryHasKept": true,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": true,
+      "droppedToolAbsent": true,
+      "jev": {
+        "kept": 0,
+        "dropped": 106,
+        "candidateCalls": 107,
+        "reductionRatio": 0.9897800194192192,
+        "summaryTokens": 8454,
+        "budget": {
+          "contextWindow": 272000,
+          "trigger": 231200,
+          "progressCeiling": 184960,
+          "reserve": 40800,
+          "recentTokens": 23318,
+          "systemPromptTokens": 5143,
+          "budgetTokens": 115699
+        }
+      }
+    }
+  ],
+  "durationMs": 2427
+}

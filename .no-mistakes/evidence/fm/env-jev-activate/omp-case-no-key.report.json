@@ -1,0 +1,72 @@
+{
+  "case": "no-key",
+  "kind": "tools",
+  "sessionChars": 300896,
+  "approxTokens": 75224,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "shortSummary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "details"
+    ]
+  },
+  "jevStatus": [],
+  "jevStderr": [],
+  "endpoint": {
+    "hits": 0,
+    "markerLeaked": false,
+    "questions": 0,
+    "states": [],
+    "modelRequests": []
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-no-key.jsonl",
+      "fromExtension": false,
+      "method": "snapcompact",
+      "summaryChars": 1033,
+      "summaryHasKept": false,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": false,
+      "droppedToolAbsent": true,
+      "jev": null
+    }
+  ],
+  "durationMs": 2303,
+  "proof": {
+    "errors": [],
+    "tools": [],
+    "hooks": 0,
+    "parentTools": [
+      "read",
+      "bash",
+      "edit",
+      "ast_edit",
+      "debug",
+      "eval",
+      "glob",
+      "grep",
+      "lsp",
+      "task",
+      "hub",
+      "todo",
+      "web_search",
+      "write",
+      "goal",
+      "init_experiment",
+      "run_experiment",
+      "log_experiment",
+      "update_notes"
+    ],
+    "keyExported": false
+  }
+}

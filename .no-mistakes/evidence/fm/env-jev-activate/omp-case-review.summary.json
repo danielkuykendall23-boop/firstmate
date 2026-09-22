@@ -1,0 +1,95 @@
+{
+  "case": "review",
+  "kind": "review",
+  "model": {
+    "id": "proof",
+    "contextWindow": 272000
+  },
+  "proof": {
+    "errors": [],
+    "hooks": 1,
+    "tools": [
+      "jev_review"
+    ],
+    "keyExported": false,
+    "parentToolsIncludeJevReview": true,
+    "baselineCorrectness": {
+      "applicable": true,
+      "score": 4,
+      "confidence": 0.91,
+      "summary": "Correctness and requirement fit is meaningfully weak based on the supplied change context.",
+      "issues": [
+        {
+          "severity": "medium",
+          "description": "Requested behavior appears missing or incomplete.",
+          "suggestion": "Address the concrete requirement, edge-case, invariant, or regression risk before polishing structure."
+        }
+      ]
+    },
+    "baselinePriorities": [
+      "correctness",
+      "changeability",
+      "security",
+      "cognitiveComplexity",
+      "modularity"
+    ],
+    "rescoreCorrectness": {
+      "applicable": true,
+      "score": 9,
+      "confidence": 0.91,
+      "summary": "Correctness and requirement fit is strong based on the supplied change context."
+    },
+    "rescoreComparisonCorrectness": {
+      "metric": "correctness",
+      "previousScore": 4,
+      "currentScore": 9,
+      "delta": 5,
+      "direction": "improved"
+    }
+  },
+  "endpoint": {
+    "jevHits": 3,
+    "markerLeaked": false,
+    "modelRequests": 11,
+    "statesSentTask": [
+      "Preserve exact key gating for Firstmate Jev integration",
+      "Preserve exact key gating for Firstmate Jev integration RESCORE",
+      "Verify the new key gate is inert without a key"
+    ],
+    "statesResubmitPreviousEvaluation": [
+      false,
+      false,
+      false
+    ]
+  },
+  "reviewEvidence": {
+    "childTools": [
+      "read",
+      "grep",
+      "glob",
+      "bash",
+      "web_search",
+      "yield",
+      "jev_review",
+      "task",
+      "hub"
+    ],
+    "childEvaluationCorrectness": {
+      "applicable": true,
+      "score": 4,
+      "confidence": 0.91,
+      "summary": "Correctness and requirement fit is meaningfully weak based on the supplied change context.",
+      "issues": [
+        {
+          "severity": "medium",
+          "description": "Requested behavior appears missing or incomplete.",
+          "suggestion": "Address the concrete requirement, edge-case, invariant, or regression risk before polishing structure."
+        }
+      ]
+    },
+    "childError": null,
+    "missingTool": null,
+    "parentResult": "Parent received reviewer result: <task-result id=\"CalmWolverine\" agent=\"reviewer\" status=\"completed\" duration=\"198ms\">\n<meta lines=\"283\" size=\"10.9KB\" />\n<preview full-output=\"agent://CalmWolverine\">\n{\n  \"jev_evaluation\": {\n    \"metrics\": {\n      \"correctness\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Correctness and requirement fit is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"Requested behavior appears missing or incomplete.\",\n            \"suggestion\": \"Address the concrete requirement, edge-case, invariant, or regression risk before polishing structure.\"\n          }\n        ]\n      },\n      \"cognitiveComplexity\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Cognitive complexity is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"Control flow is harder to follow than the problem requires.\",\n            \"suggestion\": \"Simplify the hardest control or data flow while preserving a cohesive implementation.\"\n          }\n        ]\n      },\n      \"readability\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Readability and intent is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"Names do not communicate intent precisely enough.\",\n            \"suggestion\": \"Make intent explicit through clearer naming, flow, or responsibility boundaries.\"\n          }\n        ]\n      },\n      \"modularity\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Modularity and cohesion is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"Unrelated responsibilities are coupled in the same module or boundary.\",\n            \"suggestion\": \"Regroup responsibilities around cohesive domain behavior without creating gratuitous layers.\"\n          }\n        ]\n      },\n      \"coupling\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Coupling and dependency quality is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"A dependency is broader or less necessary than the behavior requires.\",\n            \"suggestion\": \"Remove or invert the dependency that most strongly leaks details or makes change unsafe.\"\n          }\n        ]\n      },\n      \"changeability\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Changeability and change amplification is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"A domain rule or decision is scattered across multiple locations.\",\n            \"suggestion\": \"Centralize the relevant knowledge or boundary so the next conceptual change has a small, predictable edit surface.\"\n          }\n        ]\n      },\n      \"abstractionQuality\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Abstraction and API design is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"A wrapper or layer adds surface without hiding meaningful complexity.\",\n            \"suggestion\": \"Deepen, remove, or reshape the abstraction that currently adds more surface than value.\"\n          }\n        ]\n      },\n      \"projectStructure\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Project and file structure is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"Code is located where future maintainers are unlikely to look for it.\",\n            \"suggestion\": \"Move the affected code toward a predictable, cohesive location without splitting it mechanically.\"\n          }\n        ]\n      },\n      \"duplication\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Duplication and reuse is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n            \"severity\": \"medium\",\n            \"description\": \"The same rule or source of truth appears in multiple places.\",\n            \"suggestion\": \"Unify duplicated knowledge only where the copies represent the same rule and should change together.\"\n          }\n        ]\n      },\n      \"maintainability\": {\n        \"applicable\": true,\n        \"score\": 4,\n        \"confidence\": 0.91,\n        \"summary\": \"Maintainability is meaningfully weak based on the supplied change context.\",\n        \"issues\": [\n          {\n</preview>\n</task-result>"
+  },
+  "durationMs": 2336
+}

@@ -1,0 +1,21 @@
+$ bin/fm-jev-desktop.sh --help
+Usage: fm-jev-desktop.sh {run|act} --access-approved --ui-approved --app App <args...>
+Approve access and UI disclosure first. run always uses --no-values; act does not support it.
+Use act without --execute for a potentially destructive step; confidence is not permission.
+[exit=0]
+
+$ env -u TYPESAFE_API_KEY FM_HOME=<empty-isolated-home> bin/fm-jev-desktop.sh run --access-approved --ui-approved --app Synthetic "read the window title"
+fm-jev-desktop: TYPESAFE_API_KEY absent; Jev-driven desktop actions paused
+[exit=1]
+
+$ (with a synthetic key in the isolated home .env, no consent flags) bin/fm-jev-desktop.sh run --app Synthetic "read the window title"
+fm-jev-desktop: recorded app access and UI disclosure consent required (--access-approved --ui-approved)
+[exit=2]
+
+$ (synthetic key, consent flags, act --no-values which Agent Desktop 0.9.2 does not support)
+fm-jev-desktop: installed act interface has no --no-values support; refusing to expose field values under that promise
+[exit=2]
+
+$ agent-desktop --version
+agent-desktop 0.9.2
+[exit=0]

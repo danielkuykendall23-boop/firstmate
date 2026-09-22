@@ -1,0 +1,26 @@
+archive dir: /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-jev-archive.iDxa1d
+commit: 3a1d55b9a041a97cc91ab9efdee4ea790cd7e20f
+archive exit=0
+tracked src/config present in archive: environment.ts
+$ npm install --no-audit --no-fund (pinned devDependencies: esbuild 0.28.2, typescript 7.0.2, @types/node 22.20.3; dependency zod 4.6.5)
+
+added 7 packages in 1s
+npm install exit=
+installed: esbuild 0.28.2 typescript 7.0.2 zod 4.6.5
+$ npm run build
+
+> jev-review@0.1.1 build
+> esbuild index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/review.js
+
+
+  dist/review.js  767.3kb
+
+⚡ Done in 13ms
+build exit=0
+$ cmp dist/review.js <tracked .omp/vendor/jev-review/dist/review.js>
+BUNDLE_BYTE_IDENTICAL=true
+sha256 rebuilt: 025949ecc87f758c3b45c616b5a13c0ce554f981df9c1988bfe4d126ebd7ec36
+sha256 tracked: 025949ecc87f758c3b45c616b5a13c0ce554f981df9c1988bfe4d126ebd7ec36
+$ npx tsc --noEmit --strict --module nodenext --moduleResolution nodenext --target es2022 --types node --allowImportingTsExtensions --skipLibCheck ../../extensions/fm-jev-compaction.ts ../../extensions/fm-jev-review.ts
+TSC_EXIT=0
+ARCHIVE_CLEANED

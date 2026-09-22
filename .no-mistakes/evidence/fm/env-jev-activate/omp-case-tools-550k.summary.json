@@ -1,0 +1,59 @@
+{
+  "case": "tools-550k",
+  "kind": "tools",
+  "approxTokens": 551190,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "preserveData"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction: kept 0, truncated 0, dropped 106 of 107 calls (99% reduction of the whole context, ~8454 of 115699 budget tokens)"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] Jev compaction: kept 0, truncated 0, dropped 106 of 107 calls (99% reduction of the whole context, ~8454 of 115699 budget tokens)"
+  ],
+  "endpoint": {
+    "hits": 1,
+    "markerLeaked": false,
+    "questions": 212
+  },
+  "compactionEntries": [
+    {
+      "file": "synthetic-tools-550k.jsonl",
+      "fromExtension": true,
+      "method": null,
+      "summaryChars": 23325,
+      "summaryHasKept": true,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": true,
+      "droppedToolAbsent": true,
+      "jev": {
+        "kept": 0,
+        "dropped": 106,
+        "candidateCalls": 107,
+        "reductionRatio": 0.9897800194192192,
+        "summaryTokens": 8454,
+        "budget": {
+          "contextWindow": 272000,
+          "trigger": 231200,
+          "progressCeiling": 184960,
+          "reserve": 40800,
+          "recentTokens": 23318,
+          "systemPromptTokens": 5143,
+          "budgetTokens": 115699
+        }
+      }
+    }
+  ],
+  "durationMs": 2427
+}
