@@ -1361,6 +1361,14 @@ families_for_changed_path() {
     .omp/vendor/jev-review/*|.omp/extensions/fm-jev-review.ts|.omp/extensions/lib/fm-jev-*|tests/fm-jev-review.node.test.ts)
       printf '%s\n' "__script__:fm-jev-compaction.test.sh"
       ;;
+    tests/fixtures/fake-systemone.mjs)
+      printf '%s\n' "__script__:fm-jev-compaction.test.sh"
+      printf '%s\n' "__script__:fm-jev-compaction-live-e2e.test.sh"
+      ;;
+    .omp/package.json|.omp/agents/reviewer.md|tests/fixtures/fm-jev-runtime.mjs|\
+    tests/fixtures/fm-jev-omp-probe.mjs|tests/fixtures/fake-reviewer-model.mjs)
+      printf '%s\n' "__script__:fm-jev-compaction-live-e2e.test.sh"
+      ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__
