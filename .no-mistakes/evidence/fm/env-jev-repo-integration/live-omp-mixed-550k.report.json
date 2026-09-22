@@ -1,0 +1,46 @@
+{
+  "case": "mixed-550k",
+  "kind": "mixed",
+  "sessionChars": 2206420,
+  "approxTokens": 551605,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "shortSummary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "details"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction skipped (even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~338986 tokens, over the 119084-token retained-context budget for a 272000-token model) - using native compaction",
+    "Jev compaction skipped (even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~338986 tokens, over the 119084-token retained-context budget for a 272000-token model) - using native compaction"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] falling back to native omp compaction: even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~338986 tokens, over the 119084-token retained-context budget for a 272000-token model",
+    "[fm-jev-compaction] falling back to native omp compaction: even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~338986 tokens, over the 119084-token retained-context budget for a 272000-token model"
+  ],
+  "endpoint": {
+    "hits": 0,
+    "markerLeaked": false,
+    "questions": 0
+  },
+  "compactionEntries": [
+    {
+      "file": "synthetic-mixed-550k.jsonl",
+      "fromExtension": false,
+      "method": "snapcompact",
+      "summaryChars": 1115,
+      "summaryHasKept": false,
+      "summaryHasMarker": false,
+      "jev": null
+    }
+  ],
+  "durationMs": 4504
+}

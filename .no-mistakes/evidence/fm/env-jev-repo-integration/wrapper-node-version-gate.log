@@ -1,0 +1,22 @@
+# Wrapper Node-version gate (tests/fm-jev-compaction.test.sh) exercised with shim node binaries on PATH
+# real node here: v24.11.1
+
+$ PATH=<shim 20.19.0>:$PATH bash tests/fm-jev-compaction.test.sh
+not ok - Node 20.19.0 cannot load tests/fm-jev-compaction.node.test.ts: unflagged TypeScript type stripping needs Node 22.18, 23.6, or 24 and later (CI provisions Node 24)
+exit=1
+
+$ PATH=<shim 22.17.1>:$PATH bash tests/fm-jev-compaction.test.sh
+not ok - Node 22.17.1 cannot load tests/fm-jev-compaction.node.test.ts: unflagged TypeScript type stripping needs Node 22.18, 23.6, or 24 and later (CI provisions Node 24)
+exit=1
+
+$ PATH=<shim 23.5.0>:$PATH bash tests/fm-jev-compaction.test.sh
+not ok - Node 23.5.0 cannot load tests/fm-jev-compaction.node.test.ts: unflagged TypeScript type stripping needs Node 22.18, 23.6, or 24 and later (CI provisions Node 24)
+exit=1
+
+$ PATH=<shim bogus>:$PATH bash tests/fm-jev-compaction.test.sh
+not ok - unrecognized Node version 'bogus'
+exit=1
+
+$ PATH=<shim 22.18.0>:$PATH bash tests/fm-jev-compaction.test.sh
+ok - fm-jev-compaction.node.test.ts passed
+exit=0

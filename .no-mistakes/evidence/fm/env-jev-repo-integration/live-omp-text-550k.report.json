@@ -1,0 +1,46 @@
+{
+  "case": "text-550k",
+  "kind": "text",
+  "sessionChars": 2201210,
+  "approxTokens": 550302,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "shortSummary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "details"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction skipped (reduction 0% of the whole context below minimum even if Jev dropped every candidate call) - using native compaction",
+    "Jev compaction skipped (reduction 0% of the whole context below minimum even if Jev dropped every candidate call) - using native compaction"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] falling back to native omp compaction: reduction 0% of the whole context below minimum even if Jev dropped every candidate call",
+    "[fm-jev-compaction] falling back to native omp compaction: reduction 0% of the whole context below minimum even if Jev dropped every candidate call"
+  ],
+  "endpoint": {
+    "hits": 0,
+    "markerLeaked": false,
+    "questions": 0
+  },
+  "compactionEntries": [
+    {
+      "file": "synthetic-text-550k.jsonl",
+      "fromExtension": false,
+      "method": "snapcompact",
+      "summaryChars": 1115,
+      "summaryHasKept": false,
+      "summaryHasMarker": false,
+      "jev": null
+    }
+  ],
+  "durationMs": 4677
+}

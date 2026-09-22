@@ -1,0 +1,7 @@
+$ bin/fm-test-run.sh --list --changed --base e5f82594d34d770a679ea60c51ccb3afc133683b   (read-only selection; exit code and Jev-related picks shown)
+exit=0
+total selected: 58
+Jev-related selections:
+tests/fm-jev-compaction.test.sh
+tests/fm-jev-review-setup.test.sh
+tests/fm-jev-compaction-live-e2e.test.sh
