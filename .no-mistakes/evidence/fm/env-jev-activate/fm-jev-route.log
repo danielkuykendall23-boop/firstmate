@@ -1,0 +1,17 @@
+✔ routes once per session, explicit todo init, and command; not routine turns (494.536375ms)
+✔ omitted op routes only after OMP confirms a successful init (404.166083ms)
+✔ workers, explicit disable, unrelated directories and print mode are inert; RPC routes (298.6215ms)
+✔ off, non-clear, malformed, empty and nonzero resolver results leave selection unchanged (616.643334ms)
+✔ explicit model and effort axes win independently at launch and after routing (644.817792ms)
+✔ unsupported profile and clamped effort cannot partially change the selection (427.576959ms)
+✔ a delayed decision cannot replace a new session or a manual choice (371.442292ms)
+✔ a model applied as the session is replaced is undone, not misread as that session's choice, and never rolls back a newer manual selection (805.639416ms)
+✔ secret protection on or unprovable declines before any resolver request (690.501542ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4819.635042
