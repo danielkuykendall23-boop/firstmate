@@ -14,6 +14,10 @@
 #   text-550k    ~550k tokens of irreducible prose: zero Jev requests, honest
 #                fallback, and omp's own native method order completes the
 #                compaction instead (a native, not extension, entry on disk).
+#   mixed-550k   ~550k tokens, each turn a droppable listing beside analysis
+#                prose that alone exceeds the retained-context budget: the
+#                tool calls would be asked about, but the floor decides first,
+#                so zero requests, honest fallback, native completion.
 #   secrets-on   agent config.yml turns Hide Secrets on: declined before any
 #                request, with omp itself as the source.
 #   shadow-A     agent on, project .omp/config.yml holds a bare `secrets:`
@@ -77,6 +81,15 @@ for (let i = 0; i < turns; i++) {
     push({ ...assistant, content: [{ type: "toolCall", id: `call-${i}`, name: "bash", arguments: { command: `ls -la dir${i}` } }], usage: usage(), stopReason: "toolUse", timestamp: Date.now() });
     push({ role: "toolResult", toolCallId: `call-${i}`, toolName: "bash", content: [{ type: "text", text: listing }], isError: false, timestamp: Date.now() });
     push({ ...assistant, content: [{ type: "text", text: `Listing ${i} noted.` }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
+  } else if (args.kind === "mixed") {
+    const line = `drwxr-xr-x  2 dev dev 4096 Jan 1 00:00 dir${i}/file-${i}.ts\n`;
+    const listing = line.repeat(Math.ceil((perTurn * 0.3) / line.length));
+    const sentence = `Analysis ${i}: the scheduler retry path re-enters the queue boundary, and each retry widens the regression window. `;
+    const prose = sentence.repeat(Math.ceil((perTurn * 0.7) / sentence.length));
+    chars += listing.length + prose.length;
+    push({ ...assistant, content: [{ type: "toolCall", id: `call-${i}`, name: "bash", arguments: { command: `ls -la dir${i}` } }], usage: usage(), stopReason: "toolUse", timestamp: Date.now() });
+    push({ role: "toolResult", toolCallId: `call-${i}`, toolName: "bash", content: [{ type: "text", text: listing }], isError: false, timestamp: Date.now() });
+    push({ ...assistant, content: [{ type: "text", text: prose }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
   } else {
     const sentence = `Analysis ${i}: the scheduler retry path re-enters the queue boundary, and each retry widens the regression window. `;
     const prose = sentence.repeat(Math.ceil(perTurn / sentence.length));
@@ -193,6 +206,17 @@ test_text_550k_falls_back_honestly() {
   pass "text-550k: irreducible prose falls back with zero requests and omp's native $(field "$report" '[.compactionEntries[] | select(.fromExtension | not)][0].method // "native"') method completes the compaction instead"
 }
 
+test_mixed_550k_declines_on_the_floor_before_any_request() {
+  local report
+  report=$(run_case mixed-550k mixed 110 2200000)
+  assert_zero_requests "$report" mixed-550k
+  assert_contains "$(field "$report" '.jevStderr | join("\n")')" "even if Jev dropped every candidate call" "the floor, not a Jev answer, decides a region whose prose alone cannot fit"
+  assert_contains "$(field "$report" '.jevStderr | join("\n")')" "retained-context budget" "the decline names the budget the prose exceeds"
+  assert_equals true "$(field "$report" '.compact.success')" "omp's own native methods must complete the compaction the hook declined"
+  assert_equals true "$(field "$report" '[.compactionEntries[] | select(.fromExtension | not)] | length >= 1')" "a native compaction entry, not an extension one, must be on disk"
+  pass "mixed-550k: 110 droppable listings beside prose over the budget make zero requests and omp's native $(field "$report" '[.compactionEntries[] | select(.fromExtension | not)][0].method // "native"') method completes the compaction instead"
+}
+
 test_secrets_on_declines_via_omp_itself() {
   local report
   report=$(run_case secrets-on tools 24 300000 "--agentConfig=secrets:\n  enabled: true\n")
@@ -230,6 +254,7 @@ test_worker_overlay_proceeds() {
 
 test_tools_550k_installs_through_real_omp
 test_text_550k_falls_back_honestly
+test_mixed_550k_declines_on_the_floor_before_any_request
 test_secrets_on_declines_via_omp_itself
 test_shadow_group_keeps_protection_on
 test_overlay_on_declines

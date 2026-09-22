@@ -77,7 +77,14 @@
 // text-only hook result following one of them would silently drop it. When
 // preparation.previousPreserveData carries such a key the handler declines
 // before Jev is contacted and native compaction, which carries both forward
-// itself, runs instead.
+// itself, runs instead. Each such native compaction writes its key into the
+// newest entry again, so that decline then holds for the rest of the
+// session: with an OpenAI-family model and a methodOrder that starts at
+// remote (the captain's configuration), the first fallback of any kind hands
+// every later compaction of that session to native compaction, and only a
+// fresh session, or a native method that leaves no such key, brings Jev
+// back. Preserving that history is deliberate; the cost is disclosed in
+// docs/jev-compaction.md.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
 // marker there (the vendored applyDecisions' own documented behavior), but
@@ -89,7 +96,14 @@
 // capacity, network error, malformed Jev response, a whole-context character
 // reduction below MIN_REDUCTION_RATIO, or a replacement above the retained-
 // context budget - this returns undefined and visibly notifies a native-
-// fallback status; it never reports Jev success when Jev did not run.
+// fallback status; it never reports Jev success when Jev did not run. Both
+// gates are first measured over the region's irreducible floor - the
+// library's own applyDecisions run as if Jev had dropped every candidate
+// call, leaving the carried summary, pinned and unanswered calls, and all
+// user/assistant prose - and a floor that already fails either gate is
+// declined before any request is built, so a region no Jev answer could make
+// installable is never uploaded. The real result can only be larger, and the
+// same gates run on it again.
 //
 // The retained-context budget is derived from omp's own arithmetic for the
 // active model rather than from the cap omp puts on an LLM-written summary:
@@ -136,10 +150,13 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  applyDecisions,
   collectToolCalls,
   compact,
+  decideCall,
   estimateTokens,
   JevClient,
+  messageChars,
   resolveOptions,
   type CompactOptions,
   type CompactResult,
@@ -558,6 +575,12 @@ export function mergePreviousSummary(previous: string | undefined, current: stri
   return `${previous}\n\n---\n\n**Later history:**\n\n${current}`;
 }
 
+/** The summary text as omp installs it: the carried previous summary, the region's text, and the <files> block. */
+export function assembleSummary(previousSummary: string, regionText: string, filesTag: string): string {
+  const text = mergePreviousSummary(previousSummary, regionText);
+  return filesTag ? `${text}\n\n${filesTag}` : text;
+}
+
 function reduction(charsBefore: number, charsAfter: number): number {
   return charsBefore > 0 ? 1 - charsAfter / charsBefore : 0;
 }
@@ -739,6 +762,38 @@ export async function compactOmpRegion(messages: readonly OmpMessage[], options:
   };
 }
 
+export type IrreducibleRegion = { text: string; charsBefore: number; charsAfter: number };
+
+/**
+ * The smallest replacement any Jev answer could leave for a region: the
+ * vendored library's own collectToolCalls, decideCall and applyDecisions run
+ * with every answer at zero, so each candidate call is dropped together with
+ * its result while pinned calls, calls without a result, orphan results and
+ * all user/assistant prose stay exactly as the library keeps them. Nothing is
+ * fitted or sent; a real answer can only add to this.
+ */
+export function irreducibleOmpRegion(messages: readonly OmpMessage[]): IrreducibleRegion {
+  const libMessages = toLibraryMessages(messages);
+  const resolved = resolveOptions({ preserveRecentMessages: 0 });
+  const calls = collectToolCalls(libMessages, resolved.preserveRecentMessages);
+  const decisions = calls.map((call) => decideCall(call, { keepCall: 0, keepResult: 0 }, resolved));
+  const kept = applyDecisions(libMessages, decisions, calls, resolved.truncateHeadChars);
+  const chars = (list: readonly LibMessage[]): number => list.reduce((sum, message) => sum + messageChars(message), 0);
+  return { text: renderLibraryMessages(kept), charsBefore: chars(libMessages), charsAfter: chars(kept) };
+}
+
+/** The floor for everything omp hands over at once: both halves of a split turn, merged as the installed summary would be. */
+export function irreducibleReplacement(historyRegion: readonly OmpMessage[], turnPrefixRegion: readonly OmpMessage[]): IrreducibleRegion {
+  const history = irreducibleOmpRegion(historyRegion);
+  if (turnPrefixRegion.length === 0) return history;
+  const prefix = irreducibleOmpRegion(turnPrefixRegion);
+  return {
+    text: mergeSplitTurnSummary(history.text, prefix.text),
+    charsBefore: history.charsBefore + prefix.charsBefore,
+    charsAfter: history.charsAfter + prefix.charsAfter,
+  };
+}
+
 // ---- Extension wiring. ----
 
 // Both channels are verified visible against a real omp 18.2.5 process
@@ -787,6 +842,19 @@ export default function (pi: ExtensionAPI): void {
     );
     if (budget.budgetTokens <= 0) return fallback(ctx, `no retained-context budget: omp's ${budget.progressCeiling}-token progress ceiling is consumed by the response reserve, the recent messages, and the system prompt`);
 
+    const previousSummary = event.preparation.previousSummary ?? "";
+    const filesTag = buildFilesTag(event.preparation.fileOps);
+
+    const floor = irreducibleReplacement(historyRegion, turnPrefixRegion);
+    const floorReduction = reduction(previousSummary.length + floor.charsBefore, previousSummary.length + floor.charsAfter);
+    if (floorReduction < MIN_REDUCTION_RATIO) {
+      return fallback(ctx, `reduction ${(floorReduction * 100).toFixed(0)}% of the whole context below minimum even if Jev dropped every candidate call`);
+    }
+    const floorTokens = estimateTokens(assembleSummary(previousSummary, floor.text, filesTag));
+    if (floorTokens > budget.budgetTokens) {
+      return fallback(ctx, `even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~${floorTokens} tokens, over the ${budget.budgetTokens}-token retained-context budget for a ${contextWindow}-token model`);
+    }
+
     const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined };
 
     let merged: JevRegionResult;
@@ -804,10 +872,7 @@ export default function (pi: ExtensionAPI): void {
       return fallback(ctx, error instanceof Error ? error.message : "Jev request failed");
     }
 
-    const previousSummary = event.preparation.previousSummary ?? "";
-    const filesTag = buildFilesTag(event.preparation.fileOps);
-    const text = mergePreviousSummary(previousSummary, merged.text);
-    const summary = filesTag ? `${text}\n\n${filesTag}` : text;
+    const summary = assembleSummary(previousSummary, merged.text, filesTag);
     const record = installedRecord(merged.audit, previousSummary, summary, budget);
 
     if (record.reductionRatio < MIN_REDUCTION_RATIO) {

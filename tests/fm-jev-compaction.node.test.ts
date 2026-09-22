@@ -24,6 +24,7 @@ import registerJevCompaction, {
   compactOmpRegion,
   envFileValue,
   hideSecretsState,
+  irreducibleOmpRegion,
   mergeAudits,
   mergePreviousSummary,
   mergeSplitTurnSummary,
@@ -42,7 +43,7 @@ import registerJevCompaction, {
   type OmpMessage,
   type SessionBeforeCompactEvent,
 } from "../.omp/extensions/fm-jev-compaction.ts";
-import { compact, SYSTEM_ONE_URL, type CompactResult, type Message as LibMessage } from "../.omp/extensions/vendor/fast-jev-compaction/src/index.ts";
+import { compact, estimateTokens, SYSTEM_ONE_URL, type CompactResult, type Message as LibMessage } from "../.omp/extensions/vendor/fast-jev-compaction/src/index.ts";
 
 const repoRoot = join(import.meta.dirname, "..");
 
@@ -192,6 +193,19 @@ function loadHandler(): Handler {
 function droppableRegion(listingLines = 40): OmpMessage[] {
   return [
     userText("investigate the failing test"),
+    assistantToolCall("keep1", "read", { path: "important.ts" }),
+    toolResult("keep1", "the important content Jev should keep"),
+    assistantToolCall("drop1", "bash", { command: "ls -la" }),
+    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(listingLines)),
+  ];
+}
+
+// The shape of a real long session: assistant analysis the library can never
+// prune beside one listing Jev can drop and one small result it keeps.
+function mixedRegion(proseSentences: number, listingLines: number): OmpMessage[] {
+  return [
+    userText("investigate the failing build"),
+    assistantText("The retry path widens the regression window on every pass. ".repeat(proseSentences)),
     assistantToolCall("keep1", "read", { path: "important.ts" }),
     toolResult("keep1", "the important content Jev should keep"),
     assistantToolCall("drop1", "bash", { command: "ls -la" }),
@@ -649,20 +663,32 @@ test("the handler returns omp's compaction result with the previous summary lead
   assert.ok(record.summaryTokens > 0 && record.summaryTokens <= record.budget.budgetTokens);
 });
 
-test("the handler gives a split turn two separate Jev passes and gates on their combined character reduction", async () => {
+test("the handler gives a split turn two separate Jev passes and merges them under omp's own split-turn header, each region's decisions recorded by omp's tool-call ids", async () => {
+  const history: OmpMessage[] = [userText("investigate"), assistantToolCall("h-keep", "read", { path: "a.ts" }), toolResult("h-keep", "history content to keep"), assistantToolCall("h-drop", "bash", { command: "ls" }), toolResult("h-drop", "h".repeat(3000))];
+  const turnPrefix: OmpMessage[] = [userText("now check"), assistantToolCall("p-keep", "read", { path: "b.ts" }), toolResult("p-keep", "prefix content to keep"), assistantToolCall("p-drop", "bash", { command: "ls" }), toolResult("p-drop", "p".repeat(3000))];
+  const { result, seen, notes } = await runHandler(compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix }));
+  assert.deepEqual(notes, []);
+  assert.equal(seen.urls.length, 2, "one Jev pass per region, never one flattened region");
+  assert.ok(result);
+  assert.match(result.compaction.summary, /history content to keep[\s\S]*\*\*Turn Context \(split turn\):\*\*[\s\S]*prefix content to keep/);
+  assert.doesNotMatch(result.compaction.summary, /hhhh|pppp/, "each region's dropped listing is gone");
+  assert.deepEqual(result.compaction.preserveData.jevCompaction.dropped, ["h-drop", "p-drop"]);
+});
+
+test("a split turn whose two regions' verbatim text already caps the combined reduction under 25% is declined before either region is uploaded", async () => {
   const history = [userText("explain X"), assistantText("y".repeat(20000))];
   const turnPrefix: OmpMessage[] = [userText("now check"), assistantToolCall("k", "read", { path: "a.ts" }), toolResult("k", "keep this"), assistantToolCall("d", "bash", { command: "ls" }), toolResult("d", "x".repeat(2500))];
   const { result, seen, notes } = await runHandler(compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix }));
-  assert.equal(seen.urls.length, 1, "the text-only history needs no Jev request; the prefix needs one");
-  assert.equal(result, undefined, "dropping 2.5k of ~22.5k characters is below the 25% minimum for the whole region");
-  assert.match(notes[0], /below minimum/);
+  assert.equal(seen.urls.length, 0, "dropping both prefix calls could remove at most ~2.5k of ~22.5k characters, so the prefix is never sent");
+  assert.equal(result, undefined);
+  assert.match(notes[0], /reduction 1\d% of the whole context below minimum even if Jev dropped every candidate call/);
 });
 
-test("repeated compaction: once the carried previous summary dominates, the handler falls back to native compaction even though the new region itself shrank by over 90%", async () => {
+test("repeated compaction: once the carried previous summary dominates, the handler declines before contacting Jev, since even dropping every candidate call could not reach the 25% minimum", async () => {
   const { result, seen, notes } = await runHandler(compactEvent(droppableRegion(), { previousSummary: "carried verbatim summary ".repeat(2000) }));
-  assert.equal(seen.urls.length, 1, "Jev was asked about the new region");
-  assert.equal(result, undefined, "a ~3% whole-context reduction hands the whole thing to native compaction, which rewrites and bounds it");
-  assert.match(notes[0], /reduction \d% of the whole context below minimum/);
+  assert.equal(seen.urls.length, 0, "the outcome is known from the region and the carried summary alone, so nothing is uploaded");
+  assert.equal(result, undefined, "a ~3% whole-context reduction at best hands the whole thing to native compaction, which rewrites and bounds it");
+  assert.match(notes[0], /reduction \d% of the whole context below minimum even if Jev dropped every candidate call/);
 });
 
 test("budget: a model whose context cannot hold any retained history under omp's reserve declines before contacting Jev, and an unknown context window declines too", async () => {
@@ -676,13 +702,13 @@ test("budget: a model whose context cannot hold any retained history under omp's
   assert.match(unknown.notes[0], /context window is unknown/);
 });
 
-test("budget: the same well-reduced replacement is refused when it exceeds a smaller model's retained-context budget and installed under Codex Max's, with the previous summary leading", async () => {
+test("budget: a carried summary that alone exceeds a smaller model's retained-context budget is declined before contacting Jev, while the same replacement is installed under Codex Max's budget with the previous summary leading", async () => {
   const previousSummary = "carried verbatim summary ".repeat(7200);
   const event = () => compactEvent(droppableRegion(16000), { previousSummary });
   const small = await runHandler(event(), { ctx: { model: { id: "gpt-small", contextWindow: 60000 } } });
-  assert.equal(small.seen.urls.length, 1, "Jev ran and the region shrank; only the installed size failed");
+  assert.equal(small.seen.urls.length, 0, "~43k carried tokens against a ~31k budget: no Jev answer could make it fit, so nothing is uploaded");
   assert.equal(small.result, undefined);
-  assert.match(small.notes[0], /exceeds the \d+-token retained-context budget for a 60000-token model/);
+  assert.match(small.notes[0], /even if Jev dropped every candidate call, .* ~\d+ tokens, over the \d+-token retained-context budget for a 60000-token model/);
 
   const codexMax = await runHandler(event());
   assert.deepEqual(codexMax.notes, [], "under Codex Max the same replacement fits");
@@ -691,6 +717,87 @@ test("budget: the same well-reduced replacement is refused when it exceeds a sma
   assert.ok(record.reductionRatio >= 0.25);
   assert.ok(record.summaryTokens > 40000 && record.summaryTokens <= record.budget.budgetTokens, `~${record.summaryTokens} retained tokens is far past the 13107-token native summary cap this budget replaces`);
   assert.ok(codexMax.result.compaction.summary.startsWith(previousSummary), "the carried summary still leads the installed replacement");
+});
+
+test("budget: when the floor fits but the result Jev keeps does not, the refusal comes only after Jev answered, because the outcome depended on the answer", async () => {
+  const previousSummary = "carried verbatim summary ".repeat(3000);
+  const region: OmpMessage[] = [
+    userText("investigate the failing test"),
+    assistantToolCall("keep1", "read", { path: "big.ts" }),
+    toolResult("keep1", "kept content line that Jev asks to retain verbatim\n".repeat(1800)),
+    assistantToolCall("drop1", "bash", { command: "ls -la" }),
+    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(16000)),
+  ];
+  const { result, seen, notes } = await runHandler(compactEvent(region, { previousSummary }), { ctx: { model: { id: "gpt-small", contextWindow: 60000 } } });
+  assert.equal(seen.urls.length, 1, "the carried summary and prose fit, so Jev was asked");
+  assert.equal(result, undefined, "keeping the large result pushed the replacement over the budget");
+  assert.match(notes[0], /replacement of ~\d+ tokens exceeds the \d+-token retained-context budget for a 60000-token model/);
+});
+
+// ---- The irreducible pre-request bound: declined before any request when
+// the region alone already decides the outcome. ----
+
+test("pre-request bound: a mixed region whose prose caps the whole-context reduction under 25% is declined before any request, although its tool calls would otherwise be asked about; with a larger listing the same shape is asked and installed", async () => {
+  const declined = await runHandler(compactEvent(mixedRegion(400, 150)));
+  assert.equal(declined.seen.urls.length, 0, "the listing is a fifth of the region, so dropping it could never reach 25%");
+  assert.equal(declined.result, undefined);
+  assert.match(declined.notes[0], /reduction (1\d|2[0-4])% of the whole context below minimum even if Jev dropped every candidate call/);
+
+  const installed = await runHandler(compactEvent(mixedRegion(400, 600)));
+  assert.deepEqual(installed.notes, []);
+  assert.equal(installed.seen.urls.length, 1, "with the listing at half the region the outcome depends on Jev, so Jev is asked");
+  assert.ok(installed.result);
+  assert.match(installed.result.compaction.summary, /the important content Jev should keep/);
+  assert.doesNotMatch(installed.result.compaction.summary, /drwxr-xr-x/);
+});
+
+test("pre-request bound: a mixed region whose unprunable prose alone exceeds a smaller model's budget is declined before any request, and the identical region is asked about and installed under Codex Max's budget", async () => {
+  const region = mixedRegion(3000, 2000);
+  const small = await runHandler(compactEvent(region), { ctx: { model: { id: "gpt-small", contextWindow: 60000 } } });
+  assert.equal(small.seen.urls.length, 0, "no Jev answer could bring ~36k tokens of prose under a ~31k budget, so the transcript never leaves the machine");
+  assert.equal(small.result, undefined);
+  assert.match(small.notes[0], /even if Jev dropped every candidate call, .* over the \d+-token retained-context budget for a 60000-token model/);
+
+  const codexMax = await runHandler(compactEvent(region));
+  assert.deepEqual(codexMax.notes, []);
+  assert.equal(codexMax.seen.urls.length, 1, "the bound is a floor, not an over-decline: with room for the prose, Jev is asked");
+  assert.ok(codexMax.result);
+  assert.match(codexMax.result.compaction.summary, /the important content Jev should keep/);
+  assert.doesNotMatch(codexMax.result.compaction.summary, /drwxr-xr-x/);
+  assert.ok(codexMax.result.compaction.preserveData.jevCompaction.summaryTokens > 31607, "the installed replacement is itself larger than the small model's whole budget");
+});
+
+test("irreducibleOmpRegion is exactly what the real vendored compact() yields when Jev drops everything, and no other answer yields less", async () => {
+  const answering = (noul: (name: string) => number): typeof fetch => async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    const answers: Record<string, unknown> = {};
+    for (const name of Object.keys(body.questions)) answers[name] = { type: "noul", noul: noul(name) };
+    return new Response(JSON.stringify({ model: "jev-latest", answers }), { status: 200 });
+  };
+  const regions: OmpMessage[][] = [
+    [...realWorldRegion, ...mixedRegion(20, 30), assistantToolCall("unanswered", "read", { path: "unfinished.ts" })],
+    [assistantToolCall("first", "read", { path: "pinned.ts" }), toolResult("first", "pinned content of the region's first message"), ...droppableRegion(30)],
+  ];
+  for (const region of regions) {
+    const floor = irreducibleOmpRegion(region);
+    const dropAll = await compactOmpRegion(region, { apiKey: "k", fetchImpl: answering(() => 0) });
+    assert.equal(dropAll.text, floor.text, "the floor is the library's own applyDecisions output, not a separate estimate");
+    assert.equal(dropAll.audit.charsBefore, floor.charsBefore);
+    assert.equal(dropAll.audit.charsAfter, floor.charsAfter);
+    for (const answer of [() => 1, (name: string) => (name.startsWith("call_") ? 1 : 0), (name: string) => (name.endsWith("_t1") ? 0.95 : 0.05)]) {
+      const actual = await compactOmpRegion(region, { apiKey: "k", fetchImpl: answering(answer) });
+      assert.ok(actual.audit.charsAfter >= floor.charsAfter, "keep and drop_result can only leave more characters than drop_call");
+      assert.ok(estimateTokens(actual.text) >= estimateTokens(floor.text), "and never fewer estimated tokens");
+      assert.equal(actual.audit.charsBefore, floor.charsBefore);
+    }
+  }
+  const [mixedFloor, pinnedFloor] = regions.map(irreducibleOmpRegion);
+  assert.match(mixedFloor.text, /unfinished\.ts/, "a call with no result is never a candidate, so it stays in every outcome");
+  assert.match(mixedFloor.text, /nudge text[\s\S]*retry path widens/, "prose and injected messages stay");
+  assert.doesNotMatch(mixedFloor.text, excludedText);
+  assert.doesNotMatch(mixedFloor.text, /drwxr-xr-x|important content/, "every candidate call and result is gone from the floor");
+  assert.match(pinnedFloor.text, /pinned content of the region's first message/, "a call in the region's first message is pinned by the library and stays");
+  assert.doesNotMatch(pinnedFloor.text, /important content|drwxr-xr-x/);
 });
 
 // ---- Native history that a text-only summary cannot carry ----
