@@ -71,8 +71,10 @@
 #   a ship/scout launch. Explicit harness (including positional), model, and
 #   effort each win over the resolved axis. Any non-clear result refuses with
 #   exit 2, including off; omit --resolve for a deliberate manual selection.
-#   Refused for --secondmate, --relaunch, and batch pairs. Records
-#   dispatch=resolved and dispatch_rule=<rule id and excerpt> in task metadata.
+#   An explicit harness other than the resolved profile's harness never adopts
+#   that profile's model id (model ids are harness-namespaced): pass --model
+#   for the explicit harness or the launch refuses with exit 2 before any
+#   worker allocation. Refused for --secondmate, --relaunch, and batch pairs.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
@@ -586,7 +588,7 @@ YOLO_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
 RESOLVE=0
-DISPATCH_RULE=
+dispatch_harness=
 POS=()
 want_value=
 for a in "$@"; do
@@ -1764,10 +1766,10 @@ if [ "$RESOLVE" -eq 1 ]; then
     echo "fm-spawn: dispatch resolution $dispatch_status; pass explicit --harness/--model/--effort without --resolve or fix the reported reason" >&2
     exit 2
   fi
-  [ -n "$ARG3" ] || ARG3=$(jq -r '.chosen.profile.harness' <<< "$dispatch_result")
+  dispatch_harness=$(jq -r '.chosen.profile.harness' <<< "$dispatch_result")
+  [ -n "$ARG3" ] || ARG3=$dispatch_harness
   [ "$MODEL_SET" -eq 1 ] || MODEL=$(jq -r '.chosen.profile.model // ""' <<< "$dispatch_result")
   [ "$EFFORT_SET" -eq 1 ] || EFFORT=$(jq -r '.chosen.profile.effort // ""' <<< "$dispatch_result")
-  DISPATCH_RULE=$(jq -r '[.rule // "", .rule_when // ""] | join(" ") | gsub("[\r\n\t]"; " ")' <<< "$dispatch_result")
 fi
 
 shell_quote() {
@@ -2153,6 +2155,10 @@ case "$ARG3" in
   }
   ;;
 esac
+if [ "$RESOLVE" -eq 1 ] && [ "$HARNESS" != "$dispatch_harness" ] && [ "$MODEL_SET" -eq 0 ] && [ -n "$MODEL" ]; then
+  echo "error: --resolve chose harness '$dispatch_harness' with model '$MODEL', which the explicit harness '$HARNESS' cannot interpret; pass --model for '$HARNESS' or omit the harness" >&2
+  exit 2
+fi
 
 # muse, gemini, and agy are verified as CREWMATE/SCOUT adapters only. A secondmate is
 # a firstmate instance, so it needs a primary supervision protocol.
@@ -4518,10 +4524,6 @@ preserve_relaunch_meta() {
   echo "tasktmp=$TASK_TMP"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
-  if [ "$RESOLVE" -eq 1 ]; then
-    echo "dispatch=resolved"
-    echo "dispatch_rule=$DISPATCH_RULE"
-  fi
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
   # Default-off writes no traceparent= line.

@@ -74,7 +74,7 @@ A live run needs a key and is not part of the suite; rerun the table above by po
 
 ## Primary and spawn routing: fake endpoint
 
-Verified 2026-09-22 on macOS arm64 with omp/18.2.8, Node v24.11.1, and jq-1.7.1-apple.
+Verified 2026-09-21 on macOS arm64 with omp/18.2.8, Node v24.11.1, jq-1.7.1-apple, and the system python3 as the pseudo-terminal driver.
 These commands exercise the real resolver and OMP runtime without production Jev credentials or provider tokens:
 
 ```sh
@@ -84,17 +84,19 @@ bin/fm-test-run.sh tests/fm-jev-route.test.sh
 bin/fm-test-run.sh tests/fm-jev-route-live-e2e.test.sh
 ```
 
-The spawn fixture verifies clear selection, independent explicit axes, the positional harness override, scout routing, non-clear refusal before launch, and rejection of secondmate, relaunch, and batch resolution.
-The portable extension tests cover session and todo boundaries, inferred todo operations, worker and unrelated-session isolation, fallback, explicit selection during an in-flight decision, obsolete-session decisions, unsupported effort, and private temporary-file cleanup.
-The live guard uses a private `FM_HOME`, separate synthetic user home and agent configuration, fake quota, and loopback Jev and chat endpoints.
-It asserts the model used by an actual OMP chat request, not merely a routing log.
+The spawn fixture verifies clear selection, independent explicit axes, the positional harness override, refusal of a resolved model under a different explicit harness, scout routing, non-clear refusal before launch, the documented no-key launch of an explicit selection without `--resolve`, and rejection of secondmate, relaunch, and batch resolution.
+The portable extension tests cover session and todo boundaries, inferred todo operations, worker, print-mode and unrelated-session isolation, fallback, an empty resolver answer treated as an error rather than off, explicit selection during an in-flight decision, obsolete-session decisions including a model applied as the session is replaced, unsupported effort, secret-protection declines with zero resolver calls, and private temporary-file cleanup.
+The live guard uses a private `FM_HOME`, separate synthetic user home and agent configuration, fake quota, and loopback Jev and chat endpoints, and drives omp both over RPC and as a real interactive terminal session (extension mode `tui`) under a Python pseudo-terminal.
+It asserts the model used by an actual OMP chat request, not merely a routing log, and that a session whose isolated agent configuration enables Hide Secrets makes no Jev request.
 
 Observed live-guard output:
 
 ```text
-ok - omp/18.2.8 fake endpoint: initial/low -> routed/high; routine turn retained; explicit manual/low retained; saved config unchanged
-ok - omp/18.2.8 no key: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
-ok - fake Jev requests=3; real OMP chat requests=7; real global config metadata unchanged; authenticated Jev proof pending
+ok - omp/18.2.8 rpc fake endpoint: initial/low -> routed/high; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 rpc no key: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 rpc secret protection on: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 interactive tui fake endpoint: initial/low -> routed/high on the first prompt; todo boundary rerouted; both chat requests used routed; saved config unchanged
+ok - fake Jev requests=5; real OMP chat requests=18; real global config metadata unchanged; authenticated Jev proof pending
 ```
 
 The verified API is `pi.setModel(ctx.models.resolve("provider/id"))`: passing a selector string directly returned `false`, while the registry model object returned `true` and changed the active model.

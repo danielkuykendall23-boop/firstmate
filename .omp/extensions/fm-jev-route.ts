@@ -3,7 +3,7 @@
 // action APIs change this session without saving model defaults (RPC guard below).
 // OMP is distributed as a binary here, without installable local host declarations;
 // keep this narrow structural API checked by TypeScript and the real RPC guard.
-import { appendFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,7 @@ type API = {
   getThinkingLevel(): Thinking;
   setThinkingLevel(level: Thinking): void;
 };
-type Status = "clear" | "off" | "ambiguous" | "escalate" | "error";
+type Status = "clear" | "off" | "ambiguous" | "escalate" | "error" | "declined";
 type Resolution = {
   status: Status;
   model: string | null;
@@ -33,16 +33,18 @@ type Resolution = {
   rule: string | null;
   confidence: number | null;
 };
+type Protection = "off" | "on" | "unprovable";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const empty = (status: Status): Resolution => ({ status, model: null, effort: null, rule: null, confidence: null });
 const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === "string" && value.length > 0 && !/[\u0000-\u001f\u007f]/.test(value);
 const selector = (model: Model | undefined) => model ? `${model.provider}/${model.id}` : null;
 const effort = (value: unknown): value is Thinking => typeof value === "string" && ["low", "medium", "high", "xhigh", "max"].includes(value);
+const timed = (seconds: number, command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv) =>
+  runCommandAsync("bash", ["-c", '. "$1"; shift; fm_run_timed "$@"', "jev-route", join(root, "bin/fm-timeout-lib.sh"), String(seconds), command, ...args], { cwd, env });
 
-function parseResult(stdout: string, stderr: string, code: number | null): Resolution {
-  if (code !== 0) return empty("error");
-  if (!stdout.trim()) return empty(stderr.startsWith("dispatch-resolve: off") ? "off" : "error");
+function parseResult(stdout: string, code: number | null): Resolution {
+  if (code !== 0 || !stdout.trim()) return empty("error");
   const value: unknown = JSON.parse(stdout);
   if (!record(value)) return empty("error");
   const status = value.status;
@@ -57,6 +59,32 @@ function parseResult(stdout: string, stderr: string, code: number | null): Resol
       typeof value.confidence !== "number" || !Number.isFinite(value.confidence) || value.confidence < 0.6 || value.confidence > 1) return empty("error");
   return { status, model: text(profile.model) ? profile.model : null, effort: effort(profile.effort) ? profile.effort : null,
     rule: value.rule, confidence: value.confidence };
+}
+
+function overlays(argv: readonly string[]): string[] {
+  const files: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--config" && i + 1 < argv.length) files.push(argv[++i]);
+    else if (argv[i].startsWith("--config=")) files.push(argv[i].slice("--config=".length));
+  }
+  return files;
+}
+
+async function secretProtection(cwd: string): Promise<Protection> {
+  for (const file of overlays(process.argv)) {
+    try {
+      if (/secrets/i.test(await readFile(resolve(cwd, file), "utf8"))) return "unprovable";
+    } catch {
+      return "unprovable";
+    }
+  }
+  const command = await timed(15, process.execPath, ["config", "get", "secrets.enabled", "--json"], cwd, { ...process.env, OMP_SKIP_SETUP: "1" });
+  if (command.status !== 0) return "unprovable";
+  try {
+    const value: unknown = JSON.parse(command.stdout);
+    if (record(value) && value.key === "secrets.enabled" && typeof value.value === "boolean") return value.value ? "on" : "off";
+  } catch { /* Not the documented shape. */ }
+  return "unprovable";
 }
 
 function todoGoal(input: unknown): string {
@@ -88,7 +116,7 @@ export default function installJevRoute(pi: API): void {
   let generation = 0;
   let queue: Promise<void> = Promise.resolve();
   const snapshot = (ctx: Context) => ({ model: selector(ctx.models.current()), effort: pi.getThinkingLevel() });
-  const primary = (ctx: Context) => resolve(ctx.cwd) === home && (!ctx.mode || ctx.mode === "interactive" || ctx.mode === "rpc");
+  const primary =(ctx: Context) => resolve(ctx.cwd) === home && (ctx.mode === "tui" || ctx.mode === "rpc");
   const notify = (ctx: Context, message: string) => {
     if (ctx.ui?.notify) ctx.ui.notify(message, "info");
     else process.stderr.write(`${message}\n`);
@@ -107,21 +135,25 @@ export default function installJevRoute(pi: API): void {
     observeOverrides(ctx);
     let result = empty("error");
     let temp: string | undefined;
-    try {
-      temp = await mkdtemp(join(tmpdir(), "fm-jev-route-")); // mkdtemp creates a private 0700 directory.
-      const brief = join(temp, "goal.txt");
-      await writeFile(brief, goal, { mode: 0o600 });
-      const command = await runCommandAsync("bash", ["-c", '. "$1"; shift; fm_run_timed 15 "$@"', "jev-route",
-        join(root, "bin/fm-timeout-lib.sh"), join(root, "bin/fm-dispatch-resolve.sh"), brief,
-        "--project", basename(ctx.cwd), "--json"], { cwd: root, env: { ...process.env, FM_HOME: home } });
-      result = parseResult(command.stdout, command.stderr, command.status);
-    } catch {
-      // Resolver diagnostics can contain input or credentials; publish metadata only.
-      result = empty("error");
-    } finally {
-      if (temp) {
-        try { await rm(temp, { recursive: true, force: true }); }
-        catch { result = empty("error"); notify(ctx, "Jev route: temporary context cleanup failed"); }
+    const protection = await secretProtection(ctx.cwd);
+    if (protection !== "off") {
+      result = empty("declined");
+    } else {
+      try {
+        temp = await mkdtemp(join(tmpdir(), "fm-jev-route-")); // mkdtemp creates a private 0700 directory.
+        const brief = join(temp, "goal.txt");
+        await writeFile(brief, goal, { mode: 0o600 });
+        const command = await timed(15, join(root, "bin/fm-dispatch-resolve.sh"), [brief, "--project", basename(ctx.cwd), "--json"],
+          root, { ...process.env, FM_HOME: home });
+        result = parseResult(command.stdout, command.status);
+      } catch {
+        // Resolver diagnostics can contain input or credentials; publish metadata only.
+        result = empty("error");
+      } finally {
+        if (temp) {
+          try { await rm(temp, { recursive: true, force: true }); }
+          catch { result = empty("error"); notify(ctx, "Jev route: temporary context cleanup failed"); }
+        }
       }
     }
     if (epoch !== generation) return; // A new/replaced session must not inherit a stale decision.
@@ -139,8 +171,16 @@ export default function installJevRoute(pi: API): void {
       } else {
         const oldModel = ctx.models.current();
         try {
-          if (selector(desired) !== previous.model && !(await pi.setModel(desired))) throw new Error("Model unavailable");
-          if (epoch !== generation) return;
+          if (selector(desired) !== previous.model) {
+            if (!(await pi.setModel(desired))) throw new Error("Model unavailable");
+            if (epoch !== generation) {
+              if (oldModel && selector(ctx.models.current()) === selector(desired)) {
+                try { await pi.setModel(oldModel); } catch { /* The replaced session reports its actual selection. */ }
+                if (baseline) baseline.model = selector(ctx.models.current());
+              }
+              return;
+            }
+          }
           // Do not overwrite a selection made while OMP was resolving the model.
           if (selector(ctx.models.current()) !== selector(desired)) {
             observeOverrides(ctx);
@@ -164,7 +204,7 @@ export default function installJevRoute(pi: API): void {
     }
     const line = changed
       ? `Jev route: ${result.model} ${result.effort} (${result.rule}, confidence ${result.confidence})${modelExplicit || effortExplicit ? " - explicit choices retained" : ""}`
-      : `Jev route: ${result.status} - ${unchanged ? "model unchanged" : `could not restore selection; current ${selector(ctx.models.current())} ${pi.getThinkingLevel()}`}`;
+      : `Jev route: ${result.status}${result.status === "declined" ? ` (secret protection ${protection})` : ""} - ${unchanged ? "model unchanged" : `could not restore selection; current ${selector(ctx.models.current())} ${pi.getThinkingLevel()}`}`;
     notify(ctx, line);
     try {
       await mkdir(state, { recursive: true, mode: 0o700 });

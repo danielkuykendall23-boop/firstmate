@@ -20,6 +20,7 @@ make_case() {
   printf '%s\n' '{"rules":[{"when":"Implement the task reliably.","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high","provider":"codex"}}]}' > "$HOME_DIR/config/crew-dispatch.json"
   cat > "$FAKEBIN/curl" <<'SH'
 #!/usr/bin/env bash
+: > "$FAKE_CURL_MARK"
 out=
 while [ $# -gt 0 ]; do
   case "$1" in -o) out=$2; shift 2 ;; *) shift ;; esac
@@ -35,10 +36,11 @@ printf '%s\n' '{"schemaVersion":5,"providers":[{"provider":"codex","quotaSemanti
 SH
   chmod +x "$FAKEBIN/curl" "$FAKEBIN/quota-axi"
   LAUNCH_LOG="$TMP_ROOT/$name/launch.log"
+  CURL_MARK="$TMP_ROOT/$name/curl.called"
 }
 run_case() {
   local output rc
-  output=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$@")
+  output=$(FAKE_CURL_MARK="$CURL_MARK" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN" "$@")
   rc=$?
   printf '%s\n' "$output"
   if [ "$rc" -ne 0 ]; then
@@ -58,8 +60,9 @@ refused() {
 make_case clear
 out=$(ship); code=$?
 expect_code 0 "$code" "clear profile launches"
-assert_grep 'dispatch=resolved' "$HOME_DIR/state/routing.meta" "resolution provenance is recorded"
-assert_grep 'dispatch_rule=rule_1 Implement the task reliably.' "$HOME_DIR/state/routing.meta" "matched rule is recorded"
+assert_present "$CURL_MARK" "the launch consulted the resolver"
+assert_grep 'model=openai-codex/gpt-6-astra' "$HOME_DIR/state/routing.meta" "effective model is recorded"
+assert_grep 'effort=high' "$HOME_DIR/state/routing.meta" "effective effort is recorded"
 assert_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6-astra' --thinking 'high'" "resolved axes reach the launch"
 pass "clear uses resolved model and effort"
 
@@ -80,6 +83,12 @@ out=$(ship codex --model gpt-5.5); code=$?
 expect_code 0 "$code" "positional harness overrides"
 assert_contains "$(cat "$LAUNCH_LOG")" "codex --model 'gpt-5.5' -c 'model_reasoning_effort=\"high\"'" "positional harness and explicit model retain resolved effort"
 pass "legacy positional harness remains explicit"
+
+make_case cross
+out=$(ship --harness claude); code=$?
+refused cross-harness
+assert_contains "$out" "explicit harness 'claude' cannot interpret" "the refusal names the incompatible tuple"
+pass "an explicit harness never adopts another harness's resolved model"
 
 make_case scout
 out=$(run_case routing "$PROJ_DIR" --scout --resolve); code=$?
@@ -113,6 +122,14 @@ out=$(ship); code=$?
 refused malformed
 assert_contains "$out" 'malformed rules file' "configuration error is retained"
 pass "all non-clear outcomes refuse without a launch"
+
+make_case fallback
+rm "$HOME_DIR/.env"
+out=$(run_case routing "$PROJ_DIR" --mode no-mistakes --yolo off --harness omp --model custom/model --effort max); code=$?
+expect_code 0 "$code" "the no-key fallback launches without --resolve"
+assert_absent "$CURL_MARK" "no resolver request is made without --resolve"
+assert_contains "$(cat "$LAUNCH_LOG")" "--model 'custom/model' --thinking 'max'" "the explicit selection is retained"
+pass "no-key fallback retains the explicit selection without --resolve"
 
 for unsupported in --secondmate --relaunch; do
   make_case "${unsupported#--}"
