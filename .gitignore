@@ -11,5 +11,6 @@ __pycache__/
 *.pyc
 .env
 config/
+!.omp/vendor/jev-review/src/config/
 
 .tools/

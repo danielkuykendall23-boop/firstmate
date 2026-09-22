@@ -183,7 +183,12 @@
 #   never lists) passes through unvalidated with a stderr notice, and a bare
 #   fuzzy pattern is left to omp's own matcher. A crewmate or scout loads its
 #   per-task busy-state extension with -e from state/ (outside the worktree, so
-#   auto-discovery cannot load it a second time); a secondmate passes no -e at
+#   auto-discovery cannot load it a second time) plus the code root's .omp
+#   directory package (key-gated Jev compaction/review extensions and the
+#   reviewer definition, which register once per session even beside a
+#   worktree's own copies; docs/jev.md), with FM_HOME=<home> on the launch line
+#   so the extensions read that home's .env in-process and no credential enters
+#   the command; a secondmate passes no -e at
 #   all and relies on omp auto-discovering the home's tracked .omp/extensions/
 #   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
 #   cwd-only with no trust dialog).
@@ -312,6 +317,7 @@
 #                  turn-end extension, written by this script; outside the worktree so
 #                  omp's cwd-only auto-discovery cannot load it a second time)
 #     __OMPWORKERCFG__ absolute path to the tracked .omp/fm-worker-overlay.yml posture overlay
+#     __OMPJEVEXT__ key-gated Jev compaction/review extensions from FM_ROOT
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
 #     __WORKTREE__  absolute path to the task worktree
 #     __CURSORBIN__ resolved, cursor-verified executable for a cursor launch
@@ -1963,7 +1969,7 @@ launch_template() {
     if [ "$kind" = secondmate ]; then
       printf '%s' ' __MODELFLAG____EFFORTFLAG__"$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     else
-      printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
+      printf '%s' ' __MODELFLAG____EFFORTFLAG__-e __OMPEXT____OMPJEVEXT__ "$(__OPINPUT__ encode launch-brief < __BRIEF__)"'
     fi
     ;;
   # agy (Antigravity CLI): --prompt-interactive "<brief>" starts the supervised
@@ -4657,6 +4663,14 @@ sq_piturnend=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-turnend-guard.ts
 sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
 sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
+OMPJEVEXT=
+if [ "$HARNESS" = omp ] && [ "$KIND" != secondmate ]; then
+  # A directory package exposes its reviewer as well as its two Jev extensions.
+  OMPJEVEXT=" -e $(shell_quote "$FM_ROOT/.omp")"
+  # Only the nonsecret home path enters the command. Extensions read its key
+  # in-process; no credential is copied into arguments, metadata or shell text.
+  LAUNCH="FM_HOME=$(shell_quote "$FM_HOME") $LAUNCH"
+fi
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
@@ -4677,6 +4691,7 @@ LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
 LAUNCH=${LAUNCH//__PITURNEND__/$sq_piturnend}
 LAUNCH=${LAUNCH//__PIWATCH__/$sq_piwatch}
 LAUNCH=${LAUNCH//__OMPEXT__/$sq_ompext}
+LAUNCH=${LAUNCH//__OMPJEVEXT__/$OMPJEVEXT}
 LAUNCH=${LAUNCH//__OMPWORKERCFG__/$sq_ompcfg}
 LAUNCH=${LAUNCH//__OPINPUT__/$sq_opinput}
 case "$HARNESS" in

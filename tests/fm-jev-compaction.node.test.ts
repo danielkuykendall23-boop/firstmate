@@ -22,15 +22,10 @@ import registerJevCompaction, {
   auditFromResult,
   buildFilesTag,
   compactOmpRegion,
-  envFileValue,
-  hideSecretsState,
   irreducibleOmpRegion,
   mergeAudits,
   mergePreviousSummary,
   mergeSplitTurnSummary,
-  ompConfiguredSecretsEnabled,
-  overlayFilesFromArgv,
-  overlaySecretsStatement,
   renderLibraryMessages,
   retainedBudget,
   systemPromptText,
@@ -44,6 +39,8 @@ import registerJevCompaction, {
   type SessionBeforeCompactEvent,
 } from "../.omp/extensions/fm-jev-compaction.ts";
 import { compact, estimateTokens, SYSTEM_ONE_URL, type CompactResult, type Message as LibMessage } from "../.omp/extensions/vendor/fast-jev-compaction/src/index.ts";
+import { envFileValue, resolveTypesafeKey } from "../.omp/extensions/lib/fm-jev-key.ts";
+import { hideSecretsState, ompConfiguredSecretsEnabled, overlayFilesFromArgv, overlaySecretsStatement } from "../.omp/extensions/lib/fm-jev-privacy.ts";
 
 const repoRoot = join(import.meta.dirname, "..");
 
@@ -169,6 +166,7 @@ function registerWith(flag: string | undefined): { handler: Handler | undefined;
   let registrations = 0;
   try {
     registerJevCompaction({
+      events: {},
       on: (event, h) => {
         registrations += 1;
         if (event === "session_before_compact") handler = h as Handler;
@@ -182,9 +180,16 @@ function registerWith(flag: string | undefined): { handler: Handler | undefined;
 }
 
 function loadHandler(): Handler {
-  const { handler } = registerWith("1");
-  assert.ok(handler, "with FM_JEV_COMPACTION=1 the extension must register a session_before_compact handler");
-  return handler;
+  const saved = process.env.TYPESAFE_API_KEY;
+  process.env.TYPESAFE_API_KEY = "fake-registration-key";
+  try {
+    const { handler } = registerWith(undefined);
+    assert.ok(handler, "a resolved key activates the compaction handler");
+    return handler;
+  } finally {
+    if (saved === undefined) delete process.env.TYPESAFE_API_KEY;
+    else process.env.TYPESAFE_API_KEY = saved;
+  }
 }
 
 // The region every repeated-compaction case hands to Jev: one call to keep
@@ -508,13 +513,33 @@ test("the vendored compact() itself is reachable directly (proves this is the re
 
 // ---- Registration ----
 
-test("with FM_JEV_COMPACTION unset or not exactly 1 the extension registers no hook at all, the condition omp checks before it arms speculative background compaction", () => {
-  const disabled = registerWith(undefined);
-  assert.equal(disabled.registrations, 0, "omp disables speculative compaction whenever any session_before_compact handler exists, so a disabled launch must register none");
-  assert.equal(disabled.handler, undefined);
-  assert.equal(registerWith("0").registrations, 0);
-  assert.equal(registerWith("true").registrations, 0);
-  assert.equal(registerWith("1").registrations, 1, "enabled, exactly one hook is registered");
+test("missing key and explicit disable leave native compaction untouched; enabled duplicate factories register once per session", async () => {
+  await withEnv({ FM_HOME: homeWithEnvFile(""), TYPESAFE_API_KEY: undefined, FM_JEV_COMPACTION: undefined }, async () => {
+    const events = {};
+    let count = 0;
+    const api = { events, on: () => { count++; } };
+    registerJevCompaction(api);
+    assert.equal(count, 0);
+    process.env.TYPESAFE_API_KEY = "fake";
+    process.env.FM_JEV_COMPACTION = "0";
+    registerJevCompaction(api);
+    assert.equal(count, 0);
+    delete process.env.FM_JEV_COMPACTION;
+    registerJevCompaction(api);
+    registerJevCompaction({ ...api });
+    assert.equal(count, 1, "an inert copy cannot claim registration, and two enabled copies share one handler");
+    registerJevCompaction({ ...api, events: {} });
+    assert.equal(count, 2, "a child session must receive its own registration");
+  });
+});
+
+test("key precedence preserves home isolation without exporting file credentials", async () => {
+  await withEnv({ FM_HOME: homeWithEnvFile('TYPESAFE_API_KEY="file-key"\n'), TYPESAFE_API_KEY: undefined }, async () => {
+    assert.equal(resolveTypesafeKey(import.meta.filename), "file-key");
+    assert.equal(process.env.TYPESAFE_API_KEY, undefined);
+    process.env.TYPESAFE_API_KEY = "env-key";
+    assert.equal(resolveTypesafeKey(import.meta.filename), "env-key");
+  });
 });
 
 // ---- Hide Secrets: omp's own reader plus launch overlays ----

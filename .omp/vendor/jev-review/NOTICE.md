@@ -1,21 +1,26 @@
 # Vendored: NiazMorshed2007/jev-review
 
-`dist/server.js` is upstream's own built MCP server bundle, copied verbatim from the pinned release archive, not rebuilt from source.
-Upstream ships this exact file in its own repository (produced by their `npm run build`, an `esbuild --bundle` of `src/server.ts` plus its `@modelcontextprotocol/sdk` and `zod` dependencies), so vendoring the bundle is vendoring their own build artifact, not a repackaging.
-
 - Source: <https://github.com/NiazMorshed2007/jev-review>
 - Pinned commit: `57690af54ef7d862c2483342c1e61c14dffcf727`
-- License: MIT (`LICENSE` in this directory, copied unmodified)
-- Pinned source archive: `NiazMorshed2007--jev-review-57690af54ef7.tar.gz`, sha256 `d5e5988f4f925efb6cc869c87f188b72ee4e4d9289e24234b72cb20c16d5d854`
-- Vendored: 2026-09-18
+- License: MIT (`LICENSE`, unchanged)
+- Pinned source archive sha256: `d5e5988f4f925efb6cc869c87f188b72ee4e4d9289e24234b72cb20c16d5d854`
+- Source vendored: 2026-09-22
 
-## What is vendored and why
+## Scope and patches
 
-Only `dist/server.js` (the built stdio MCP server, unmodified) and `package.json` (upstream's own metadata, unmodified, kept for the pinned version and dependency record) are copied here.
-`src/`, `test/`, `skills/`, `.claude-plugin/`, `.codex-plugin/`, and `public/` are not copied: they are upstream's own TypeScript sources, tests, and Claude/Codex-specific plugin scaffolding this repository does not build or need.
-`bin/fm-jev-review-setup.sh` is the omp-side installer that registers this vendored server in a user-scope `mcp.json`; it is not part of the vendored copy and is not upstream's code.
+`src/config`, `src/evaluation`, and `src/jev` are byte-for-byte upstream source.
+No import-extension or credential patch is needed: esbuild resolves upstream `.js` specifiers to its `.ts` sources, and upstream already accepts an explicit `apiKey` and injected client.
+`index.ts` is the Firstmate-authored transport-free export surface.
+`package.json` retains upstream's version and exact Zod/esbuild versions, removes the unused MCP dependency, and replaces the build command with the evaluator-only bundle.
+`dist/review.js` is generated from that entry with Zod 4.6.5 included, not a reimplementation of evaluation logic.
+`dist/review.d.ts` exposes the corresponding upstream types.
+The old server bundle is removed; no MCP client, subprocess, or user-scope installation is used.
+The OMP adapter owns key resolution, native secret-protection refusal, the local fake-endpoint fetch seam and sanitized fallback messages.
 
-## No modification
+## Dependency notice and reproducibility
 
-No byte of `dist/server.js` or `package.json` was changed from the pinned archive.
-Diff this directory against the pinned archive's `dist/server.js` and `package.json` to confirm.
+Zod 4.6.5 is MIT-licensed; `LICENSE.zod` is its unmodified license.
+Its npm archive is <https://registry.npmjs.org/zod/-/zod-4.6.5.tgz>, integrity `sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==`.
+From this directory, install the exact development dependencies from `package.json`, then run `npm run build`.
+The build is `esbuild index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/review.js` with esbuild 0.28.2.
+No runtime dependency installation is necessary because the bundle is committed.

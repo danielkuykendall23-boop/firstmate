@@ -1,17 +1,6 @@
-// Optional Jev-guided compaction for omp (Oh My Pi).
-//
-// Off by default. Set FM_JEV_COMPACTION=1 in the environment that launches
-// omp to register this extension's session_before_compact handler;
-// otherwise the default export returns without registering anything, so
-// omp sees no compaction hook at all. That matters beyond the handler: omp
-// disables its speculative (background) compaction whenever any
-// session_before_compact handler exists, so a default launch must leave it
-// with none, and omp's own compaction.methodOrder and
-// compaction.thresholdTokens (verified live in this environment as
-// ["remote","handoff","snapcompact","shake","soft"] and 550000 respectively
-// - see docs/jev-compaction.md "Verified against a real omp session") are
-// never touched by a default launch. This never writes to a captain's
-// ~/.omp/agent/config.yml.
+// Key-gated Jev-guided compaction for OMP. A missing key or
+// FM_JEV_COMPACTION=0 registers no hook, preserving native speculative
+// compaction. Neither activation nor fallback changes saved settings.
 //
 // This is an OMP adapter around the real, pinned upstream decision
 // algorithm - not a reimplementation of it. `./vendor/fast-jev-compaction/`
@@ -45,9 +34,11 @@
 // preparation.recentMessages, after that boundary, are never touched by any
 // compaction method, Jev-guided or native, and the original journal entries
 // for the summarized region are never deleted from disk by omp itself: only
-// the rebuilt LLM context stops including them. Verified empirically against
-// live omp 18.2.5 (docs/jev-compaction.md): a disposable synthetic session
-// with a probe hook dumped the real session_before_compact event, which is
+// the rebuilt LLM context stops including them. Verified against a real omp
+// process: tests/fm-jev-compaction-live-e2e.test.sh resumes synthetic
+// sessions through omp's own compact command and installs this handler's
+// replacement through the event itself (dated results and the omp version in
+// docs/verification/jev.md); the real session_before_compact event is
 // exactly { type, preparation: { firstKeptEntryId, messagesToSummarize,
 // turnPrefixMessages, recentMessages, isSplitTurn, tokensBefore, fileOps,
 // settings }, branchEntries, signal }, and omp's real assistant message
@@ -84,7 +75,7 @@
 // every later compaction of that session to native compaction, and only a
 // fresh session, or a native method that leaves no such key, brings Jev
 // back. Preserving that history is deliberate; the cost is disclosed in
-// docs/jev-compaction.md.
+// docs/jev.md.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
 // marker there (the vendored applyDecisions' own documented behavior), but
@@ -145,10 +136,10 @@
 // FM_JEV_ENDPOINT replaces the upstream System One URL so the repository's
 // live omp test can point a real session at a local fake endpoint; it is
 // not a tuning knob and is unset in every real launch.
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveTypesafeKey } from "./lib/fm-jev-key.ts";
+import { hideSecretsState } from "./lib/fm-jev-privacy.ts";
+import { registrations } from "./lib/fm-jev-registration.ts";
 import {
   applyDecisions,
   collectToolCalls,
@@ -187,6 +178,7 @@ type HookContext = {
 // no separately installable type package (same approach as
 // fm-primary-turnend-guard.ts's ExtensionAPI).
 type ExtensionAPI = {
+  events: object;
   on: (event: string, handler: (event: unknown, ctx: HookContext) => unknown) => void;
 };
 
@@ -285,176 +277,9 @@ const MIN_REDUCTION_RATIO = 0.25;
 const FILES_TAG_LIMIT = 20;
 
 const extensionFile = fileURLToPath(import.meta.url);
-const root = resolve(dirname(extensionFile), "../..");
 
-function fmHome(): string {
-  return process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
-}
 
-/**
- * The one-key .env read of bin/fm-env-lib.sh's fmx_env_get: the last
- * `KEY=` assignment wins, a leading `export ` and surrounding whitespace are
- * tolerated, one layer of matching quotes is stripped, and an absent file or
- * key yields "".
- */
-export function envFileValue(file: string, key: string): string {
-  let text: string;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch {
-    return "";
-  }
-  const assignment = new RegExp(`^\\s*(?:export\\s+)?${key}=(.*)$`);
-  let value = "";
-  for (const line of text.split(/\r?\n/)) {
-    const match = assignment.exec(line);
-    if (match) value = match[1].trim();
-  }
-  const quote = value[0];
-  if (quote === '"' || quote === "'") {
-    value = value.slice(1);
-    if (value.endsWith(quote)) value = value.slice(0, -1);
-  }
-  return value;
-}
 
-function resolveApiKey(): string {
-  return process.env.TYPESAFE_API_KEY || envFileValue(`${fmHome()}/.env`, "TYPESAFE_API_KEY");
-}
-
-// ---- omp's Hide Secrets switch: omp's own reader for the layered config
-// files, plus the --config overlays only this process can see. ----
-
-export type HideSecretsState = { state: "on" | "off"; source: string } | { state: "unprovable"; detail: string };
-
-const OMP_CONFIG_GET_TIMEOUT_MS = 15_000;
-
-/**
- * omp's own `config get secrets.enabled --json`, run as a child of this very
- * omp binary (process.execPath inside a session) with the session's cwd and
- * inherited environment, so omp's settings loader decides global/project
- * precedence, config.yml versus config.yaml, the project group-shadow rule,
- * and a --profile agent directory (exported as PI_CODING_AGENT_DIR).
- */
-export function ompConfiguredSecretsEnabled(cwd: string, execPath = process.execPath): { value: boolean } | { error: string } {
-  const run = spawnSync(execPath, ["config", "get", "secrets.enabled", "--json"], {
-    cwd,
-    encoding: "utf8",
-    timeout: OMP_CONFIG_GET_TIMEOUT_MS,
-    env: { ...process.env, OMP_SKIP_SETUP: "1" },
-  });
-  if (run.error) return { error: `omp config get did not run (${run.error.message})` };
-  if (run.status !== 0) return { error: `omp config get exited ${run.status ?? "by signal"}: ${(run.stderr || run.stdout || "").trim().slice(0, 200)}` };
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(run.stdout);
-  } catch {
-    return { error: "omp config get returned non-JSON output" };
-  }
-  const record = parsed as { key?: unknown; value?: unknown } | null;
-  if (record?.key !== "secrets.enabled" || typeof record.value !== "boolean") return { error: "omp config get returned an unexpected shape for secrets.enabled" };
-  return { value: record.value };
-}
-
-/** Every `--config <file>` / `--config=<file>` overlay on omp's own argv, in order, resolved against the session's working directory. */
-export function overlayFilesFromArgv(argv: readonly string[], cwd: string): string[] {
-  const files: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--config" && i + 1 < argv.length) files.push(argv[++i]);
-    else if (arg.startsWith("--config=")) files.push(arg.slice("--config=".length));
-  }
-  return files.map((file) => (isAbsolute(file) ? file : resolve(cwd, file)));
-}
-
-type YamlMappingLine = { indent: number; key: string; value: string };
-
-// null: a line that is not a plain `key: value` mapping line (list item,
-// continuation); undefined: blank, comment, or document marker.
-function yamlMappingLine(raw: string): YamlMappingLine | null | undefined {
-  const line = raw.replace(/(^|\s)#.*$/, "");
-  if (line.trim() === "" || /^\s*(---|\.\.\.)\s*$/.test(line)) return undefined;
-  const match = /^["']?([A-Za-z0-9_.-]+)["']?\s*:(?:\s+(.*))?$/.exec(line.trim());
-  if (!match) return null;
-  return { indent: line.length - line.trimStart().length, key: match[1], value: (match[2] ?? "").trim() };
-}
-
-function yamlBoolean(value: string): boolean | undefined {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return undefined;
-}
-
-/**
- * What one `--config` overlay states about `secrets.enabled`: the boolean
- * when a top-level `secrets:` block carries a plain boolean `enabled:` child
- * (the last statement wins), "unstated" when the overlay never mentions
- * secrets, and undefined for every other way of touching it - a bare or
- * flow `secrets:` group, an alias, a dotted `secrets.` key, a quoted or
- * non-boolean value - because omp's handling of those forms in an overlay is
- * not established here and a wrong guess would be a silent bypass.
- */
-export function overlaySecretsStatement(text: string): boolean | "unstated" | undefined {
-  let stated: boolean | "unstated" = "unstated";
-  let block: { indent: number; childIndent?: number; statedEnabled: boolean } | undefined;
-  const closeBlock = (): boolean => {
-    if (block && !block.statedEnabled) return false;
-    block = undefined;
-    return true;
-  };
-  for (const raw of text.split(/\r?\n/)) {
-    const line = yamlMappingLine(raw);
-    if (line === undefined) continue;
-    if (block && line !== null && line.indent <= block.indent && !closeBlock()) return undefined;
-    if (block) {
-      if (line === null) continue;
-      block.childIndent ??= line.indent;
-      if (line.indent === block.childIndent && line.key === "enabled") {
-        const value = yamlBoolean(line.value);
-        if (value === undefined) return undefined;
-        stated = value;
-        block.statedEnabled = true;
-      }
-      continue;
-    }
-    if (line === null || line.indent !== 0) continue;
-    if (line.key === "secrets") {
-      if (line.value !== "") return undefined;
-      block = { indent: line.indent, statedEnabled: false };
-    } else if (line.key === "secrets.enabled" || line.key.startsWith("secrets.")) {
-      return undefined;
-    }
-  }
-  return closeBlock() ? stated : undefined;
-}
-
-/**
- * omp's effective Hide Secrets switch for this session: omp's own answer for
- * the layered config files, then each --config overlay in launch order, a
- * later statement overriding an earlier one. Anything that cannot be
- * established faithfully is "unprovable", and the handler declines on it.
- */
-export function hideSecretsState(cwd: string, argv: readonly string[] = process.argv): HideSecretsState {
-  const configured = ompConfiguredSecretsEnabled(cwd);
-  if ("error" in configured) return { state: "unprovable", detail: configured.error };
-  let enabled = configured.value;
-  let source = "omp config get secrets.enabled";
-  for (const file of overlayFilesFromArgv(argv, cwd)) {
-    let overlay: string;
-    try {
-      overlay = readFileSync(file, "utf8");
-    } catch (error) {
-      return { state: "unprovable", detail: `--config overlay ${file} could not be read (${(error as NodeJS.ErrnoException).code ?? "error"})` };
-    }
-    const statement = overlaySecretsStatement(overlay);
-    if (statement === undefined) return { state: "unprovable", detail: `--config overlay ${file} touches secrets in a form this gate does not follow` };
-    if (statement !== "unstated") {
-      enabled = statement;
-      source = `--config overlay ${file}`;
-    }
-  }
-  return { state: enabled ? "on" : "off", source };
-}
 
 function contentBlocks(content: unknown): OmpContentBlock[] {
   if (typeof content === "string") return [{ type: "text", text: content }];
@@ -796,14 +621,15 @@ export function irreducibleReplacement(historyRegion: readonly OmpMessage[], tur
 
 // ---- Extension wiring. ----
 
-// Both channels are verified visible against a real omp 18.2.5 process
-// (docs/jev-compaction.md "Verified against a real omp session"):
-// ctx.ui.setStatus/notify surface as real extension_ui_request frames
-// (method "setStatus"/"notify") in the RPC stream itself, and
-// console.error surfaces on the process's own stderr, captured in the same
-// run when stderr is merged into the driver's log (the ordinary way any
-// real omp launcher captures a session's output). Neither channel silently
-// claims Jev ran when it did not.
+// Both channels are verified visible against a real omp process by
+// tests/fm-jev-compaction-live-e2e.test.sh, which asserts the setStatus
+// frame and the stderr line on every run (dated results in
+// docs/verification/jev.md): ctx.ui.setStatus/notify surface as real
+// extension_ui_request frames (method "setStatus"/"notify") in the RPC
+// stream itself, and console.error surfaces on the process's own stderr,
+// captured in the same run when stderr is merged into the driver's log (the
+// ordinary way any real omp launcher captures a session's output). Neither
+// channel silently claims Jev ran when it did not.
 function fallback(ctx: HookContext, reason: string): undefined {
   console.error(`[fm-jev-compaction] falling back to native omp compaction: ${reason}`);
   ctx.ui?.setStatus?.("jev-compaction", `Jev compaction skipped (${reason}) - using native compaction`);
@@ -812,7 +638,9 @@ function fallback(ctx: HookContext, reason: string): undefined {
 }
 
 export default function (pi: ExtensionAPI): void {
-  if (process.env.FM_JEV_COMPACTION !== "1") return;
+  if (process.env.FM_JEV_COMPACTION === "0" || !resolveTypesafeKey(extensionFile)) return;
+  const loaded = registrations("fm-jev-compaction");
+  if (loaded.has(pi.events)) return;
 
   pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
     const event = rawEvent as SessionBeforeCompactEvent;
@@ -822,7 +650,7 @@ export default function (pi: ExtensionAPI): void {
     if (hideSecrets.state === "on") return fallback(ctx, `omp Hide Secrets is on (${hideSecrets.source}) and the hook receives the un-redacted region`);
     if (hideSecrets.state === "unprovable") return fallback(ctx, `omp Hide Secrets could not be established: ${hideSecrets.detail}`);
 
-    const apiKey = resolveApiKey();
+    const apiKey = resolveTypesafeKey(extensionFile);
     if (!apiKey) return fallback(ctx, "TYPESAFE_API_KEY unset");
 
     const historyRegion = event.preparation.messagesToSummarize;
@@ -895,4 +723,5 @@ export default function (pi: ExtensionAPI): void {
     };
     return { compaction };
   });
+  loaded.add(pi.events);
 }

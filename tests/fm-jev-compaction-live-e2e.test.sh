@@ -25,6 +25,13 @@
 #   overlay-on   --config overlay turns it on: declined via the overlay.
 #   worker       the tracked .omp/fm-worker-overlay.yml every Firstmate omp
 #                launch carries: proceeds and installs.
+#   no-key      no hooks/tools or requests; native compaction still completes.
+#   review      duplicate-safe loading, actual read-only reviewer child and
+#               upstream baseline/rescore handling through a loopback model.
+#   review-no-key  no key: omp drops the unregistered jev_review from the
+#               reviewer definition; the child still spawns read-only,
+#               reports Jev unavailable through yield and completes.
+#   protected   native Hide Secrets blocks all review uploads.
 # The tool-heavy cases also plant an excludeFromContext bash execution
 # carrying a marker and prove it never reaches the fake endpoint.
 #
@@ -38,128 +45,8 @@ fm_live_gate opt-in FM_JEV_COMPACTION_LIVE_E2E omp node jq
 
 LAB=$(fm_test_tmproot fm-jev-compaction-live-e2e)
 OMP_BIN=$(command -v omp)
-DRIVER="$LAB/drive.mjs"
+DRIVER="$ROOT/tests/fixtures/fm-jev-runtime.mjs"
 
-cat > "$DRIVER" <<'DRIVER_EOF'
-// Runs one case: builds a scratch omp agent dir, home, project (with the
-// extension copied in), and a synthetic resumed session; serves a fake
-// System One endpoint; launches real omp in RPC mode; sends get_state and
-// compact; then reports what omp, the extension, the endpoint, and the
-// session file on disk show.
-import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
-import { join } from "node:path";
-
-const args = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, ...v] = a.replace(/^--/, "").split("="); return [k, v.join("=")]; }));
-const caseDir = join(args.lab, args.case);
-const agent = join(caseDir, "agent"), home = join(caseDir, "home"), project = join(caseDir, "project"), sessions = join(caseDir, "sessions");
-for (const d of [agent, home, join(project, ".omp", "extensions"), sessions]) mkdirSync(d, { recursive: true });
-cpSync(join(args.root, ".omp", "extensions", "fm-jev-compaction.ts"), join(project, ".omp", "extensions", "fm-jev-compaction.ts"));
-cpSync(join(args.root, ".omp", "extensions", "vendor"), join(project, ".omp", "extensions", "vendor"), { recursive: true });
-if (args.agentConfig) writeFileSync(join(agent, "config.yml"), args.agentConfig.replace(/\\n/g, "\n"));
-if (args.projectConfig) writeFileSync(join(project, ".omp", "config.yml"), args.projectConfig.replace(/\\n/g, "\n"));
-
-// ---- synthetic session in omp's own v3 JSONL shape ----
-const MARKER = "EXCLUDED-BASH-MARKER-" + Math.random().toString(16).slice(2);
-const KEPT = "the important invariant the run must keep";
-let seq = 0; const nextId = () => (seq++).toString(16).padStart(8, "0");
-const lines = [JSON.stringify({ type: "session", version: 3, id: `synthetic-${args.case}`, timestamp: new Date().toISOString(), cwd: project })];
-let parent = null; let chars = 0;
-const push = (message) => { const e = { type: "message", id: nextId(), parentId: parent, timestamp: new Date().toISOString(), message }; parent = e.id; lines.push(JSON.stringify(e)); };
-const usage = () => { const ctx = Math.floor(chars / 4); return { input: ctx, output: 60, cacheRead: 0, cacheWrite: 0, totalTokens: ctx + 60, contextTokens: ctx, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }; };
-const assistant = { role: "assistant", api: "openai-responses", provider: "openai", model: "gpt-5.1-codex-max" };
-const turns = Number(args.turns), targetChars = Number(args.targetChars);
-const perTurn = Math.floor(targetChars / turns);
-push({ role: "user", content: [{ type: "text", text: `Investigate the failing build across the repository. ${KEPT}.` }], timestamp: Date.now() });
-push({ role: "bashExecution", command: "cat .env", output: `AWS_SECRET_ACCESS_KEY=${MARKER}`, exitCode: 0, cancelled: false, truncated: false, excludeFromContext: true, timestamp: Date.now() });
-for (let i = 0; i < turns; i++) {
-  if (args.kind === "tools") {
-    const line = `drwxr-xr-x  2 dev dev 4096 Jan 1 00:00 dir${i}/file-${i}.ts\n`;
-    const listing = line.repeat(Math.ceil(perTurn / line.length));
-    chars += listing.length;
-    push({ ...assistant, content: [{ type: "toolCall", id: `call-${i}`, name: "bash", arguments: { command: `ls -la dir${i}` } }], usage: usage(), stopReason: "toolUse", timestamp: Date.now() });
-    push({ role: "toolResult", toolCallId: `call-${i}`, toolName: "bash", content: [{ type: "text", text: listing }], isError: false, timestamp: Date.now() });
-    push({ ...assistant, content: [{ type: "text", text: `Listing ${i} noted.` }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
-  } else if (args.kind === "mixed") {
-    const line = `drwxr-xr-x  2 dev dev 4096 Jan 1 00:00 dir${i}/file-${i}.ts\n`;
-    const listing = line.repeat(Math.ceil((perTurn * 0.3) / line.length));
-    const sentence = `Analysis ${i}: the scheduler retry path re-enters the queue boundary, and each retry widens the regression window. `;
-    const prose = sentence.repeat(Math.ceil((perTurn * 0.7) / sentence.length));
-    chars += listing.length + prose.length;
-    push({ ...assistant, content: [{ type: "toolCall", id: `call-${i}`, name: "bash", arguments: { command: `ls -la dir${i}` } }], usage: usage(), stopReason: "toolUse", timestamp: Date.now() });
-    push({ role: "toolResult", toolCallId: `call-${i}`, toolName: "bash", content: [{ type: "text", text: listing }], isError: false, timestamp: Date.now() });
-    push({ ...assistant, content: [{ type: "text", text: prose }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
-  } else {
-    const sentence = `Analysis ${i}: the scheduler retry path re-enters the queue boundary, and each retry widens the regression window. `;
-    const prose = sentence.repeat(Math.ceil(perTurn / sentence.length));
-    chars += prose.length;
-    push({ role: "user", content: [{ type: "text", text: `Explain part ${i} in depth.` }], timestamp: Date.now() });
-    push({ ...assistant, content: [{ type: "text", text: prose }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
-  }
-}
-push({ role: "user", content: [{ type: "text", text: "Now summarize what we learned so far." }], timestamp: Date.now() });
-push({ ...assistant, content: [{ type: "text", text: "Summarizing: the scheduler retry path is the culprit." }], usage: usage(), stopReason: "stop", timestamp: Date.now() });
-const sessionFile = join(sessions, `synthetic-${args.case}.jsonl`);
-writeFileSync(sessionFile, lines.join("\n") + "\n");
-
-// ---- fake System One endpoint: keep the first collected call, drop the rest ----
-const endpoint = { hits: 0, markerLeaked: false, questions: 0 };
-const server = createServer((req, res) => {
-  let body = "";
-  req.on("data", (d) => { body += d; });
-  req.on("end", () => {
-    endpoint.hits += 1;
-    if (body.includes(MARKER)) endpoint.markerLeaked = true;
-    const parsed = JSON.parse(body);
-    const answers = {};
-    for (const q of Object.keys(parsed.questions)) { endpoint.questions += 1; answers[q] = { type: "noul", noul: q.endsWith("_t1") ? 0.95 : 0.05 }; }
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ model: "jev-latest", answers, usage: { input_tokens: 1, output_tokens: 1 } }));
-  });
-});
-await new Promise((r) => server.listen(0, "127.0.0.1", r));
-
-// ---- real omp, RPC mode ----
-const ompArgs = ["--mode", "rpc", "--session-dir", sessions, "--resume", sessionFile, "--cwd", project, "--model", "openai/gpt-5.1-codex-max"];
-if (args.overlay) ompArgs.push("--config", args.overlay);
-const env = {
-  ...process.env, PI_CODING_AGENT_DIR: agent, HOME: home, OMP_SKIP_SETUP: "1",
-  FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "fake-live-key-never-valid",
-  FM_JEV_ENDPOINT: `http://127.0.0.1:${server.address().port}/systemone`,
-};
-const child = spawn(args.omp, ompArgs, { cwd: project, stdio: ["pipe", "pipe", "pipe"], env });
-let out = "", err = "", sent = false; const started = Date.now();
-const report = { case: args.case, kind: args.kind, sessionChars: chars, approxTokens: Math.floor(chars / 4), model: null, compact: null, jevStatus: [], jevStderr: [], endpoint, compactionEntries: [], durationMs: 0 };
-const finish = () => setTimeout(() => child.kill("SIGTERM"), 800);
-child.stdout.on("data", (d) => {
-  out += d;
-  if (!sent && out.includes('"type":"ready"')) { sent = true; child.stdin.write(JSON.stringify({ id: "s", type: "get_state" }) + "\n"); child.stdin.write(JSON.stringify({ id: "c", type: "compact" }) + "\n"); }
-  if (out.includes('"command":"compact"')) finish();
-});
-child.stderr.on("data", (d) => { err += d; });
-const killer = setTimeout(() => child.kill("SIGKILL"), Number(args.timeoutMs ?? 180000));
-child.on("exit", () => {
-  clearTimeout(killer);
-  report.durationMs = Date.now() - started;
-  for (const l of out.split("\n").filter(Boolean)) {
-    let j; try { j = JSON.parse(l); } catch { continue; }
-    if (j.type === "response" && j.command === "get_state") report.model = { id: j.data?.model?.id, contextWindow: j.data?.model?.contextWindow };
-    if (j.type === "response" && j.command === "compact") report.compact = { success: j.success, error: j.error ?? null, dataKeys: j.data && typeof j.data === "object" ? Object.keys(j.data) : typeof j.data };
-    if (j.type === "extension_ui_request" && j.statusKey === "jev-compaction") report.jevStatus.push(j.statusText);
-    if (j.type === "extension_error") report.jevStderr.push(`extension_error: ${JSON.stringify(j).slice(0, 300)}`);
-  }
-  for (const l of err.split("\n")) if (l.includes("[fm-jev-compaction]")) report.jevStderr.push(l.trim());
-  for (const f of readdirSync(sessions)) {
-    for (const l of readFileSync(join(sessions, f), "utf8").split("\n")) {
-      let j; try { j = JSON.parse(l); } catch { continue; }
-      if (j.type === "compaction") report.compactionEntries.push({ file: f, fromExtension: j.fromExtension === true, method: j.method ?? null, summaryChars: (j.summary ?? "").length, summaryHasKept: (j.summary ?? "").includes(KEPT), summaryHasMarker: (j.summary ?? "").includes(MARKER), jev: j.preserveData?.jevCompaction ? { kept: j.preserveData.jevCompaction.kept, dropped: j.preserveData.jevCompaction.dropped?.length, candidateCalls: j.preserveData.jevCompaction.candidateCalls, reductionRatio: j.preserveData.jevCompaction.reductionRatio, summaryTokens: j.preserveData.jevCompaction.summaryTokens, budget: j.preserveData.jevCompaction.budget } : null });
-    }
-  }
-  server.close();
-  writeFileSync(args.out, JSON.stringify(report, null, 2));
-});
-DRIVER_EOF
 
 run_case() {
   local name=$1 kind=$2 turns=$3 target=$4
@@ -187,6 +74,8 @@ test_tools_550k_installs_through_real_omp() {
   assert_equals true "$(field "$report" '.compact.success')" "omp's RPC compact must succeed on the tool-heavy history"
   assert_equals 1 "$(field "$report" '[.compactionEntries[] | select(.fromExtension)] | length')" "exactly one compaction entry from the extension must be on disk"
   assert_equals true "$(field "$report" '.compactionEntries[0].summaryHasKept')" "the summary keeps the verbatim text Jev was told to keep"
+  assert_equals true "$(field "$report" '.compactionEntries[0].keptToolVerbatim')" "the chosen tool result, not just user prose, must survive verbatim"
+  assert_equals true "$(field "$report" '.compactionEntries[0].droppedToolAbsent')" "a dropped tool result must not survive in the replacement"
   assert_equals false "$(field "$report" '.compactionEntries[0].summaryHasMarker')" "the excludeFromContext execution never reaches the installed summary"
   assert_equals false "$(field "$report" '.endpoint.markerLeaked')" "the excludeFromContext execution never reaches the fake endpoint"
   assert_equals true "$(field "$report" '.endpoint.hits >= 1')" "Jev was asked at least once"
@@ -252,6 +141,58 @@ test_worker_overlay_proceeds() {
   pass "worker: the tracked .omp/fm-worker-overlay.yml launch posture proceeds and installs"
 }
 
+
+test_no_key_preserves_native_compaction() {
+  local report
+  report=$(run_case no-key tools 24 300000)
+  assert_zero_requests "$report" no-key
+  assert_equals 0 "$(field "$report" '.proof.hooks')" "no key must not disable native speculative compaction"
+  assert_equals 0 "$(field "$report" '.proof.tools | length')" "no key must not register review"
+  assert_equals true "$(field "$report" '.compact.success')" "native compaction must still complete"
+  pass "no-key: no hooks/tools or Jev requests; native compaction completes"
+}
+
+test_real_reviewer_tool_and_rescore() {
+  local report
+  report=$(run_case review review 12 180000)
+  assert_equals 0 "$(field "$report" '.proof.errors | length')" "real OMP must load the review extension"
+  assert_equals 1 "$(field "$report" '.proof.hooks')" "two source copies must register only one compaction hook"
+  assert_equals 1 "$(field "$report" '.proof.tools | length')" "two source copies must register only one review tool"
+  assert_equals false "$(field "$report" '.proof.keyExported')" "file credentials must stay out of the OMP environment"
+  assert_equals 4 "$(field "$report" '.proof.baseline.details.metrics.correctness.score')" "real upstream transformation uses the fake baseline answer"
+  assert_equals 9 "$(field "$report" '.proof.rescore.details.metrics.correctness.score')" "rescore must use the new answer"
+  assert_equals 5 "$(field "$report" '.proof.rescore.details.comparison[] | select(.metric == "correctness") | .delta')" "upstream comparison must expose the real score delta"
+  assert_equals true "$(field "$report" '.reviewEvidence.childTools | index("jev_review") != null')" "reviewer child must receive the tool"
+  assert_equals false "$(field "$report" '.reviewEvidence.childTools | index("edit") != null')" "reviewer must remain read-only"
+  assert_equals 4 "$(field "$report" '.reviewEvidence.childEvaluation.metrics.correctness.score')" "reviewer child must call the real tool and consume scores"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" 'status="completed"' "reviewer must finish, not only spawn"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" '"jev_evaluation"' "reviewer must return structured evaluation"
+  pass "review: duplicate loads register once; real reviewer child uses Jev and returns scores; upstream rescore delta is +5"
+}
+
+test_reviewer_without_key_continues_agent_led_review() {
+  local report
+  report=$(run_case review-no-key review 12 180000)
+  assert_equals 0 "$(field "$report" '.proof.errors | length')" "review-no-key: real OMP must load both extensions without a key"
+  assert_equals 0 "$(field "$report" '.proof.tools | length')" "review-no-key: no key must register no review tool"
+  assert_equals 0 "$(field "$report" '.endpoint.hits')" "review-no-key: nothing may reach the endpoint"
+  assert_equals false "$(field "$report" '.reviewEvidence.childTools | index("jev_review") != null')" "review-no-key: the unregistered tool must not reach the reviewer child"
+  assert_equals true "$(field "$report" '.reviewEvidence.childTools | index("read") != null')" "review-no-key: the reviewer child keeps its read tools"
+  assert_equals false "$(field "$report" '.reviewEvidence.childTools | index("edit") != null')" "review-no-key: reviewer must remain read-only"
+  assert_equals null "$(field "$report" '.reviewEvidence.missingTool')" "review-no-key: the child must not stall on the absent tool"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" 'status="completed"' "review-no-key: reviewer must finish without Jev"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" 'jev_review tool absent' "review-no-key: the structured result must carry the unavailable reason"
+  pass "review-no-key: omp drops the unregistered jev_review from the reviewer definition; the child spawns read-only, reports Jev unavailable and completes"
+}
+
+test_real_review_honors_secret_protection() {
+  local report
+  report=$(run_case review-protected review 12 180000 "--agentConfig=secrets:\n  enabled: true\n")
+  assert_equals 0 "$(field "$report" '.endpoint.hits')" "protected review input must not reach TypeSafe"
+  assert_equals true "$(field "$report" '.proof.baseline.isError')" "protected review must report unavailable, not scores"
+  assert_contains "$(field "$report" '.proof.baseline.content[0].text')" "Hide Secrets is on" "native protection owner must decide"
+  pass "review-protected: real OMP protection refuses all review uploads"
+}
 test_tools_550k_installs_through_real_omp
 test_text_550k_falls_back_honestly
 test_mixed_550k_declines_on_the_floor_before_any_request
@@ -259,3 +200,7 @@ test_secrets_on_declines_via_omp_itself
 test_shadow_group_keeps_protection_on
 test_overlay_on_declines
 test_worker_overlay_proceeds
+test_no_key_preserves_native_compaction
+test_real_reviewer_tool_and_rescore
+test_reviewer_without_key_continues_agent_led_review
+test_real_review_honors_secret_protection

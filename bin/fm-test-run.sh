@@ -1358,8 +1358,16 @@ families_for_changed_path() {
       # is referenced by no shell test, so both resolve to the wrapper here.
       printf '%s\n' "__script__:fm-jev-compaction.test.sh"
       ;;
-    .omp/vendor/jev-review/*|bin/fm-jev-review-setup.sh)
-      printf '%s\n' "__script__:fm-jev-review-setup.test.sh"
+    .omp/vendor/jev-review/*|.omp/extensions/fm-jev-review.ts|.omp/extensions/lib/fm-jev-*|tests/fm-jev-review.node.test.ts)
+      printf '%s\n' "__script__:fm-jev-compaction.test.sh"
+      ;;
+    tests/fixtures/fake-systemone.mjs)
+      printf '%s\n' "__script__:fm-jev-compaction.test.sh"
+      printf '%s\n' "__script__:fm-jev-compaction-live-e2e.test.sh"
+      ;;
+    .omp/package.json|.omp/agents/reviewer.md|tests/fixtures/fm-jev-runtime.mjs|\
+    tests/fixtures/fm-jev-omp-probe.mjs|tests/fixtures/fake-reviewer-model.mjs)
+      printf '%s\n' "__script__:fm-jev-compaction-live-e2e.test.sh"
       ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family

@@ -2,19 +2,15 @@
   "name": "jev-review",
   "version": "0.1.1",
   "private": true,
-  "description": "Local-first software-quality evaluation for AI coding agents, powered by Jev.",
+  "description": "Pinned Jev Review evaluation library, bundled in-process for Firstmate OMP.",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.js --banner:js=\"#!/usr/bin/env node\"",
-    "check": "tsc --noEmit",
-    "test": "tsc --project tsconfig.test.json && node --test .test-dist/test/**/*.test.js",
-    "validate": "npm run check && npm test && npm run build"
+    "build": "esbuild index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/review.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
