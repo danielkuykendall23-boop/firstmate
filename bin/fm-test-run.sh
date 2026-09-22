@@ -1349,6 +1349,14 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
       ;;
+    .omp/extensions/fm-jev-compaction.ts|.omp/extensions/vendor/fast-jev-compaction/*|tests/fm-jev-compaction.node.test.ts)
+      # The Node suite is not a tests/*.test.sh file and the vendored library
+      # is referenced by no shell test, so both resolve to the wrapper here.
+      printf '%s\n' "__script__:fm-jev-compaction.test.sh"
+      ;;
+    .omp/vendor/jev-review/*|bin/fm-jev-review-setup.sh)
+      printf '%s\n' "__script__:fm-jev-review-setup.test.sh"
+      ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__

@@ -95,8 +95,21 @@
 // TYPESAFE_API_KEY= line of $FM_HOME/.env read under the same rule as
 // bin/fm-env-lib.sh's fmx_env_get (environment wins, last assignment wins,
 // one layer of matching quotes stripped). The value is never logged.
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+//
+// omp's own "Hide Secrets" redaction (`secrets.enabled`, default off) is
+// applied to every native provider request, but the preparation omp hands a
+// session_before_compact handler is the raw, un-redacted region, and the
+// hook context exposes no redaction helper or settings reader. So before
+// anything is sent, the handler reads `secrets.enabled` from the config.yml
+// files omp itself layers - the agent directory's (PI_CODING_AGENT_DIR, else
+// ~/.omp/agent) and the project's .omp/config.yml - and declines when it is
+// on, or when a file exists that it cannot read or follow, so a region omp
+// would redact never reaches Jev un-redacted. A `--config` overlay or
+// `--config-override` flag is not visible here; docs/jev-compaction.md
+// "Activation" states that limit.
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   collectToolCalls,
@@ -119,6 +132,7 @@ type HookUiContext = {
 
 type HookContext = {
   ui?: HookUiContext;
+  cwd?: string;
 };
 
 // The omp extension API surface this file uses, declared locally: omp ships
@@ -260,6 +274,95 @@ export function envFileValue(file: string, key: string): string {
 
 function resolveApiKey(): string {
   return process.env.TYPESAFE_API_KEY || envFileValue(`${fmHome()}/.env`, "TYPESAFE_API_KEY");
+}
+
+// ---- omp's Hide Secrets switch, read from the config files omp layers. ----
+
+function ompAgentDir(): string {
+  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".omp", "agent");
+}
+
+/** The config.yml files omp reads, in omp's own layering order: the agent directory's, then the project's. */
+export function ompConfigFiles(agentDir: string, cwd: string): string[] {
+  const global = [join(agentDir, "config.yml"), join(agentDir, "config.yaml")];
+  return [global.find((file) => existsSync(file)) ?? global[0], join(cwd, ".omp", "config.yml")];
+}
+
+type YamlMappingLine = { indent: number; key: string; value: string };
+
+// null: a line that is not a plain `key: value` mapping line (list item,
+// continuation); undefined: blank, comment, or document marker.
+function yamlMappingLine(raw: string): YamlMappingLine | null | undefined {
+  const line = raw.replace(/(^|\s)#.*$/, "");
+  if (line.trim() === "" || /^\s*(---|\.\.\.)\s*$/.test(line)) return undefined;
+  const match = /^["']?([A-Za-z0-9_.-]+)["']?\s*:(?:\s+(.*))?$/.exec(line.trim());
+  if (!match) return null;
+  return { indent: line.length - line.trimStart().length, key: match[1], value: (match[2] ?? "").trim() };
+}
+
+function yamlBoolean(value: string): boolean | undefined {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
+
+/**
+ * omp's `secrets.enabled` as one config.yml states it: the boolean when the
+ * file spells it plainly (a top-level `secrets:` block with an `enabled:`
+ * key, or a flat `secrets.enabled:` key; the last statement wins), false
+ * when the file says nothing about it, and undefined when it is written in
+ * a form this reader does not follow (a flow mapping, an alias, a quoted or
+ * non-boolean value), so the caller fails closed rather than guessing.
+ */
+export function secretsEnabledInConfig(text: string): boolean | undefined {
+  let enabled = false;
+  let block: { indent: number; childIndent?: number } | undefined;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = yamlMappingLine(raw);
+    if (line === undefined) continue;
+    if (block && line !== null && line.indent <= block.indent) block = undefined;
+    if (block) {
+      if (line === null) continue;
+      block.childIndent ??= line.indent;
+      if (line.indent === block.childIndent && line.key === "enabled") {
+        const value = yamlBoolean(line.value);
+        if (value === undefined) return undefined;
+        enabled = value;
+      }
+      continue;
+    }
+    if (line === null || line.indent !== 0) continue;
+    if (line.key === "secrets") {
+      if (line.value !== "") return undefined;
+      block = { indent: line.indent };
+    } else if (line.key === "secrets.enabled") {
+      const value = yamlBoolean(line.value);
+      if (value === undefined) return undefined;
+      enabled = value;
+    }
+  }
+  return enabled;
+}
+
+export type HideSecretsState = { state: "off" } | { state: "on" | "unreadable"; file: string };
+
+/** Hide Secrets across omp's layered config files: a later file that states the switch overrides an earlier one, as in omp; an unreadable or unfollowable file wins outright. */
+export function hideSecretsState(files: readonly string[]): HideSecretsState {
+  let on: string | undefined;
+  for (const file of files) {
+    let text: string;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      return { state: "unreadable", file };
+    }
+    const enabled = secretsEnabledInConfig(text);
+    if (enabled === undefined) return { state: "unreadable", file };
+    if (enabled) on = file;
+    else if (/^\s*secrets(\.enabled)?\s*:/m.test(text)) on = undefined;
+  }
+  return on ? { state: "on", file: on } : { state: "off" };
 }
 
 function contentBlocks(content: unknown): OmpContentBlock[] {
@@ -520,6 +623,11 @@ export default function (pi: ExtensionAPI): void {
 
   pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
     const event = rawEvent as SessionBeforeCompactEvent;
+
+    const hideSecrets = hideSecretsState(ompConfigFiles(ompAgentDir(), ctx.cwd ?? process.cwd()));
+    if (hideSecrets.state === "on") return fallback(ctx, `omp Hide Secrets is on in ${hideSecrets.file} and the hook receives the un-redacted region`);
+    if (hideSecrets.state === "unreadable") return fallback(ctx, `omp Hide Secrets could not be read from ${hideSecrets.file}`);
+
     const apiKey = resolveApiKey();
     if (!apiKey) return fallback(ctx, "TYPESAFE_API_KEY unset");
 

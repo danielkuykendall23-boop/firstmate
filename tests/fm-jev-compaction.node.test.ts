@@ -10,7 +10,7 @@
 // network-shaped test drives a fake fetch, injected either directly or as
 // the global fetch the registered session_before_compact handler picks up.
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -19,11 +19,13 @@ import registerJevCompaction, {
   buildFilesTag,
   compactOmpRegion,
   envFileValue,
+  hideSecretsState,
   mergeAudits,
   mergePreviousSummary,
   mergeSplitTurnSummary,
   nativeSummaryTokenCap,
   renderLibraryMessages,
+  secretsEnabledInConfig,
   toLibraryMessages,
   unretainableNativeHistory,
   type JevCompactionAudit,
@@ -86,7 +88,26 @@ function keepFirstDropRestFetch(seen: { headers: string[]; bodies: string[] }): 
 // and drives the session_before_compact handler it installs, exactly as omp would.
 
 type HookUi = { notify?: (message: string, kind?: string) => void; setStatus?: (key: string, text: string) => void };
-type Handler = (event: unknown, ctx: { ui?: HookUi }) => Promise<{ compaction: OmpCompactionResult } | undefined>;
+type Handler = (event: unknown, ctx: { ui?: HookUi; cwd?: string }) => Promise<{ compaction: OmpCompactionResult } | undefined>;
+
+// Every handler run reads omp's Hide Secrets switch from the agent directory
+// and the project; both default to fresh empty directories here so no test
+// ever reads this machine's real ~/.omp/agent/config.yml.
+const isolatedAgentDir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
+const isolatedProject = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
+
+function agentDirWith(config: string, file = "config.yml"): string {
+  const dir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
+  writeFileSync(join(dir, file), config);
+  return dir;
+}
+
+function projectWith(config: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
+  mkdirSync(join(dir, ".omp"));
+  writeFileSync(join(dir, ".omp", "config.yml"), config);
+  return dir;
+}
 
 // Loads the extension exactly as omp does at session start, with
 // FM_JEV_COMPACTION set as given for the duration of the load only.
@@ -146,12 +167,13 @@ function compactEvent(messagesToSummarize: OmpMessage[], overrides: Partial<OmpC
   };
 }
 
-function uiCapture(): { notes: string[]; ctx: { ui: HookUi } } {
+function uiCapture(cwd = isolatedProject): { notes: string[]; ctx: { ui: HookUi; cwd: string } } {
   const notes: string[] = [];
-  return { notes, ctx: { ui: { notify: (message) => { notes.push(message); }, setStatus: () => {} } } };
+  return { notes, ctx: { ui: { notify: (message) => { notes.push(message); }, setStatus: () => {} }, cwd } };
 }
 
-async function withEnv<T>(vars: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+async function withEnv<T>(overrides: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  const vars: Record<string, string | undefined> = { PI_CODING_AGENT_DIR: isolatedAgentDir, ...overrides };
   const saved = new Map(Object.keys(vars).map((k) => [k, process.env[k]] as const));
   for (const [k, v] of Object.entries(vars)) {
     if (v === undefined) delete process.env[k];
@@ -602,4 +624,104 @@ test("the same later compaction proceeds and installs when the previous compacti
   assert.ok(result);
   assert.ok(result.compaction.summary.startsWith(previousSummary), "the earlier Jev summary leads the installed replacement");
   assert.match(result.compaction.summary, /important content Jev should keep/);
+});
+
+test("secretsEnabledInConfig reads omp's Hide Secrets switch as config.yml states it, treats silence as off, and refuses to guess at forms it does not follow", () => {
+  assert.equal(secretsEnabledInConfig(""), false);
+  assert.equal(secretsEnabledInConfig("compaction:\n  thresholdTokens: 550000\n  methodOrder:\n    - remote\n    - shake\n"), false);
+  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: true\n"), true);
+  assert.equal(secretsEnabledInConfig("theme:\n  dark: x\nsecrets:\n  enabled: false # off for now\ncompaction:\n  thresholdTokens: 1\n"), false);
+  assert.equal(secretsEnabledInConfig("secrets.enabled: true\n"), true);
+  assert.equal(secretsEnabledInConfig("secrets:\n  patterns:\n    - AKIA\n  enabled: true\n"), true, "a sibling list inside the block must not hide the switch");
+  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: true\nsecrets.enabled: false\n"), false, "the last statement wins, as in omp's own layering");
+  assert.equal(secretsEnabledInConfig("secrets: { enabled: true }\n"), undefined, "a flow mapping is not followed, so the caller fails closed");
+  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: 'true'\n"), undefined);
+  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: yes\n"), undefined);
+  assert.equal(secretsEnabledInConfig("secrets: &s\n  enabled: true\n"), undefined);
+});
+
+test("hideSecretsState layers omp's config files like omp does and fails closed on a file it cannot read", () => {
+  const off = agentDirWith("secrets:\n  enabled: false\n");
+  const on = agentDirWith("secrets:\n  enabled: true\n");
+  const silent = agentDirWith("compaction:\n  thresholdTokens: 550000\n");
+  assert.deepEqual(hideSecretsState([join(silent, "config.yml"), join(isolatedProject, ".omp", "config.yml")]), { state: "off" });
+  assert.deepEqual(hideSecretsState([join(on, "config.yml"), join(isolatedProject, ".omp", "config.yml")]), { state: "on", file: join(on, "config.yml") });
+  const projectOff = projectWith("secrets:\n  enabled: false\n");
+  assert.deepEqual(hideSecretsState([join(on, "config.yml"), join(projectOff, ".omp", "config.yml")]), { state: "off" }, "a project file that states the switch overrides the global one");
+  const projectOn = projectWith("secrets.enabled: true\n");
+  assert.deepEqual(hideSecretsState([join(off, "config.yml"), join(projectOn, ".omp", "config.yml")]), { state: "on", file: join(projectOn, ".omp", "config.yml") });
+  const flow = agentDirWith("secrets: { enabled: false }\n");
+  assert.deepEqual(hideSecretsState([join(flow, "config.yml")]), { state: "unreadable", file: join(flow, "config.yml") });
+  const asDirectory = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
+  mkdirSync(join(asDirectory, "config.yml"));
+  assert.deepEqual(hideSecretsState([join(asDirectory, "config.yml")]), { state: "unreadable", file: join(asDirectory, "config.yml") });
+});
+
+// A region carrying a credential-shaped value omp's Hide Secrets would redact
+// before any provider request; the hook receives it un-redacted.
+function regionWithSecret(): OmpMessage[] {
+  return [
+    ...droppableRegion(),
+    { role: "bashExecution", command: "cat .env", output: "AWS_SECRET_ACCESS_KEY=REDACTED-BY-OMP-NATIVELY", exitCode: 0, cancelled: false, truncated: false, timestamp: 9 },
+  ];
+}
+
+// omp emits the identical session_before_compact event from a manual /compact
+// and from automatic threshold compaction, so one handler run stands for both.
+async function runPrivacyCase(agentDir: string, cwd: string) {
+  const handler = loadHandler();
+  const seen = { headers: [] as string[], bodies: [] as string[] };
+  const { notes, ctx } = uiCapture(cwd);
+  const result = await quietStderr(() =>
+    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k", PI_CODING_AGENT_DIR: agentDir }, () => handler(compactEvent(regionWithSecret()), ctx))));
+  return { result, seen, notes };
+}
+
+test("privacy: with omp Hide Secrets on in the agent directory's config.yml, the handler declines before anything is sent, so the un-redacted region never reaches Jev", async () => {
+  const { result, seen, notes } = await runPrivacyCase(agentDirWith("secrets:\n  enabled: true\n"), isolatedProject);
+  assert.equal(result, undefined, "native compaction, which omp redacts, must run instead");
+  assert.equal(seen.headers.length, 0, "no request may leave the machine");
+  assert.match(notes[0], /Hide Secrets is on in .*config\.yml/);
+});
+
+test("privacy: Hide Secrets on in the project's .omp/config.yml, or in a config.yaml, declines the same way", async () => {
+  const project = await runPrivacyCase(isolatedAgentDir, projectWith("secrets:\n  enabled: true\n"));
+  assert.equal(project.result, undefined);
+  assert.equal(project.seen.headers.length, 0);
+  assert.match(project.notes[0], /Hide Secrets is on in .*\.omp\/config\.yml/);
+
+  const yaml = await runPrivacyCase(agentDirWith("secrets:\n  enabled: true\n", "config.yaml"), isolatedProject);
+  assert.equal(yaml.result, undefined);
+  assert.equal(yaml.seen.headers.length, 0);
+  assert.match(yaml.notes[0], /Hide Secrets is on in .*config\.yaml/);
+});
+
+test("privacy: a config.yml the handler cannot read or follow declines before contacting Jev rather than assuming Hide Secrets is off", async () => {
+  const flow = await runPrivacyCase(agentDirWith("secrets: { enabled: false }\n"), isolatedProject);
+  assert.equal(flow.result, undefined);
+  assert.equal(flow.seen.headers.length, 0);
+  assert.match(flow.notes[0], /Hide Secrets could not be read from .*config\.yml/);
+
+  const unreadableDir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
+  mkdirSync(join(unreadableDir, "config.yml"));
+  const eisdir = await runPrivacyCase(unreadableDir, isolatedProject);
+  assert.equal(eisdir.result, undefined);
+  assert.equal(eisdir.seen.headers.length, 0);
+  assert.match(eisdir.notes[0], /could not be read/);
+});
+
+test("privacy: with Hide Secrets off, or absent, or overridden off by the project, the same region is sent to Jev and installed - the un-redacted disclosure is then the captain's documented opt-in", async () => {
+  for (const [agentDir, cwd] of [
+    [agentDirWith("secrets:\n  enabled: false\n"), isolatedProject],
+    [agentDirWith("compaction:\n  thresholdTokens: 550000\n"), isolatedProject],
+    [agentDirWith("secrets:\n  enabled: true\n"), projectWith("secrets:\n  enabled: false\n")],
+  ] as const) {
+    const { result, seen, notes } = await runPrivacyCase(agentDir, cwd);
+    assert.deepEqual(notes, []);
+    assert.equal(seen.headers.length, 1, "Jev is asked exactly once");
+    assert.match(seen.bodies[0], /cat \.env/, "the raw region reaches Jev when omp itself would not redact it either");
+    assert.ok(result);
+    assert.match(result.compaction.summary, /REDACTED-BY-OMP-NATIVELY/);
+  }
 });
