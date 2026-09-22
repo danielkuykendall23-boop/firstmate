@@ -577,6 +577,7 @@ Keep it proportionate: skip \`AGENTS.md\` edits for trivial tasks that produced 
 $DESKTOP_SECTION
 
 ## Jev review loop
+This loop applies only when you are running inside an OMP session, where Firstmate loads the \`jev_review\` tool; in any other harness skip this section silently, write no Jev status line, and keep the ordinary review and delivery path above.
 After the implementation commit, before starting no-mistakes, pushing a direct-PR, or reporting local-only ready, use \`jev_review\` with the task and focused diff to establish a baseline.
 Use the weakest important dimension to guide your own code inspection, not to manufacture a finding.
 Make only the smallest evidence-based improvement the accepted task needs, run the relevant checks, commit it, and rescore the current diff with the unchanged prior result as \`previousEvaluation\`.
@@ -584,7 +585,7 @@ Stop when requirements and checks pass and no justified improvement remains; nev
 The reviewer diagnoses and reports but remains read-only; the implementing worker owns fixes before validation.
 Scores never dismiss findings, authorize a merge, or replace agent judgment.
 Write the final evaluation JSON to \`$DATA/$ID/jev-review.json\` and append one \`working [at=<epoch>]:\` line with scores and deltas.
-If the tool is absent or reports unavailable, append one \`working [at=<epoch>]: jev_review unavailable - reviewing without Jev\` line and continue ordinary review.
+In an OMP session, if the tool is absent or reports unavailable, append one \`working [at=<epoch>]: jev_review unavailable - reviewing without Jev\` line and continue ordinary review.
 This loop is preparation, not an extra validation gate: once no-mistakes starts it alone owns the branch, review and fixes.
 Never hand-edit a pipeline-owned branch or add a parallel or post-pipeline review.
 

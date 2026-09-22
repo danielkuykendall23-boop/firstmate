@@ -83,7 +83,7 @@ No score dismisses a finding, authorizes an edit by a read-only reviewer, grants
 
 The `.omp/agents/reviewer.md` override preserves the bundled review criteria and tool restrictions, adds `jev_review`, and returns its evaluation through the optional `jev_evaluation` output field.
 The implementing worker, not the reviewer, makes justified fixes.
-`bin/fm-brief.sh` owns the ship-only improvement/rescore instructions and their stop condition.
+`bin/fm-brief.sh` owns the ship-only improvement/rescore instructions and their stop condition; the section tells the worker it applies only inside an OMP session, and a ship worker in any other harness skips it silently with no Jev status line.
 The loop runs before the selected delivery path starts; no-mistakes alone owns its branch and fixes after validation begins.
 Scouts have desktop guidance but no ship improvement loop.
 A previously configured external Jev server is not used by this tool; remove only that obsolete user-configured server entry before restarting, leaving unrelated servers unchanged.
