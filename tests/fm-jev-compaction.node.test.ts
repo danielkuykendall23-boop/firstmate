@@ -25,6 +25,7 @@ import registerJevCompaction, {
   nativeSummaryTokenCap,
   renderLibraryMessages,
   toLibraryMessages,
+  unretainableNativeHistory,
   type JevCompactionAudit,
   type OmpCompactionPreparation,
   type OmpCompactionResult,
@@ -532,4 +533,73 @@ test("the handler gives a split turn two separate Jev passes and gates on their 
   assert.equal(seen.headers.length, 1, "the text-only history needs no Jev request; the prefix needs one");
   assert.equal(result, undefined, "dropping 2.5k of ~22.5k characters is below the 25% minimum for the whole region");
   assert.match(notes[0], /below minimum/);
+});
+
+test("unretainableNativeHistory names the method-native history a text-only summary would drop, and nothing else", () => {
+  assert.equal(unretainableNativeHistory(undefined), undefined);
+  assert.equal(unretainableNativeHistory({}), undefined);
+  assert.equal(unretainableNativeHistory({ jevCompaction: { kept: 1 } }), undefined, "the extension's own earlier record is fully represented by the carried summary text");
+  assert.equal(unretainableNativeHistory({ openaiRemoteCompaction: { provider: "openai", replacementHistory: [] } }), "openaiRemoteCompaction");
+  assert.equal(unretainableNativeHistory({ snapcompact: { frames: [], text: "archived history" } }), "snapcompact");
+  assert.equal(unretainableNativeHistory({ openaiRemoteCompaction: "not an object" }), undefined, "omp's own readers ignore a non-object value, so there is nothing to lose");
+});
+
+// What omp hands the hook after a native OpenAI remote compaction: the entry's
+// summary is only a placeholder sentence, and the compacted history lives in
+// preserveData.openaiRemoteCompaction.replacementHistory.
+const openaiRemotePlaceholder = "Remote compaction preserved provider-native history for this session. Compaction processed 12345 input tokens.";
+const openaiRemotePreserveData = {
+  openaiRemoteCompaction: {
+    provider: "openai",
+    replacementHistory: [{ type: "message", role: "user", content: [{ type: "input_text", text: "history only the provider replay still holds" }] }],
+    compactionItem: { type: "compaction_summary" },
+  },
+};
+
+test("after a native OpenAI remote compaction the handler declines before contacting Jev, so native compaction keeps the replayed history the placeholder summary does not contain", async () => {
+  const handler = loadHandler();
+  const seen = { headers: [] as string[], bodies: [] as string[] };
+  const { notes, ctx } = uiCapture();
+  const event = compactEvent(droppableRegion(), { previousSummary: openaiRemotePlaceholder, previousPreserveData: openaiRemotePreserveData });
+  const result = await quietStderr(() =>
+    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  assert.equal(result, undefined, "a text-only summary would install the placeholder sentence and lose everything compaction #1 preserved");
+  assert.equal(seen.headers.length, 0, "no transcript is sent to Jev for a result that could not be installed anyway");
+  assert.match(notes[0], /previous compaction's openaiRemoteCompaction history cannot be carried/);
+});
+
+test("after a native snapcompact compaction the handler declines the same way, since its archive frames live beside the summary text", async () => {
+  const handler = loadHandler();
+  const seen = { headers: [] as string[], bodies: [] as string[] };
+  const { notes, ctx } = uiCapture();
+  const event = compactEvent(droppableRegion(), {
+    previousSummary: "Archived 40,000 chars of history onto 3 snapcompact frames",
+    previousPreserveData: { snapcompact: { frames: [{ data: "...", mimeType: "image/png", cols: 80, rows: 40, chars: 3200 }], text: "" } },
+  });
+  const result = await quietStderr(() =>
+    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  assert.equal(result, undefined);
+  assert.equal(seen.headers.length, 0);
+  assert.match(notes[0], /snapcompact history cannot be carried/);
+});
+
+test("the same later compaction proceeds and installs when the previous compaction was this extension's own, whose substance is the carried summary text", async () => {
+  const handler = loadHandler();
+  const seen = { headers: [] as string[], bodies: [] as string[] };
+  const { notes, ctx } = uiCapture();
+  const previousSummary = "user: earlier Jev-kept history\n\n<files>\nold.ts (Read)\n</files>";
+  const event = compactEvent(droppableRegion(), {
+    previousSummary,
+    previousPreserveData: { jevCompaction: { model: "jev-latest", kept: 1, dropped: ["old-call"], charsBefore: 900, charsAfter: 90 } },
+  });
+  const result = await quietStderr(() =>
+    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  assert.deepEqual(notes, []);
+  assert.equal(seen.headers.length, 1, "Jev is asked about the new region");
+  assert.ok(result);
+  assert.ok(result.compaction.summary.startsWith(previousSummary), "the earlier Jev summary leads the installed replacement");
+  assert.match(result.compaction.summary, /important content Jev should keep/);
 });

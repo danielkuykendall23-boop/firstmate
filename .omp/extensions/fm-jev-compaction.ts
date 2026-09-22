@@ -68,7 +68,16 @@
 // carried text is opaque to every later Jev pass, both gates below measure
 // the complete replacement - carried summary plus the new region - and hand
 // the whole thing to native compaction, which rewrites and bounds it, when
-// Jev's verbatim result cannot satisfy them.
+// Jev's verbatim result cannot satisfy them. Two native methods keep a
+// compaction's substance beside the entry's summary text rather than in it
+// (OpenAI remote compaction's replayed history under
+// preserveData.openaiRemoteCompaction, behind a placeholder summary
+// sentence; snapcompact's archive frames under preserveData.snapcompact),
+// and omp reads either back only from the newest compaction entry, so a
+// text-only hook result following one of them would silently drop it. When
+// preparation.previousPreserveData carries such a key the handler declines
+// before Jev is contacted and native compaction, which carries both forward
+// itself, runs instead.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
 // marker there (the vendored applyDecisions' own documented behavior), but
@@ -165,6 +174,7 @@ export type OmpCompactionPreparation = {
   isSplitTurn: boolean;
   tokensBefore: number;
   previousSummary?: string;
+  previousPreserveData?: Record<string, unknown>;
   fileOps: OmpFileOps;
   settings: OmpCompactionSettings;
 };
@@ -416,6 +426,19 @@ export function mergeAudits(a: JevCompactionAudit, b: JevCompactionAudit): JevCo
   };
 }
 
+// preserveData keys under which a native method keeps the substance of its
+// compaction beside the summary text; omp reads each back only from the
+// newest compaction entry, and a text-only summary cannot carry either.
+const NATIVE_PRESERVED_HISTORY_KEYS = ["openaiRemoteCompaction", "snapcompact"] as const;
+
+/** The key of a previous compaction's method-native history a text-only Jev result would drop, if any. */
+export function unretainableNativeHistory(previousPreserveData: Record<string, unknown> | undefined): string | undefined {
+  return NATIVE_PRESERVED_HISTORY_KEYS.find((key) => {
+    const value = previousPreserveData?.[key];
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  });
+}
+
 /** omp's own bound on a native summary, applied here to the complete replacement Jev would install. */
 export function nativeSummaryTokenCap(settings: OmpCompactionSettings): number {
   return Math.min(Math.floor(0.8 * (settings.reserveTokens ?? NATIVE_DEFAULT_RESERVE_TOKENS)), NATIVE_MAX_SUMMARY_TOKENS);
@@ -503,6 +526,9 @@ export default function (pi: ExtensionAPI): void {
     const historyRegion = event.preparation.messagesToSummarize;
     const turnPrefixRegion = event.preparation.isSplitTurn ? event.preparation.turnPrefixMessages : [];
     if (historyRegion.length === 0 && turnPrefixRegion.length === 0) return undefined; // nothing to summarize: let omp handle it
+
+    const nativeHistory = unretainableNativeHistory(event.preparation.previousPreserveData);
+    if (nativeHistory) return fallback(ctx, `the previous compaction's ${nativeHistory} history cannot be carried by a text-only summary`);
 
     const options: JevRegionOptions = { apiKey };
 
