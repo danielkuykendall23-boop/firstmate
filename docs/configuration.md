@@ -508,22 +508,29 @@ Valid files stay silent by default; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstr
 Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
 While typed resolution is active, malformed `approval`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
 Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
-While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
+While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness or a clear `--resolve` result; malformed configuration must be reported and corrected rather than selected around.
 Secondmate homes inherit this file from the primary, so a secondmate's own crewmates apply the same dispatch profile behavior.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
 It is off unless `TYPESAFE_API_KEY` is non-empty in the calling environment or the home's gitignored `.env` holds a `TYPESAFE_API_KEY=` line; the environment wins, matching the Relay and mail-plane contracts, and the Relay accessor in `bin/fm-env-lib.sh` reads the line.
-Off means one `dispatch-resolve: off` line on stderr, nothing on stdout, exit 0, and no network call, so firstmate dispatches exactly as it does without the tool.
+Off means one `dispatch-resolve: off` line on stderr, nothing on stdout in the default text format (or `{"status":"off"}` with `--json`), exit 0, and no network call, leaving the existing selection unchanged.
 This section is the single owner of the tool's operator contract; the script header owns its exact flags and output lines, and "Crew dispatch profiles" above owns the declared rule and profile fields it applies.
 Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFIG_OVERRIDE` selects the config directory for tests and specialized setup like the other scripts.
 
 ```sh
 bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>        # TOON block on stdout
+bin/fm-spawn.sh <id> <project-dir> --mode no-mistakes --yolo off --resolve
 ```
 
-Firstmate invokes the resolve path directly after writing the brief, without a preflight; the absent-key off line is handled exactly like every other non-clear outcome.
+Firstmate normally passes `--resolve` for a single new ship or scout, so resolution reads the written brief within the launch rather than relying on copied shell flags.
+The launch consumes the resolver's structured `--json` result without evaluating shell text.
+Explicit harness (including the positional form), model, and effort each win over the corresponding resolved axis.
+Any non-clear result, missing key, malformed result, or resolver failure refuses before launching, even if all three axes were supplied.
+The resolver result remains visible for the existing intake; to proceed after that intake, omit `--resolve` and pass its concrete selection explicitly.
+Secondmate spawns, relaunches, and batch pairs reject `--resolve`.
+Successful resolution records `dispatch=resolved` and `dispatch_rule=` beside the effective model and effort in the task metadata.
 When on and at least one rule exists, the tool sends the project name and the whole brief as state and asks one Choice question whose options are every rule's `when` plus the fixed neutral option for no matching rule; the model never sees quota, catalogs, `why`, `use`, or approvals.
 An absent rules file, a default-only file, or `rules: []` returns the non-clear reason `no rules to match` without a model or quota request, leaving firstmate's existing routing in control; an existing but unreadable or malformed rules file, including a broken symlink, remains an actionable exit 2 configuration error.
 Everything after the answer runs in code: the confidence floor, the matched rule's `approval` and `floor`, each candidate's `provider` and `floor`, every applicable account-wide and model/product row from one `quota-axi --json` snapshot, and the numeric `spendPriority` argmax over candidates using each candidate's limiting row.
@@ -537,12 +544,36 @@ Only a usage or configuration error exits 2: an unreadable brief, an existing bu
 Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
 The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captain-approval gate, or `fm-spawn.sh` validation; `AGENTS.md` section 4 owns what firstmate does with each outcome.
 By accepted design, a `clear` result does not enforce catalog/authentication, reasoning-class, or completion-runway gates.
-Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
+Firstmate may inspect the resolver directly before launch when a judgment or override is needed; every non-clear result returns to the full existing intake.
 
 The resolver and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
 The resolver sends the key to `curl` only as a header read from a file descriptor, never on argv, and nothing prints, logs, or writes it.
 The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
+
+### Primary routing (.omp/extensions/fm-jev-route.ts)
+
+The OMP extension chooses once on the first user-work prompt of a session, on an explicit `todo init` plan boundary, or on `/jev-route [goal]`.
+An omitted todo operation routes only after OMP reports a successful inferred `init`; append, progress updates, routine follow-up turns, and compaction do not reroute.
+The command uses its argument or the last user prompt; a todo boundary adds the new task items to that prompt.
+The extension is inactive for `FM_TASK_ID` workers and `FM_JEV_ROUTE=0`, and only acts in the owning home's interactive or RPC primary session.
+Workers use spawn-time selection instead; native Claude Code and unrelated OMP sessions are unchanged.
+Without a key the command remains available and reports `Jev route: off - model unchanged`.
+
+Primary profiles must use `harness: "omp"` and an exact authenticated `provider/id` from the current OMP catalog.
+Configure the rules to prefer reliable completion and admit cheaper or faster candidates only for well-suited work.
+The existing provider declarations, quota floors, confidence and approval rules above remain in force.
+Launch-time `--model`, `--provider`, and `--thinking` overrides win per axis; a subsequent manual model or effort change also stays authoritative at later boundaries.
+Natural-language requests for a particular model or effort must be enacted through OMP's selection controls, or passed as explicit spawn flags.
+The extension uses the registry model object with `setModel` and the session-only `setThinkingLevel`, never saved global defaults.
+An unavailable model, unsupported effort, non-OMP profile, or unresolved `auto` thinking retains the previous selection and reports an error rather than silently selecting another provider or effort.
+Other non-clear resolver outcomes likewise leave the model unchanged and disclose the fallback.
+
+Task context is passed to the resolver in a private temporary directory with a mode-600 file, removed when the bounded 15-second resolver call finishes.
+Only routing metadata is appended to the effective home's `state/.jev-route.log` (or `FM_STATE_OVERRIDE`): timestamp, trigger, status, model, effort, rule identifier, and confidence.
+Prompts, secrets, resolver diagnostics, and temporary filenames are not logged.
+The resolver owns key lookup; the extension never reads a credential store or enables production access.
+[`verification/dispatch-resolve.md`](verification/dispatch-resolve.md) owns the token-free RPC guard and separately identifies pending authenticated proof.
 
 ## Toolchain
 

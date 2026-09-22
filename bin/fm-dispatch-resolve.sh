@@ -3,7 +3,7 @@
 # profile from a task brief with typesafe.ai's System One model (Jev), opt-in.
 #
 # Usage:
-#   fm-dispatch-resolve.sh <brief-file> [--project <name>]
+#   fm-dispatch-resolve.sh <brief-file> [--project <name>] [--json]
 #
 # Opt-in gate: TYPESAFE_API_KEY non-empty in this process environment, else a
 #   TYPESAFE_API_KEY= line in $FM_HOME/.env read with fmx_env_get, the same
@@ -34,6 +34,9 @@
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>]     (status clear only)
+#   --json emits the structured result instead (chosen.profile holds the axes).
+#   Off emits {"status":"off"} in JSON mode; usage/configuration failures still
+#   exit 2, with diagnostics on stderr. No shell evaluation is needed by callers.
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> the rule requires captain approval, no candidate is rankable, or a genuine tie
@@ -77,7 +80,11 @@ DEFAULT_WHEN="No listed rule applies to this task."
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
 no_rules() {
-  printf 'dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n'
+  if [ "$JSON" -eq 1 ]; then
+    printf '%s\n' '{"status":"escalate","reason":"no rules to match"}'
+  else
+    printf 'dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n'
+  fi
   exit 0
 }
 usage() {
@@ -88,10 +95,11 @@ usage() {
   ' "$0"
 }
 
-BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES=''
+BRIEF='' PROJECT='' RULES_PATH="$CONFIG/crew-dispatch.json" RULES='' JSON=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --project) [ $# -ge 2 ] || die "--project needs a value"; PROJECT=$2; shift 2 ;;
+    --json) JSON=1; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) die "unknown flag $1" ;;
     *) [ -z "$BRIEF" ] || die "one brief file only"; BRIEF=$1; shift ;;
@@ -104,6 +112,7 @@ if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
 fi
 if [ -z "$TYPESAFE_API_KEY_PRIVATE" ]; then
   echo "dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and $FM_HOME/.env)" >&2
+  [ "$JSON" -eq 0 ] || printf '%s\n' '{"status":"off"}'
   exit 0
 fi
 
@@ -208,7 +217,11 @@ RULE_COUNT=$(jq -r '(.rules // []) | length' "$RULES")
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
-  printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
+  if [ "$JSON" -eq 1 ]; then
+    jq -nc --arg reason "$reason" '{status:"error",reason:$reason}'
+  else
+    printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
+  fi
   exit 0
 }
 
@@ -379,6 +392,11 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       end
     end
   end') || emit_error "resolution failed"
+
+if [ "$JSON" -eq 1 ]; then
+  printf '%s\n' "$RESULT"
+  exit 0
+fi
 
 TEXT=$(jq -r '
   def flat: tostring | gsub("[\t\r\n]"; " ");

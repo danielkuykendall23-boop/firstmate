@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Spawn a direct report: a crewmate in a treehouse or Orca worktree, or a
 # secondmate in its isolated firstmate home.
-# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
-#        fm-spawn.sh <task-id> <project-dir> --scout [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
+# Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--resolve] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
+#        fm-spawn.sh <task-id> <project-dir> --scout [--resolve] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
@@ -67,6 +67,12 @@
 #   from that harness's launch rather than guessed. Ultra is the explicit
 #   exception: bin/fm-harness.sh validate-native-effort owns its model scope;
 #   supported Pi launches receive --codex-effort ultra, never --thinking ultra.
+#   --resolve asks fm-dispatch-resolve.sh --json about the written brief before
+#   a ship/scout launch. Explicit harness (including positional), model, and
+#   effort each win over the resolved axis. Any non-clear result refuses with
+#   exit 2, including off; omit --resolve for a deliberate manual selection.
+#   Refused for --secondmate, --relaunch, and batch pairs. Records
+#   dispatch=resolved and dispatch_rule=<rule id and excerpt> in task metadata.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
@@ -145,8 +151,8 @@
 #   contention refuses rather than waits.
 #   With no harness arg, a crewmate/scout spawn resolves the CREW harness only when
 #   config/crew-dispatch.json is absent. When that file exists, crewmate/scout
-#   spawns require an explicit harness so firstmate cannot silently skip dispatch
-#   profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
+#   spawns require an explicit harness or --resolve so firstmate cannot silently
+#   skip profile consultation. A --secondmate spawn is exempt and resolves the SECONDMATE
 #   harness (config/secondmate-harness -> config/crew-harness -> own), so the
 #   secondmate-vs-crewmate split is DURABLE across every respawn (recovery,
 #   /updatefirstmate, restart). A bare adapter name (claude|codex|opencode|pi|pi-signed|grok|kimi|cursor|gemini|muse|rovo|omp|agy)
@@ -579,6 +585,8 @@ MODE_SET=0
 YOLO_SET=0
 TRACEPARENT_SET=0
 RELAUNCH=0
+RESOLVE=0
+DISPATCH_RULE=
 POS=()
 want_value=
 for a in "$@"; do
@@ -636,6 +644,7 @@ for a in "$@"; do
     KIND_SET=1
     ;;
   --relaunch) RELAUNCH=1 ;;
+  --resolve) RESOLVE=1 ;;
   --harness) want_value=harness ;;
   --harness=*)
     HARNESS_ARG=${a#--harness=}
@@ -678,6 +687,10 @@ done
   echo "error: --$want_value requires a value" >&2
   exit 1
 }
+if [ "$RESOLVE" -eq 1 ] && { [ "$KIND" = secondmate ] || [ "$RELAUNCH" -eq 1 ]; }; then
+  echo "error: --resolve applies only to new single-task ship/scout spawns" >&2
+  exit 2
+fi
 [ "$HARNESS_SET" -eq 0 ] || [ -n "$HARNESS_ARG" ] || {
   echo "error: --harness requires a non-empty value" >&2
   exit 1
@@ -1337,6 +1350,10 @@ if [ "$RELAUNCH" -eq 1 ] && [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart"
   exit 1
 fi
 if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in */*) false ;; *) true ;; esac then
+  if [ "$RESOLVE" -eq 1 ]; then
+    echo "error: --resolve does not support batch pairs; resolve each written brief separately" >&2
+    exit 2
+  fi
   if [ "$KIND" != secondmate ] && [ -z "$HARNESS_ARG" ] && [ -f "$CONFIG/crew-dispatch.json" ]; then
     echo "error: config/crew-dispatch.json is active - pass an explicit harness resolved from the dispatch rules (the consultation backstop, so the rules are never silently skipped)." >&2
     exit 1
@@ -1721,6 +1738,37 @@ else
   ARG3=${POS[2]:-}
 fi
 [ -z "$HARNESS_ARG" ] || ARG3=$HARNESS_ARG
+
+if [ "$RESOLVE" -eq 1 ]; then
+  dispatch_status=error
+  dispatch_rc=0
+  dispatch_result=$(FM_HOME="$FM_HOME" "$FM_ROOT/bin/fm-dispatch-resolve.sh" \
+    "$DATA/$ID/brief.md" --project "$(basename "$PROJ")" --json) || dispatch_rc=$?
+  [ -z "$dispatch_result" ] || printf '%s\n' "$dispatch_result"
+  if [ "$dispatch_rc" -eq 0 ]; then
+    dispatch_status=$(jq -er '.status | select(. == "clear" or . == "off" or . == "ambiguous" or . == "escalate" or . == "error")' \
+      <<< "$dispatch_result" 2>/dev/null) || dispatch_status=error
+  fi
+  if [ "$dispatch_status" = clear ]; then
+    # Validate the data interface before copying strings; never evaluate flags.
+    if ! jq -e '
+      def axis: type == "string" and length > 0 and (test("[\u0000-\u001f\u007f]") | not);
+      .chosen.profile | (.harness | axis)
+        and (if has("model") then (.model | axis) else true end)
+        and (if has("effort") then (.effort as $e | ["low","medium","high","xhigh","max","ultra"] | index($e) != null) else true end)
+    ' <<< "$dispatch_result" >/dev/null 2>&1; then
+      dispatch_status=error
+    fi
+  fi
+  if [ "$dispatch_status" != clear ]; then
+    echo "fm-spawn: dispatch resolution $dispatch_status; pass explicit --harness/--model/--effort without --resolve or fix the reported reason" >&2
+    exit 2
+  fi
+  [ -n "$ARG3" ] || ARG3=$(jq -r '.chosen.profile.harness' <<< "$dispatch_result")
+  [ "$MODEL_SET" -eq 1 ] || MODEL=$(jq -r '.chosen.profile.model // ""' <<< "$dispatch_result")
+  [ "$EFFORT_SET" -eq 1 ] || EFFORT=$(jq -r '.chosen.profile.effort // ""' <<< "$dispatch_result")
+  DISPATCH_RULE=$(jq -r '[.rule // "", .rule_when // ""] | join(" ") | gsub("[\r\n\t]"; " ")' <<< "$dispatch_result")
+fi
 
 shell_quote() {
   printf "'"
@@ -4470,6 +4518,10 @@ preserve_relaunch_meta() {
   echo "tasktmp=$TASK_TMP"
   echo "model=${MODEL:-default}"
   echo "effort=${EFFORT:-default}"
+  if [ "$RESOLVE" -eq 1 ]; then
+    echo "dispatch=resolved"
+    echo "dispatch_rule=$DISPATCH_RULE"
+  fi
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
   # Default-off writes no traceparent= line.

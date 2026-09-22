@@ -246,6 +246,19 @@ assert_not_contains "$body" 'spendPriority' "quota never leaves the machine"
 assert_not_contains "$body" 'cursor-grok' "use profiles never leave the machine"
 pass "clear: one rule Choice request, key on the fd header only, spendPriority argmax over every candidate"
 
+# The data interface preserves values as data rather than shell flags.
+reset_log
+TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" --project pager --json
+expect_code 0 "$code" "structured resolution exits 0"
+assert_equals 'clear' "$(jq -r '.status' <<<"$out")" "JSON exposes the decision"
+assert_equals 'cursor-grok-4.6-medium' "$(jq -r '.chosen.profile.model' <<<"$out")" "JSON exposes the selected model"
+assert_equals 'rule_4' "$(jq -r '.rule' <<<"$out")" "JSON retains the matched rule"
+run code out err "$BRIEF" --json
+assert_equals '{"status":"off"}' "$out" "JSON off is explicit without a key"
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=503 run code out err "$BRIEF" --json
+assert_equals 'error' "$(jq -r '.status' <<<"$out")" "JSON errors are structured"
+pass "JSON resolution and fallback need no shell evaluation"
+
 # --- rules are snapshotted and line output is injection-safe -------------------
 MUTATED_RULES="$TMP_ROOT/mutated-rules.json"
 jq '.rules[3].use = {"harness":"claude","model":"opus"}' "$BASE_RULES" > "$MUTATED_RULES"
@@ -320,7 +333,7 @@ assert_contains "$out" "  profile: --harness 'gemini' --model 'gemini-3.8-flash-
 
 cp "$ROOT/docs/examples/crew-dispatch.json" "$RULES"
 cat > "$RESPONSE" <<'JSON'
-{"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"default","confidence":0.9,"probabilities":{"rule_1":0.02,"rule_2":0.02,"rule_3":0.02,"default":0.94}}},"usage":{"input_tokens":812,"output_tokens":60}}
+{"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"default","confidence":0.9,"probabilities":{"rule_1":0.02,"rule_2":0.02,"rule_3":0.02,"rule_4":0.02,"default":0.92}}},"usage":{"input_tokens":812,"output_tokens":60}}
 JSON
 reset_log
 TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
@@ -623,7 +636,7 @@ for bad in \
 done
 assert_absent "$LOG/argv" "configuration errors never reach the network"
 cp "$BASE_RULES" "$RULES"
-for removed in --json --rules --quota; do
+for removed in --rules --quota; do
   TYPESAFE_API_KEY=$KEY run code out err "$BRIEF" "$removed"
   expect_code 2 "$code" "removed option is rejected: $removed"
   assert_contains "$err" "unknown flag $removed" "removed option has no public path: $removed"

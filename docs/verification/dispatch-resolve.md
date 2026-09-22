@@ -71,3 +71,72 @@ $ bash tests/fm-dispatch-resolve.test.sh | tail -1
 ```
 
 A live run needs a key and is not part of the suite; rerun the table above by pointing the tool at a brief with the key injected for that one command.
+
+## Primary and spawn routing: fake endpoint
+
+Verified 2026-09-22 on macOS arm64 with omp/18.2.8, Node v24.11.1, and jq-1.7.1-apple.
+These commands exercise the real resolver and OMP runtime without production Jev credentials or provider tokens:
+
+```sh
+bin/fm-test-run.sh tests/fm-dispatch-resolve.test.sh
+bin/fm-test-run.sh tests/fm-spawn-resolve.test.sh
+bin/fm-test-run.sh tests/fm-jev-route.test.sh
+bin/fm-test-run.sh tests/fm-jev-route-live-e2e.test.sh
+```
+
+The spawn fixture verifies clear selection, independent explicit axes, the positional harness override, scout routing, non-clear refusal before launch, and rejection of secondmate, relaunch, and batch resolution.
+The portable extension tests cover session and todo boundaries, inferred todo operations, worker and unrelated-session isolation, fallback, explicit selection during an in-flight decision, obsolete-session decisions, unsupported effort, and private temporary-file cleanup.
+The live guard uses a private `FM_HOME`, separate synthetic user home and agent configuration, fake quota, and loopback Jev and chat endpoints.
+It asserts the model used by an actual OMP chat request, not merely a routing log.
+
+Observed live-guard output:
+
+```text
+ok - omp/18.2.8 fake endpoint: initial/low -> routed/high; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 no key: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - fake Jev requests=3; real OMP chat requests=7; real global config metadata unchanged; authenticated Jev proof pending
+```
+
+The verified API is `pi.setModel(ctx.models.resolve("provider/id"))`: passing a selector string directly returned `false`, while the registry model object returned `true` and changed the active model.
+`pi.setThinkingLevel("high")` changed the session's effort without changing saved configuration.
+The guard checks the isolated saved config's bytes and modification time and the real global config's size and modification time, without reading real credentials.
+An RPC `prompt` response acknowledges a slash command before its handler completes; the guard waits for that command's matching `prompt_result` before checking its final model.
+`FM_JEV_ROUTE_LIVE_E2E=1` requires the installed runtime and tools rather than allowing a capability skip.
+
+## Pending live proof
+
+The following checks remain unrun until a real key, credits, and user-authorized OMP login exist.
+The fake-endpoint results above do not establish production authentication, account access, or real Jev rule quality.
+Run from the real Firstmate home, with real `curl` and quota tools on `PATH`, no fake provider or transport, and no worker marker:
+
+```sh
+FM_HOME=/Users/danielkuykendall/kun-agent-workspace bin/fm-dispatch-resolve.sh data/env-jev-route/brief.md --project kun-agent-workspace
+```
+
+Require `clear`, a matched rule, and confidence at least 0.6; a different outcome is evidence to inspect, not permission to force a launch.
+Next, start a separate RPC process without other extensions or a saved session:
+
+```sh
+env -u FM_TASK_ID -u FM_JEV_ROUTE FM_HOME=/Users/danielkuykendall/kun-agent-workspace \
+  omp --mode rpc --no-session --no-extensions --no-skills --no-rules --tools todo \
+  -e .omp/extensions/fm-jev-route.ts
+```
+
+After its `ready` event and registration of `jev-route`, send these JSON records one at a time, waiting for the first state response and then `agent_end` before the final state request:
+
+```json
+{"id":"before","type":"get_state"}
+{"id":"route","type":"prompt","message":"Choose the model and effort for this task, then reply ROUTE_LIVE_OK without tools."}
+{"id":"after","type":"get_state"}
+```
+
+Require a clear routing record and a corresponding active-model switch in RPC, with saved global model configuration unchanged.
+Select an authorized rule whose model differs from the initial selection so the switch assertion is not vacuous.
+Finally, after filing a newly authorized ship task and writing its real brief, exercise spawn-time selection through the normal guarded launch:
+
+```sh
+bin/fm-spawn.sh <new-task-id> <project-dir> --mode no-mistakes --yolo off --resolve
+```
+
+Require adoption of the resolver's clear axes or refusal before launch for any other outcome, preserving explicit flags per axis.
+Do not reuse an active task id or dispatch a synthetic production task merely to obtain this evidence.

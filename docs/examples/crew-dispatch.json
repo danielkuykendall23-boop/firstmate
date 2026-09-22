@@ -17,6 +17,14 @@
         { "harness": "codex", "model": "gpt-5.5", "effort": "high" }
       ],
       "why": "Use a strong coding profile for big, ambiguous work; resolve the alternatives through quota-array-dispatch."
+    },
+    {
+      "when": "An OMP task or primary plan needs reliable multi-step implementation or careful analysis.",
+      "use": [
+        { "harness": "omp", "model": "openai-codex/gpt-6-astra", "effort": "high", "provider": "codex" },
+        { "harness": "omp", "model": "anthropic/claude-sonnet-5", "effort": "high", "provider": "claude" }
+      ],
+      "why": "Prefer reliable completion; use provider-declared alternatives only where they fit the work."
     }
   ],
   "default": [
