@@ -527,7 +527,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 
 # Rules
 $RULE1
-2. Stay inside this worktree except for the status, steering-inbox acknowledgements, Jev evaluation and no-mistakes findings artifacts explicitly named below.
+2. Stay inside this worktree except for the status, steering-inbox acknowledgement and Jev evaluation artifacts explicitly named below.
 3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
 4. Report status by appending one line:
    \`echo "{state} [at=<epoch>]: {one short line}" >> $STATUS_FILE\`
