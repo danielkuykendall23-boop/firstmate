@@ -1,12 +1,17 @@
 // Optional Jev-guided compaction for omp (Oh My Pi).
 //
-// Off by default. Set FM_JEV_COMPACTION=1 to activate this extension's
-// session_before_compact handler; otherwise it registers and immediately
-// no-ops, so omp's own compaction.methodOrder and compaction.thresholdTokens
-// (verified live in this environment as ["remote","handoff","snapcompact",
-// "shake","soft"] and 550000 respectively - see docs/jev-compaction.md
-// "Verified against a real omp session") are never touched by a default
-// launch. This never writes to a captain's ~/.omp/agent/config.yml.
+// Off by default. Set FM_JEV_COMPACTION=1 in the environment that launches
+// omp to register this extension's session_before_compact handler;
+// otherwise the default export returns without registering anything, so
+// omp sees no compaction hook at all. That matters beyond the handler: omp
+// disables its speculative (background) compaction whenever any
+// session_before_compact handler exists, so a default launch must leave it
+// with none, and omp's own compaction.methodOrder and
+// compaction.thresholdTokens (verified live in this environment as
+// ["remote","handoff","snapcompact","shake","soft"] and 550000 respectively
+// - see docs/jev-compaction.md "Verified against a real omp session") are
+// never touched by a default launch. This never writes to a captain's
+// ~/.omp/agent/config.yml.
 //
 // This is an OMP adapter around the real, pinned upstream decision
 // algorithm - not a reimplementation of it. `./vendor/fast-jev-compaction/`
@@ -59,7 +64,11 @@
 // nothing omp keeps out of the model's context reaches Jev or the summary.
 // An earlier compaction's summary never sits in the region: omp passes it
 // as preparation.previousSummary, and the handler prepends it verbatim so a
-// second compaction never discards what the first one kept.
+// second compaction never discards what the first one kept. Because that
+// carried text is opaque to every later Jev pass, both gates below measure
+// the complete replacement - carried summary plus the new region - and hand
+// the whole thing to native compaction, which rewrites and bounds it, when
+// Jev's verbatim result cannot satisfy them.
 //
 // A dropped call/result is omitted from the rendered summary with no recall
 // marker there (the vendored applyDecisions' own documented behavior), but
@@ -67,8 +76,9 @@
 // already keeps regardless of method, and every decision (kept/truncated/
 // dropped, by omp tool-call id) is written to preserveData.jevCompaction for
 // audit, straight from the vendored library's own result.decisions/stats. On
-// any failure - missing key, network error, malformed Jev response, or an
-// estimated character reduction below MIN_REDUCTION_RATIO - this returns
+// any failure - missing key, network error, malformed Jev response, a
+// whole-context character reduction below MIN_REDUCTION_RATIO, or a
+// replacement above omp's own native summary token cap - this returns
 // undefined and visibly notifies a native-fallback status; it never reports
 // Jev success when Jev did not run.
 //
@@ -82,6 +92,7 @@ import { fileURLToPath } from "node:url";
 import {
   collectToolCalls,
   compact,
+  estimateTokens,
   JevClient,
   resolveOptions,
   type CompactOptions,
@@ -139,6 +150,13 @@ export type OmpFileOps = {
   edited: Iterable<string>;
 };
 
+// omp's compaction settings as the hook receives them; reserveTokens is the
+// one field the native summary cap below depends on.
+export type OmpCompactionSettings = {
+  reserveTokens?: number;
+  [key: string]: unknown;
+};
+
 export type OmpCompactionPreparation = {
   firstKeptEntryId: string;
   messagesToSummarize: OmpMessage[];
@@ -148,7 +166,7 @@ export type OmpCompactionPreparation = {
   tokensBefore: number;
   previousSummary?: string;
   fileOps: OmpFileOps;
-  settings: Record<string, unknown>;
+  settings: OmpCompactionSettings;
 };
 
 export type SessionBeforeCompactEvent = {
@@ -161,7 +179,7 @@ export type OmpCompactionResult = {
   firstKeptEntryId: string;
   tokensBefore: number;
   fromExtension: true;
-  preserveData: { jevCompaction: JevCompactionAudit };
+  preserveData: { jevCompaction: JevCompactionRecord };
 };
 
 export type JevCompactionAudit = {
@@ -178,9 +196,23 @@ export type JevCompactionAudit = {
   reductionRatio: number;
 };
 
+// The audit as installed: the region stats above, re-measured over the
+// complete replacement (carried previous summary included) with omp's own
+// summary cap beside the estimated size of what was installed.
+export type JevCompactionRecord = JevCompactionAudit & {
+  previousSummaryChars: number;
+  summaryTokens: number;
+  summaryTokenCap: number;
+};
+
 const JEV_MODEL = "jev-latest";
 const MIN_REDUCTION_RATIO = 0.25;
 const FILES_TAG_LIMIT = 20;
+// omp 18.2.5 caps every native summary at
+// min(floor(0.8 * compaction.reserveTokens), MAX_SUMMARY_TOKENS), with the
+// default reserve and MAX_SUMMARY_TOKENS both 16384.
+const NATIVE_MAX_SUMMARY_TOKENS = 16384;
+const NATIVE_DEFAULT_RESERVE_TOKENS = 16384;
 
 const extensionFile = fileURLToPath(import.meta.url);
 const root = resolve(dirname(extensionFile), "../..");
@@ -330,8 +362,9 @@ export function mergeSplitTurnSummary(history: string, turnPrefix: string): stri
  * omp never places an earlier compaction's summary in the region; it arrives
  * as preparation.previousSummary, and buildSessionContext afterwards reads
  * only the newest compaction entry, so it must lead the new summary or be
- * lost. Kept verbatim, so Jev summaries accumulate across compactions; the
- * reduction gate only ever measures the newly compacted region.
+ * lost. Kept verbatim, so the carried text is opaque to every later Jev
+ * pass; installedRecord therefore measures both gates over the complete
+ * replacement rather than the new region alone.
  */
 export function mergePreviousSummary(previous: string | undefined, current: string): string {
   if (!previous) return current;
@@ -380,6 +413,28 @@ export function mergeAudits(a: JevCompactionAudit, b: JevCompactionAudit): JevCo
     charsBefore,
     charsAfter,
     reductionRatio: reduction(charsBefore, charsAfter),
+  };
+}
+
+/** omp's own bound on a native summary, applied here to the complete replacement Jev would install. */
+export function nativeSummaryTokenCap(settings: OmpCompactionSettings): number {
+  return Math.min(Math.floor(0.8 * (settings.reserveTokens ?? NATIVE_DEFAULT_RESERVE_TOKENS)), NATIVE_MAX_SUMMARY_TOKENS);
+}
+
+/**
+ * The region audit re-measured as installed: the carried previous summary
+ * counts on both sides of the reduction, so a small region that shrank a lot
+ * cannot pass once the verbatim carry dominates, and the whole replacement's
+ * estimated size stands beside the native cap it must fit.
+ */
+export function installedRecord(audit: JevCompactionAudit, previousSummary: string, summary: string, settings: OmpCompactionSettings): JevCompactionRecord {
+  const previousSummaryChars = previousSummary.length;
+  return {
+    ...audit,
+    previousSummaryChars,
+    reductionRatio: reduction(previousSummaryChars + audit.charsBefore, previousSummaryChars + audit.charsAfter),
+    summaryTokens: estimateTokens(summary),
+    summaryTokenCap: nativeSummaryTokenCap(settings),
   };
 }
 
@@ -438,9 +493,9 @@ function fallback(ctx: HookContext, reason: string): undefined {
 }
 
 export default function (pi: ExtensionAPI): void {
-  pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
-    if (process.env.FM_JEV_COMPACTION !== "1") return undefined;
+  if (process.env.FM_JEV_COMPACTION !== "1") return;
 
+  pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
     const event = rawEvent as SessionBeforeCompactEvent;
     const apiKey = resolveApiKey();
     if (!apiKey) return fallback(ctx, "TYPESAFE_API_KEY unset");
@@ -466,15 +521,20 @@ export default function (pi: ExtensionAPI): void {
       return fallback(ctx, error instanceof Error ? error.message : "Jev request failed");
     }
 
-    if (merged.audit.reductionRatio < MIN_REDUCTION_RATIO) {
-      return fallback(ctx, `reduction ${(merged.audit.reductionRatio * 100).toFixed(0)}% below minimum`);
+    const previousSummary = event.preparation.previousSummary ?? "";
+    const filesTag = buildFilesTag(event.preparation.fileOps);
+    const text = mergePreviousSummary(previousSummary, merged.text);
+    const summary = filesTag ? `${text}\n\n${filesTag}` : text;
+    const record = installedRecord(merged.audit, previousSummary, summary, event.preparation.settings);
+
+    if (record.reductionRatio < MIN_REDUCTION_RATIO) {
+      return fallback(ctx, `reduction ${(record.reductionRatio * 100).toFixed(0)}% of the whole context below minimum`);
+    }
+    if (record.summaryTokens > record.summaryTokenCap) {
+      return fallback(ctx, `replacement of ~${record.summaryTokens} tokens exceeds omp's ${record.summaryTokenCap}-token summary cap`);
     }
 
-    const filesTag = buildFilesTag(event.preparation.fileOps);
-    const text = mergePreviousSummary(event.preparation.previousSummary, merged.text);
-    const summary = filesTag ? `${text}\n\n${filesTag}` : text;
-
-    const statusText = `Jev compaction: kept ${merged.audit.kept}, truncated ${merged.audit.truncated}, dropped ${merged.audit.dropped.length} of ${merged.audit.candidateCalls} calls (${(merged.audit.reductionRatio * 100).toFixed(0)}% reduction)`;
+    const statusText = `Jev compaction: kept ${record.kept}, truncated ${record.truncated}, dropped ${record.dropped.length} of ${record.candidateCalls} calls (${(record.reductionRatio * 100).toFixed(0)}% reduction of the whole context, ~${record.summaryTokens} of ${record.summaryTokenCap} tokens)`;
     console.error(`[fm-jev-compaction] ${statusText}`);
     ctx.ui?.setStatus?.("jev-compaction", statusText);
 
@@ -483,7 +543,7 @@ export default function (pi: ExtensionAPI): void {
       firstKeptEntryId: event.preparation.firstKeptEntryId,
       tokensBefore: event.preparation.tokensBefore,
       fromExtension: true,
-      preserveData: { jevCompaction: merged.audit },
+      preserveData: { jevCompaction: record },
     };
     return { compaction };
   });

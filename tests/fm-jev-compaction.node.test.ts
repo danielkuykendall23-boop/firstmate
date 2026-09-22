@@ -22,11 +22,13 @@ import registerJevCompaction, {
   mergeAudits,
   mergePreviousSummary,
   mergeSplitTurnSummary,
+  nativeSummaryTokenCap,
   renderLibraryMessages,
   toLibraryMessages,
   type JevCompactionAudit,
   type OmpCompactionPreparation,
   type OmpCompactionResult,
+  type OmpCompactionSettings,
   type OmpMessage,
   type SessionBeforeCompactEvent,
 } from "../.omp/extensions/fm-jev-compaction.ts";
@@ -85,15 +87,45 @@ function keepFirstDropRestFetch(seen: { headers: string[]; bodies: string[] }): 
 type HookUi = { notify?: (message: string, kind?: string) => void; setStatus?: (key: string, text: string) => void };
 type Handler = (event: unknown, ctx: { ui?: HookUi }) => Promise<{ compaction: OmpCompactionResult } | undefined>;
 
-function loadHandler(): Handler {
+// Loads the extension exactly as omp does at session start, with
+// FM_JEV_COMPACTION set as given for the duration of the load only.
+function registerWith(flag: string | undefined): { handler: Handler | undefined; registrations: number } {
+  const saved = process.env.FM_JEV_COMPACTION;
+  if (flag === undefined) delete process.env.FM_JEV_COMPACTION;
+  else process.env.FM_JEV_COMPACTION = flag;
   let handler: Handler | undefined;
-  registerJevCompaction({
-    on: (event, h) => {
-      if (event === "session_before_compact") handler = h as Handler;
-    },
-  });
-  assert.ok(handler, "the extension must register a session_before_compact handler");
+  let registrations = 0;
+  try {
+    registerJevCompaction({
+      on: (event, h) => {
+        registrations += 1;
+        if (event === "session_before_compact") handler = h as Handler;
+      },
+    });
+  } finally {
+    if (saved === undefined) delete process.env.FM_JEV_COMPACTION;
+    else process.env.FM_JEV_COMPACTION = saved;
+  }
+  return { handler, registrations };
+}
+
+function loadHandler(): Handler {
+  const { handler } = registerWith("1");
+  assert.ok(handler, "with FM_JEV_COMPACTION=1 the extension must register a session_before_compact handler");
   return handler;
+}
+
+// The region every repeated-compaction case hands to Jev: one call to keep
+// and one 1.5k-character listing Jev drops, so the new region itself always
+// shrinks by well over 25% on its own.
+function droppableRegion(): OmpMessage[] {
+  return [
+    userText("investigate the failing test"),
+    assistantToolCall("keep1", "read", { path: "important.ts" }),
+    toolResult("keep1", "the important content Jev should keep"),
+    assistantToolCall("drop1", "bash", { command: "ls -la" }),
+    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(40)),
+  ];
 }
 
 function compactEvent(messagesToSummarize: OmpMessage[], overrides: Partial<OmpCompactionPreparation> = {}): SessionBeforeCompactEvent {
@@ -345,12 +377,19 @@ test("the vendored compact() itself is reachable directly (proves this is the re
   assert.equal(result.stats.calls, 0, "no tool calls in this fixture: the vendored compact() makes zero Jev requests");
 });
 
-test("the registered handler is a no-op unless FM_JEV_COMPACTION=1, even with a key present", async () => {
-  const handler = loadHandler();
-  const { notes, ctx } = uiCapture();
-  const result = await withEnv({ FM_JEV_COMPACTION: undefined, TYPESAFE_API_KEY: "k" }, () => handler(compactEvent([userText("x")]), ctx));
-  assert.equal(result, undefined);
-  assert.deepEqual(notes, [], "the default-off path must not even announce a fallback");
+test("with FM_JEV_COMPACTION unset or not exactly 1 the extension registers no hook at all, the condition omp checks before it arms speculative background compaction", () => {
+  const disabled = registerWith(undefined);
+  assert.equal(disabled.registrations, 0, "omp disables speculative compaction whenever any session_before_compact handler exists, so a disabled launch must register none");
+  assert.equal(disabled.handler, undefined);
+  assert.equal(registerWith("0").registrations, 0);
+  assert.equal(registerWith("true").registrations, 0);
+  assert.equal(registerWith("1").registrations, 1, "enabled, exactly one hook is registered");
+});
+
+test("nativeSummaryTokenCap mirrors omp's own native summary bound: min(floor(0.8 * compaction.reserveTokens), 16384)", () => {
+  assert.equal(nativeSummaryTokenCap({}), 13107);
+  assert.equal(nativeSummaryTokenCap({ reserveTokens: 200 }), 160);
+  assert.equal(nativeSummaryTokenCap({ reserveTokens: 100_000 }), 16384);
 });
 
 test("the handler falls back to native compaction for a region with no tool calls instead of installing the region verbatim as its own summary", async () => {
@@ -360,7 +399,7 @@ test("the handler falls back to native compaction for a region with no tool call
   const result = await quietStderr(() => withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(compactEvent(region), ctx)));
   assert.equal(result, undefined);
   assert.equal(notes.length, 1);
-  assert.match(notes[0], /reduction 0% below minimum/);
+  assert.match(notes[0], /reduction 0% of the whole context below minimum/);
 });
 
 test("the handler reads TYPESAFE_API_KEY from $FM_HOME/.env when the environment lacks it, and reports unset when neither has it", async () => {
@@ -392,8 +431,9 @@ test("the handler returns omp's compaction result with the previous summary lead
   const home = homeWithEnvFile('TYPESAFE_API_KEY="from-dot-env"\n');
   const seen = { headers: [] as string[], bodies: [] as string[] };
   const { notes, ctx } = uiCapture();
+  const previousSummary = "EARLIER SUMMARY kept verbatim by compaction #1\n\n<files>\nold.ts (Read)\n</files>";
   const event = compactEvent(region, {
-    previousSummary: "EARLIER SUMMARY kept verbatim by compaction #1\n\n<files>\nold.ts (Read)\n</files>",
+    previousSummary,
     fileOps: { read: new Set(["important.ts", "notes.md"]), written: new Set(["notes.md"]), edited: new Set() },
   });
 
@@ -421,9 +461,56 @@ test("the handler returns omp's compaction result with the previous summary lead
   assert.match(compaction.summary, /important content Jev should keep/);
   assert.doesNotMatch(compaction.summary, /drwxr-xr-x/);
   assert.match(compaction.summary, /<files>\nimportant\.ts \(Read\)\nnotes\.md \(Write\)\n<\/files>$/);
-  assert.equal(compaction.preserveData.jevCompaction.candidateCalls, 2);
-  assert.deepEqual(compaction.preserveData.jevCompaction.dropped, ["drop1"]);
-  assert.ok(compaction.preserveData.jevCompaction.reductionRatio >= 0.25);
+  const record = compaction.preserveData.jevCompaction;
+  assert.equal(record.candidateCalls, 2);
+  assert.deepEqual(record.dropped, ["drop1"]);
+  assert.equal(record.previousSummaryChars, previousSummary.length);
+  const wholeContext = 1 - (previousSummary.length + record.charsAfter) / (previousSummary.length + record.charsBefore);
+  assert.ok(Math.abs(record.reductionRatio - wholeContext) < 1e-9, "the recorded reduction is measured over the whole context, carried summary included");
+  assert.ok(record.reductionRatio >= 0.25);
+  assert.equal(record.summaryTokenCap, 13107, "omp's default cap: min(floor(0.8 * 16384), 16384)");
+  assert.ok(record.summaryTokens > 0 && record.summaryTokens <= record.summaryTokenCap);
+});
+
+test("repeated compaction: once the carried previous summary dominates, the handler falls back to native compaction even though the new region itself shrank by over 90%", async () => {
+  const handler = loadHandler();
+  const seen = { headers: [] as string[], bodies: [] as string[] };
+  const { notes, ctx } = uiCapture();
+  const event = compactEvent(droppableRegion(), { previousSummary: "carried verbatim summary ".repeat(2000) });
+  const result = await quietStderr(() =>
+    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  assert.equal(seen.headers.length, 1, "Jev was asked about the new region");
+  assert.equal(result, undefined, "a ~3% whole-context reduction hands the whole thing to native compaction, which rewrites and bounds it");
+  assert.match(notes[0], /reduction \d% of the whole context below minimum/);
+});
+
+test("repeated compaction: a replacement above omp's native summary cap falls back to native compaction, and the same replacement within the cap is installed with the previous summary leading", async () => {
+  const handler = loadHandler();
+  const previousSummary = "carried verbatim summary ".repeat(80);
+  const run = async (settings: OmpCompactionSettings) => {
+    const seen = { headers: [] as string[], bodies: [] as string[] };
+    const capture = uiCapture();
+    const event = compactEvent(droppableRegion(), { previousSummary, settings });
+    const result = await quietStderr(() =>
+      withGlobalFetch(keepFirstDropRestFetch(seen), () =>
+        withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, capture.ctx))));
+    return { result, notes: capture.notes };
+  };
+
+  const capped = await run({ reserveTokens: 200 });
+  assert.equal(capped.result, undefined);
+  assert.match(capped.notes[0], /exceeds omp's 160-token summary cap/);
+
+  const fitting = await run({});
+  assert.deepEqual(fitting.notes, [], "within the default cap nothing falls back");
+  assert.ok(fitting.result);
+  const record = fitting.result.compaction.preserveData.jevCompaction;
+  assert.equal(record.previousSummaryChars, previousSummary.length);
+  assert.equal(record.summaryTokenCap, 13107);
+  assert.ok(record.summaryTokens > 160 && record.summaryTokens <= 13107, `the same ~${record.summaryTokens}-token replacement is what the 160-token cap refused`);
+  assert.ok(record.reductionRatio >= 0.25);
+  assert.ok(fitting.result.compaction.summary.startsWith(previousSummary), "the carried summary still leads the installed replacement");
 });
 
 test("the handler gives a split turn two separate Jev passes and gates on their combined character reduction", async () => {
