@@ -400,6 +400,21 @@ IFS= read -r -d '' TASK_SECTION <<'EOF' || true
 EOF
 TASK_SECTION=${TASK_SECTION%$'\n'}
 
+IFS= read -r -d '' DESKTOP_SECTION <<EOF || true
+## Desktop control
+When this task needs a Mac application, load the installed \`agent-desktop\` and \`jev-desktop\` skills before observing or acting.
+Use \`$FM_ROOT/bin/fm-jev-desktop.sh run --access-approved --ui-approved --app <App> --no-values "<bounded reversible goal>"\` or \`$FM_ROOT/bin/fm-jev-desktop.sh act --access-approved --ui-approved --app <App> "<one step>"\`.
+Those approval flags attest existing permission for this exact app and the UI descriptions sent to TypeSafe; they never grant it.
+Stop and ask Firstmate before observing any app holding private documents, filled forms, or credentials.
+No-values withholds field values, not names, titles, or document text exposed as labels.
+Installed Agent Desktop 0.9.2 act does not support no-values; the wrapper refuses that combination rather than pretending it is private.
+Use run only for already-authorized reversible goals; for a potentially destructive step use act without execute and obtain Firstmate's concrete approval before an execution.
+Never answer a destructive confirmation automatically; confidence is not permission.
+Jev chooses the operation and target, Agent Desktop executes, and you supply any entered text.
+If the wrapper reports a missing key, unavailable Jev, or an unsupported safety option, pause and report it instead of switching operators.
+EOF
+DESKTOP_SECTION=${DESKTOP_SECTION%$'\n'}
+
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
   LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
@@ -459,6 +474,8 @@ The report is the only thing that survives, so anything worth keeping must be in
 
 $INBOX_SECTION
 
+$DESKTOP_SECTION
+
 # Definition of done
 Write your findings to \`$DATA/$ID/report.md\`.
 The report must stand alone: what you did, what you found, the evidence (commands run, output, file:line references), and what you recommend.
@@ -510,7 +527,7 @@ If the top-level path is the primary checkout or not the worktree you were launc
 
 # Rules
 $RULE1
-2. Stay inside this worktree; modify nothing outside it.
+2. Stay inside this worktree except for the status, steering-inbox acknowledgements, Jev evaluation and no-mistakes findings artifacts explicitly named below.
 3. Use gh-axi for GitHub operations and chrome-devtools-axi for browser operations.
 4. Report status by appending one line:
    \`echo "{state} [at=<epoch>]: {one short line}" >> $STATUS_FILE\`
@@ -556,6 +573,20 @@ Record only project knowledge useful to almost every future session.
 For anything the codebase already shows, prefer a pointer to the authoritative file, command, or doc over copying the detail.
 If you touch a project \`AGENTS.md\`, follow \`$FM_ROOT/bin/fm-ensure-agents-md.sh\`'s self-governance contract in the same pass.
 Keep it proportionate: skip \`AGENTS.md\` edits for trivial tasks that produced no durable project knowledge.
+
+$DESKTOP_SECTION
+
+## Jev review loop
+After the implementation commit, before starting no-mistakes, pushing a direct-PR, or reporting local-only ready, use \`jev_review\` with the task and focused diff to establish a baseline.
+Use the weakest important dimension to guide your own code inspection, not to manufacture a finding.
+Make only the smallest evidence-based improvement the accepted task needs, run the relevant checks, commit it, and rescore the current diff with the unchanged prior result as \`previousEvaluation\`.
+Stop when requirements and checks pass and no justified improvement remains; never add scope, abstractions, or tests to chase scores.
+The reviewer diagnoses and reports but remains read-only; the implementing worker owns fixes before validation.
+Scores never dismiss findings, authorize a merge, or replace agent judgment.
+Write the final evaluation JSON to \`$DATA/$ID/jev-review.json\` and append one \`working [at=<epoch>]:\` line with scores and deltas.
+If the tool is absent or reports unavailable, append one \`working [at=<epoch>]: jev_review unavailable - reviewing without Jev\` line and continue ordinary review.
+This loop is preparation, not an extra validation gate: once no-mistakes starts it alone owns the branch, review and fixes.
+Never hand-edit a pipeline-owned branch or add a parallel or post-pipeline review.
 
 $DOD
 EOF

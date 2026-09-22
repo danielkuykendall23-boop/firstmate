@@ -28,13 +28,13 @@ if [ "$node_major" -lt 22 ] \
   fail "Node $node_version cannot load tests/fm-jev-compaction.node.test.ts: unflagged TypeScript type stripping needs Node 22.18, 23.6, or 24 and later (CI provisions Node 24)"
 fi
 
-out=$(node --test "$ROOT/tests/fm-jev-compaction.node.test.ts" 2>&1)
+out=$(node --test "$ROOT/tests/fm-jev-compaction.node.test.ts" "$ROOT/tests/fm-jev-review.node.test.ts" 2>&1)
 code=$?
 
 if [ "$code" -ne 0 ]; then
   printf '%s\n' "$out" >&2
-  fail "fm-jev-compaction.node.test.ts reported a failure (exit $code)"
+  fail "Jev Node behavior suites reported a failure (exit $code)"
 fi
 
 assert_contains "$out" "fail 0" "expected zero failing Node subtests"
-pass "fm-jev-compaction.node.test.ts passed"
+pass "Jev compaction and review Node behavior suites passed"
