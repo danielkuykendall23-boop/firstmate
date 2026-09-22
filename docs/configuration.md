@@ -576,7 +576,7 @@ Task context is passed to the resolver in a private temporary directory with a m
 Only routing metadata is appended to the effective home's `state/.jev-route.log` (or `FM_STATE_OVERRIDE`): timestamp, trigger, status, model, effort, rule identifier, and confidence.
 Prompts, secrets, resolver diagnostics, and temporary filenames are not logged.
 The resolver owns key lookup; the extension never reads a credential store or enables production access.
-[`verification/dispatch-resolve.md`](verification/dispatch-resolve.md) owns the token-free RPC guard and separately identifies pending authenticated proof.
+[`verification/dispatch-resolve.md`](verification/dispatch-resolve.md) owns the token-free live guard for the RPC and interactive terminal sessions and separately identifies pending authenticated proof.
 
 ## Toolchain
 

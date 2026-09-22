@@ -2178,5 +2178,5 @@ A throwaway scout was spawned through `bin/fm-spawn.sh --scout --harness omp --m
 
 ### Task-bound Jev routing
 
-Verified on 2026-09-22 with omp/18.2.8 on macOS arm64 using `bin/fm-test-run.sh tests/fm-jev-route-live-e2e.test.sh`.
+Verified on 2026-09-21 with omp/18.2.8 on macOS arm64 using `bin/fm-test-run.sh tests/fm-jev-route-live-e2e.test.sh`.
 The token-free real-runtime proof, exact output, accepted model-object API, and deferred authenticated commands are owned by [Typed dispatch resolution verification](dispatch-resolve.md#primary-and-spawn-routing-fake-endpoint).

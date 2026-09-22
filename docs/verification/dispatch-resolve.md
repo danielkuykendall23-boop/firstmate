@@ -112,14 +112,14 @@ The fake-endpoint results above do not establish production authentication, acco
 Run from the real Firstmate home, with real `curl` and quota tools on `PATH`, no fake provider or transport, and no worker marker:
 
 ```sh
-FM_HOME=/Users/danielkuykendall/kun-agent-workspace bin/fm-dispatch-resolve.sh data/env-jev-route/brief.md --project kun-agent-workspace
+FM_HOME=<firstmate-home> bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>
 ```
 
 Require `clear`, a matched rule, and confidence at least 0.6; a different outcome is evidence to inspect, not permission to force a launch.
 Next, start a separate RPC process without other extensions or a saved session:
 
 ```sh
-env -u FM_TASK_ID -u FM_JEV_ROUTE FM_HOME=/Users/danielkuykendall/kun-agent-workspace \
+env -u FM_TASK_ID -u FM_JEV_ROUTE FM_HOME=<firstmate-home> \
   omp --mode rpc --no-session --no-extensions --no-skills --no-rules --tools todo \
   -e .omp/extensions/fm-jev-route.ts
 ```
