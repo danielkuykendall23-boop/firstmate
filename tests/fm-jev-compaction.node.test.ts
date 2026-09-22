@@ -9,8 +9,12 @@
 // of the decision algorithm, and never touches the real Jev endpoint - every
 // network-shaped test drives a fake fetch, injected either directly or as
 // the global fetch the registered session_before_compact handler picks up.
+// The handler's `omp config get` call runs against a stand-in omp binary
+// installed as process.execPath for the duration of each run, exactly where
+// the real omp binary sits inside a real session; the live counterpart is
+// tests/fm-jev-compaction-live-e2e.test.sh.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -23,19 +27,24 @@ import registerJevCompaction, {
   mergeAudits,
   mergePreviousSummary,
   mergeSplitTurnSummary,
-  nativeSummaryTokenCap,
+  ompConfiguredSecretsEnabled,
+  overlayFilesFromArgv,
+  overlaySecretsStatement,
   renderLibraryMessages,
-  secretsEnabledInConfig,
+  retainedBudget,
+  systemPromptText,
   toLibraryMessages,
+  triggerTokens,
   unretainableNativeHistory,
   type JevCompactionAudit,
   type OmpCompactionPreparation,
   type OmpCompactionResult,
-  type OmpCompactionSettings,
   type OmpMessage,
   type SessionBeforeCompactEvent,
 } from "../.omp/extensions/fm-jev-compaction.ts";
-import { compact, type CompactResult, type Message as LibMessage } from "../.omp/extensions/vendor/fast-jev-compaction/src/index.ts";
+import { compact, SYSTEM_ONE_URL, type CompactResult, type Message as LibMessage } from "../.omp/extensions/vendor/fast-jev-compaction/src/index.ts";
+
+const repoRoot = join(import.meta.dirname, "..");
 
 function userText(text: string): OmpMessage {
   return { role: "user", content: [{ type: "text", text }] };
@@ -70,9 +79,15 @@ function audit(overrides: Partial<JevCompactionAudit>): JevCompactionAudit {
   };
 }
 
+type Seen = { urls: string[]; headers: string[]; bodies: string[] };
+function seenRequests(): Seen {
+  return { urls: [], headers: [], bodies: [] };
+}
+
 // Jev answers keep for the first collected call (t1) and drop for every other.
-function keepFirstDropRestFetch(seen: { headers: string[]; bodies: string[] }): typeof fetch {
-  return async (_url, init) => {
+function keepFirstDropRestFetch(seen: Seen): typeof fetch {
+  return async (url, init) => {
+    seen.urls.push(String(url));
     seen.headers.push(JSON.stringify(init?.headers ?? {}));
     seen.bodies.push(String(init?.body));
     const body = JSON.parse(String(init?.body));
@@ -88,25 +103,59 @@ function keepFirstDropRestFetch(seen: { headers: string[]; bodies: string[] }): 
 // and drives the session_before_compact handler it installs, exactly as omp would.
 
 type HookUi = { notify?: (message: string, kind?: string) => void; setStatus?: (key: string, text: string) => void };
-type Handler = (event: unknown, ctx: { ui?: HookUi; cwd?: string }) => Promise<{ compaction: OmpCompactionResult } | undefined>;
+type HookCtx = { ui?: HookUi; cwd?: string; model?: { id?: string; contextWindow?: number }; getSystemPrompt?: () => unknown };
+type Handler = (event: unknown, ctx: HookCtx) => Promise<{ compaction: OmpCompactionResult } | undefined>;
 
-// Every handler run reads omp's Hide Secrets switch from the agent directory
-// and the project; both default to fresh empty directories here so no test
-// ever reads this machine's real ~/.omp/agent/config.yml.
 const isolatedAgentDir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
 const isolatedProject = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
 
-function agentDirWith(config: string, file = "config.yml"): string {
-  const dir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
-  writeFileSync(join(dir, file), config);
-  return dir;
+// The omp binary the handler runs `config get` through is process.execPath
+// (inside a real session that is omp itself). This stand-in answers from
+// FAKE_OMP_MODE and records its arguments and physical cwd in FAKE_OMP_LOG.
+const fakeOmp = join(mkdtempSync(join(tmpdir(), "fm-jev-fake-omp-")), "omp");
+writeFileSync(fakeOmp, `#!/bin/sh
+printf '%s\\n' "$*" > "$FAKE_OMP_LOG"
+pwd -P >> "$FAKE_OMP_LOG"
+case "$FAKE_OMP_MODE" in
+  on) printf '{"key":"secrets.enabled","value":true,"type":"boolean"}\\n' ;;
+  off) printf '{"key":"secrets.enabled","value":false,"type":"boolean"}\\n' ;;
+  fail) echo "Unknown setting: secrets.enabled" >&2; exit 1 ;;
+  garbage) echo "not json at all" ;;
+  string) printf '{"key":"secrets.enabled","value":"true","type":"boolean"}\\n' ;;
+esac
+`);
+chmodSync(fakeOmp, 0o755);
+
+type OmpMode = "on" | "off" | "fail" | "garbage" | "string" | "missing";
+type OmpRuntime = { mode?: OmpMode; argv?: string[] };
+type OmpCall = { args: string; cwd: string };
+
+function readOmpCall(log: string): OmpCall | undefined {
+  if (!existsSync(log)) return undefined;
+  const [args, cwd] = readFileSync(log, "utf8").split("\n");
+  return { args, cwd };
 }
 
-function projectWith(config: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
-  mkdirSync(join(dir, ".omp"));
-  writeFileSync(join(dir, ".omp", "config.yml"), config);
-  return dir;
+// Installs the stand-in as process.execPath and the given launch flags as
+// process.argv (omp's own argv shape: `bun`, the bundled entry, then flags)
+// for the duration of fn, exactly the two process facts the gate reads.
+async function withOmpRuntime<T>(runtime: OmpRuntime, fn: (log: string) => Promise<T>): Promise<T> {
+  const saved = { execPath: process.execPath, argv: process.argv, mode: process.env.FAKE_OMP_MODE, log: process.env.FAKE_OMP_LOG };
+  const log = join(mkdtempSync(join(tmpdir(), "fm-jev-omp-log-")), "call.log");
+  process.execPath = runtime.mode === "missing" ? join(tmpdir(), "fm-jev-no-such-omp-binary") : fakeOmp;
+  process.argv = ["bun", "/$bunfs/root/omp-darwin-arm64", "--mode", "rpc", ...(runtime.argv ?? [])];
+  process.env.FAKE_OMP_MODE = runtime.mode ?? "off";
+  process.env.FAKE_OMP_LOG = log;
+  try {
+    return await fn(log);
+  } finally {
+    process.execPath = saved.execPath;
+    process.argv = saved.argv;
+    if (saved.mode === undefined) delete process.env.FAKE_OMP_MODE;
+    else process.env.FAKE_OMP_MODE = saved.mode;
+    if (saved.log === undefined) delete process.env.FAKE_OMP_LOG;
+    else process.env.FAKE_OMP_LOG = saved.log;
+  }
 }
 
 // Loads the extension exactly as omp does at session start, with
@@ -138,15 +187,24 @@ function loadHandler(): Handler {
 }
 
 // The region every repeated-compaction case hands to Jev: one call to keep
-// and one 1.5k-character listing Jev drops, so the new region itself always
-// shrinks by well over 25% on its own.
-function droppableRegion(): OmpMessage[] {
+// and one listing Jev drops (1.5k characters unless asked for more), so the
+// new region itself always shrinks by well over 25% on its own.
+function droppableRegion(listingLines = 40): OmpMessage[] {
   return [
     userText("investigate the failing test"),
     assistantToolCall("keep1", "read", { path: "important.ts" }),
     toolResult("keep1", "the important content Jev should keep"),
     assistantToolCall("drop1", "bash", { command: "ls -la" }),
-    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(40)),
+    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(listingLines)),
+  ];
+}
+
+// A region carrying a credential-shaped value omp's Hide Secrets would redact
+// before any provider request; the hook receives it un-redacted.
+function regionWithSecret(): OmpMessage[] {
+  return [
+    ...droppableRegion(),
+    { role: "bashExecution", command: "cat .env", output: "AWS_SECRET_ACCESS_KEY=REDACTED-BY-OMP-NATIVELY", exitCode: 0, cancelled: false, truncated: false, timestamp: 9 },
   ];
 }
 
@@ -161,19 +219,32 @@ function compactEvent(messagesToSummarize: OmpMessage[], overrides: Partial<OmpC
       isSplitTurn: false,
       tokensBefore: 1000,
       fileOps: { read: new Set<string>(), written: new Set<string>(), edited: new Set<string>() },
-      settings: {},
+      settings: { thresholdTokens: 550000 },
       ...overrides,
     },
   };
 }
 
-function uiCapture(cwd = isolatedProject): { notes: string[]; ctx: { ui: HookUi; cwd: string } } {
+// The hook context omp 18.2.8 hands a handler, as far as this extension
+// reads it: ui, the session cwd, the active model with its context window
+// (Codex Max, the captain's required model), and the system prompt.
+const CODEX_MAX_CONTEXT = 272000;
+function uiCapture(overrides: Partial<HookCtx> = {}): { notes: string[]; ctx: HookCtx } {
   const notes: string[] = [];
-  return { notes, ctx: { ui: { notify: (message) => { notes.push(message); }, setStatus: () => {} }, cwd } };
+  return {
+    notes,
+    ctx: {
+      ui: { notify: (message) => { notes.push(message); }, setStatus: () => {} },
+      cwd: isolatedProject,
+      model: { id: "gpt-5.1-codex-max", contextWindow: CODEX_MAX_CONTEXT },
+      getSystemPrompt: () => ["You are omp.", { text: "Work in the harness." }],
+      ...overrides,
+    },
+  };
 }
 
 async function withEnv<T>(overrides: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
-  const vars: Record<string, string | undefined> = { PI_CODING_AGENT_DIR: isolatedAgentDir, ...overrides };
+  const vars: Record<string, string | undefined> = { PI_CODING_AGENT_DIR: isolatedAgentDir, FM_JEV_ENDPOINT: undefined, ...overrides };
   const saved = new Map(Object.keys(vars).map((k) => [k, process.env[k]] as const));
   for (const [k, v] of Object.entries(vars)) {
     if (v === undefined) delete process.env[k];
@@ -209,10 +280,38 @@ async function quietStderr<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+type RunOptions = { ctx?: Partial<HookCtx>; env?: Record<string, string | undefined>; runtime?: OmpRuntime; fetch?: typeof fetch };
+type Run = { result: { compaction: OmpCompactionResult } | undefined; seen: Seen; notes: string[]; ompCall?: OmpCall };
+
+// One handler run exactly as omp performs it: the registered handler, the
+// hook context, the stand-in omp binary, the launch argv, the environment,
+// and a fake fetch standing in for the network.
+async function runHandler(event: SessionBeforeCompactEvent, options: RunOptions = {}): Promise<Run> {
+  const handler = loadHandler();
+  const seen = seenRequests();
+  const { notes, ctx } = uiCapture(options.ctx);
+  let ompCall: OmpCall | undefined;
+  const result = await quietStderr(() =>
+    withOmpRuntime(options.runtime ?? {}, (log) =>
+      withGlobalFetch(options.fetch ?? keepFirstDropRestFetch(seen), () =>
+        withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k", ...options.env }, async () => {
+          const outcome = await handler(event, ctx);
+          ompCall = readOmpCall(log);
+          return outcome;
+        }))));
+  return { result, seen, notes, ompCall };
+}
+
 function homeWithEnvFile(lines: string): string {
   const home = mkdtempSync(join(tmpdir(), "fm-jev-home-"));
   writeFileSync(join(home, ".env"), lines);
   return home;
+}
+
+function overlayFile(text: string): string {
+  const file = join(mkdtempSync(join(tmpdir(), "fm-jev-overlay-")), "overlay.yml");
+  writeFileSync(file, text);
+  return file;
 }
 
 // A region omp really hands the hook in a firstmate session: a `custom`
@@ -232,6 +331,8 @@ const realWorldRegion: OmpMessage[] = [
 ];
 const excludedText = /EXCLUDED-BASH|credentials|EXCLUDED-PYTHON|shadow/;
 
+// ---- Translation and rendering ----
+
 test("toLibraryMessages pairs an omp toolCall block with its separate toolResult message", () => {
   const messages: OmpMessage[] = [userText("do it"), assistantToolCall("c1", "read", { path: "a.ts" }), toolResult("c1", "file contents")];
   const lib = toLibraryMessages(messages);
@@ -242,8 +343,6 @@ test("toLibraryMessages pairs an omp toolCall block with its separate toolResult
   assert.equal(lib[1].toolUses[0].tool_use_id, "c1");
   assert.equal(lib[1].toolUses[0].tool, "read");
   assert.deepEqual(lib[1].toolUses[0].input, { path: "a.ts" });
-  // Backfilled from the paired toolResult, matching what the vendored
-  // library's own Claude Code-derived type doc comment assumes is present.
   assert.equal(lib[1].toolUses[0].text, "file contents");
   assert.equal(lib[2].toolResults?.[0].tool_use_id, "c1");
   assert.equal(lib[2].toolResults?.[0].text, "file contents");
@@ -289,8 +388,7 @@ test("renderLibraryMessages walks a kept Message[] verbatim, including an applyD
 });
 
 test("mergeSplitTurnSummary matches omp's documented split-turn section header format", () => {
-  const merged = mergeSplitTurnSummary("older history text", "recent turn text");
-  assert.equal(merged, "older history text\n\n---\n\n**Turn Context (split turn):**\n\nrecent turn text");
+  assert.equal(mergeSplitTurnSummary("older history text", "recent turn text"), "older history text\n\n---\n\n**Turn Context (split turn):**\n\nrecent turn text");
 });
 
 test("mergeSplitTurnSummary returns the non-empty side alone when the other is empty", () => {
@@ -299,9 +397,6 @@ test("mergeSplitTurnSummary returns the non-empty side alone when the other is e
 });
 
 test("mergeAudits sums counts, combines dropped ids, and measures the merged reduction in characters rather than per-call ratios", () => {
-  // A 100k-character text-only history (nothing droppable) plus a 3k-character
-  // turn prefix whose two results Jev dropped: the real reduction is ~2.4% of
-  // 103k characters, however good the prefix's own ratio looks.
   const history = audit({ candidateCalls: 0, charsBefore: 100_000, charsAfter: 100_000, reductionRatio: 0 });
   const prefix = audit({ candidateCalls: 2, kept: 0, dropped: ["call-a", "call-b"], requestCount: 1, stateTokens: 200, charsBefore: 3_000, charsAfter: 500, reductionRatio: 1 - 500 / 3_000 });
   const merged = mergeAudits(history, prefix);
@@ -316,8 +411,7 @@ test("mergeAudits sums counts, combines dropped ids, and measures the merged red
 });
 
 test("buildFilesTag reads omp's Set<string> fileOps and renders the native <files> shape, marking write-after-read as Write", () => {
-  const tag = buildFilesTag({ read: new Set(["b.ts", "a.ts"]), written: new Set(["b.ts"]), edited: new Set() });
-  assert.equal(tag, "<files>\na.ts (Read)\nb.ts (Write)\n</files>");
+  assert.equal(buildFilesTag({ read: new Set(["b.ts", "a.ts"]), written: new Set(["b.ts"]), edited: new Set() }), "<files>\na.ts (Read)\nb.ts (Write)\n</files>");
 });
 
 test("buildFilesTag elides past twenty paths and returns an empty string when nothing was touched", () => {
@@ -352,7 +446,7 @@ test("auditFromResult reads counts and character totals straight from the vendor
 });
 
 test("envFileValue follows fmx_env_get: last assignment wins, export and quotes are tolerated, absent file or key is empty", () => {
-  const home = homeWithEnvFile(['OTHER=x', 'TYPESAFE_API_KEY=first', "  export TYPESAFE_API_KEY = 'second'  ", 'TYPESAFE_API_KEY="third"\r', ''].join("\n"));
+  const home = homeWithEnvFile(["OTHER=x", "TYPESAFE_API_KEY=first", "  export TYPESAFE_API_KEY = 'second'  ", 'TYPESAFE_API_KEY="third"\r', ""].join("\n"));
   assert.equal(envFileValue(join(home, ".env"), "TYPESAFE_API_KEY"), "third");
   assert.equal(envFileValue(join(home, ".env"), "MISSING"), "");
   assert.equal(envFileValue(join(home, "no-such-file"), "TYPESAFE_API_KEY"), "");
@@ -360,18 +454,13 @@ test("envFileValue follows fmx_env_get: last assignment wins, export and quotes 
   assert.equal(envFileValue(join(single, ".env"), "TYPESAFE_API_KEY"), "quoted value");
 });
 
-test("compactOmpRegion runs the real vendored compact() end to end against a fake fetch, never sending real network traffic", async () => {
-  const messages: OmpMessage[] = [
-    userText("investigate the failing test"),
-    assistantToolCall("keep1", "read", { path: "important.ts" }),
-    toolResult("keep1", "the important content Jev should keep"),
-    assistantToolCall("drop1", "bash", { command: "ls -la" }),
-    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(20)),
-  ];
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const result = await compactOmpRegion(messages, { apiKey: "test-key", fetchImpl: keepFirstDropRestFetch(seen), maxRequestTokens: 100000 });
+// ---- The real vendored compact() through the adapter ----
 
-  assert.equal(seen.headers.length, 1);
+test("compactOmpRegion runs the real vendored compact() end to end against a fake fetch at upstream's own endpoint, never sending real network traffic", async () => {
+  const seen = seenRequests();
+  const result = await compactOmpRegion(droppableRegion(20), { apiKey: "test-key", fetchImpl: keepFirstDropRestFetch(seen), maxRequestTokens: 100000 });
+  assert.equal(seen.urls.length, 1);
+  assert.equal(seen.urls[0], SYSTEM_ONE_URL, "without an override the vendored client targets upstream's System One URL");
   assert.equal(result.audit.candidateCalls, 2);
   assert.equal(result.audit.kept, 1);
   assert.deepEqual(result.audit.dropped, ["drop1"], "the dropped id is omp's toolCall id, resolvable against the journal");
@@ -380,10 +469,13 @@ test("compactOmpRegion runs the real vendored compact() end to end against a fak
   assert.doesNotMatch(result.text, /drwxr-xr-x/, "dropped tool output must not appear in the rendered summary");
 });
 
+test("compactOmpRegion sends to the given endpoint when one is supplied, the hook the live omp test uses to aim a real session at a local fake", async () => {
+  const seen = seenRequests();
+  await compactOmpRegion(droppableRegion(20), { apiKey: "test-key", fetchImpl: keepFirstDropRestFetch(seen), baseUrl: "http://127.0.0.1:1/systemone" });
+  assert.deepEqual(seen.urls, ["http://127.0.0.1:1/systemone"]);
+});
+
 test("compactOmpRegion never orphans a tool call without its result or vice versa (the vendored library's own pairing guarantee)", async () => {
-  // A leading text message keeps the tool call out of the library's own
-  // unconditional "index 0 is always pinned" rule, so this actually
-  // exercises the drop decision rather than the pin decision.
   const messages: OmpMessage[] = [userText("investigate"), assistantToolCall("c1", "read", { path: "a.ts" }), toolResult("c1", "content")];
   const fakeFetch: typeof fetch = async () =>
     new Response(JSON.stringify({ model: "jev-latest", answers: { call_t1: { type: "noul", noul: 0.1 }, result_t1: { type: "noul", noul: 0.1 } } }), { status: 200 });
@@ -400,6 +492,8 @@ test("the vendored compact() itself is reachable directly (proves this is the re
   assert.equal(result.stats.calls, 0, "no tool calls in this fixture: the vendored compact() makes zero Jev requests");
 });
 
+// ---- Registration ----
+
 test("with FM_JEV_COMPACTION unset or not exactly 1 the extension registers no hook at all, the condition omp checks before it arms speculative background compaction", () => {
   const disabled = registerWith(undefined);
   assert.equal(disabled.registrations, 0, "omp disables speculative compaction whenever any session_before_compact handler exists, so a disabled launch must register none");
@@ -409,63 +503,117 @@ test("with FM_JEV_COMPACTION unset or not exactly 1 the extension registers no h
   assert.equal(registerWith("1").registrations, 1, "enabled, exactly one hook is registered");
 });
 
-test("nativeSummaryTokenCap mirrors omp's own native summary bound: min(floor(0.8 * compaction.reserveTokens), 16384)", () => {
-  assert.equal(nativeSummaryTokenCap({}), 13107);
-  assert.equal(nativeSummaryTokenCap({ reserveTokens: 200 }), 160);
-  assert.equal(nativeSummaryTokenCap({ reserveTokens: 100_000 }), 16384);
+// ---- Hide Secrets: omp's own reader plus launch overlays ----
+
+test("ompConfiguredSecretsEnabled asks the running omp binary itself, in the session's cwd, and refuses to guess when the answer is not a plain boolean", async () => {
+  const project = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
+  const ask = (mode: OmpMode) => withOmpRuntime({ mode }, async (log) => ({ answer: ompConfiguredSecretsEnabled(project), call: readOmpCall(log) }));
+  const off = await ask("off");
+  assert.deepEqual(off.answer, { value: false });
+  assert.equal(off.call?.args, "config get secrets.enabled --json", "the exact supported omp CLI reader, no hand-parsed config files");
+  assert.equal(off.call?.cwd, realpathSync(project), "asked from the session's own working directory so project precedence is omp's");
+  assert.deepEqual((await ask("on")).answer, { value: true });
+  for (const mode of ["fail", "garbage", "string", "missing"] as const) {
+    const { answer } = await ask(mode);
+    assert.ok("error" in answer, `${mode}: an answer that cannot be established must be an error, never a default`);
+  }
 });
 
+test("overlayFilesFromArgv collects every --config overlay on omp's own argv, in order, resolving relative paths against the session cwd", () => {
+  const argv = ["bun", "/$bunfs/root/omp", "--mode", "rpc", "--config", "/abs/a.yml", "--cwd", "/somewhere", "--config=rel/b.yml", "--model", "x"];
+  assert.deepEqual(overlayFilesFromArgv(argv, "/proj"), ["/abs/a.yml", "/proj/rel/b.yml"]);
+  assert.deepEqual(overlayFilesFromArgv(["bun", "omp", "--mode", "rpc"], "/proj"), []);
+});
+
+test("overlaySecretsStatement follows only a nested boolean secrets.enabled statement and refuses every other way an overlay could touch secrets", () => {
+  assert.equal(overlaySecretsStatement(""), "unstated");
+  assert.equal(overlaySecretsStatement("composer:\n  shape: line\nplan:\n  defaultOnStartup: false\n"), "unstated");
+  assert.equal(overlaySecretsStatement("secrets:\n  enabled: true\n"), true);
+  assert.equal(overlaySecretsStatement("theme:\n  dark: x\nsecrets:\n  enabled: false # off\ncompaction:\n  thresholdTokens: 1\n"), false);
+  assert.equal(overlaySecretsStatement("secrets:\n  patterns:\n    - AKIA\n  enabled: true\n"), true, "a sibling list inside the block must not hide the switch");
+  assert.equal(overlaySecretsStatement("secrets:\n  # enabled: false\n"), undefined, "a bare group omp may shadow or ignore is not followed");
+  assert.equal(overlaySecretsStatement("secrets.enabled: true\n"), undefined, "a dotted key omp's loader does not expand is not followed");
+  assert.equal(overlaySecretsStatement("secrets.enabled: false\n"), undefined);
+  assert.equal(overlaySecretsStatement("secrets: { enabled: true }\n"), undefined);
+  assert.equal(overlaySecretsStatement("secrets:\n  enabled: 'true'\n"), undefined);
+  assert.equal(overlaySecretsStatement("secrets:\n  enabled: yes\n"), undefined);
+  assert.equal(overlaySecretsStatement("secrets: &s\n  enabled: true\n"), undefined);
+});
+
+test("hideSecretsState layers omp's own answer with the launch overlays in order and is unprovable whenever any input cannot be established", async () => {
+  const project = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
+  const state = (mode: OmpMode, argv: string[]) => withOmpRuntime({ mode, argv }, async () => hideSecretsState(project, process.argv));
+  assert.deepEqual(await state("off", []), { state: "off", source: "omp config get secrets.enabled" });
+  assert.deepEqual(await state("on", []), { state: "on", source: "omp config get secrets.enabled" });
+  const on = overlayFile("secrets:\n  enabled: true\n");
+  const off = overlayFile("secrets:\n  enabled: false\n");
+  const silent = overlayFile("composer:\n  shape: line\n");
+  assert.deepEqual(await state("off", ["--config", on]), { state: "on", source: `--config overlay ${on}` });
+  assert.deepEqual(await state("on", [`--config=${off}`]), { state: "off", source: `--config overlay ${off}` }, "a later overlay statement overrides omp's file-layer answer, as omp layers overlays last");
+  assert.deepEqual(await state("on", ["--config", silent]), { state: "on", source: "omp config get secrets.enabled" }, "an overlay that never mentions secrets changes nothing");
+  assert.deepEqual(await state("off", ["--config", off, "--config", on]), { state: "on", source: `--config overlay ${on}` }, "repeated overlays apply in launch order");
+  assert.equal((await state("off", ["--config", overlayFile("secrets:\n")])).state, "unprovable");
+  assert.equal((await state("off", ["--config", overlayFile("secrets.enabled: false\n")])).state, "unprovable");
+  assert.equal((await state("off", ["--config", join(project, "missing.yml")])).state, "unprovable");
+  assert.equal((await state("fail", [])).state, "unprovable");
+  assert.equal((await state("garbage", [])).state, "unprovable");
+});
+
+// ---- The retained-context budget ----
+
+test("triggerTokens and retainedBudget mirror omp's own arithmetic for the active model: a 550000 trigger is clamped to the model, the reserve is 15% or reserveTokens, and the budget sits under the 80% progress ceiling", () => {
+  assert.equal(triggerTokens(CODEX_MAX_CONTEXT, { thresholdTokens: 550000 }), 271999, "the captain's 550000 trigger clamps to contextWindow - 1 for Codex Max");
+  assert.equal(triggerTokens(1_000_000, { thresholdTokens: 550000 }), 550000);
+  assert.equal(triggerTokens(CODEX_MAX_CONTEXT, {}), 231200, "no fixed threshold: contextWindow minus the 15% reserve");
+  assert.equal(triggerTokens(CODEX_MAX_CONTEXT, { thresholdPercent: 50 }), 136000);
+  const budget = retainedBudget(CODEX_MAX_CONTEXT, { thresholdTokens: 550000 }, 20000, 5000);
+  assert.equal(budget.trigger, 271999);
+  assert.equal(budget.progressCeiling, 217599);
+  assert.equal(budget.reserve, 40800);
+  assert.equal(budget.budgetTokens, 217599 - 40800 - 20000 - 5000);
+  assert.equal(retainedBudget(CODEX_MAX_CONTEXT, { thresholdTokens: 550000, reserveTokens: 100000 }, 0, 0).reserve, 100000, "an explicit larger reserveTokens wins over the 15% floor");
+  assert.ok(retainedBudget(3000, { thresholdTokens: 550000 }, 0, 0).budgetTokens < 0, "a tiny model has no budget at all once omp's 16384-token default reserve is counted");
+});
+
+test("systemPromptText reads the system prompt in every shape omp hands the hook: a string, an array of strings, or text parts, and nothing else", () => {
+  assert.equal(systemPromptText("plain"), "plain");
+  assert.equal(systemPromptText(["RFC 2119: MUST", "§ Role"]), "RFC 2119: MUST\n§ Role", "omp 18.2.8 hands an array of strings");
+  assert.equal(systemPromptText(["a", { text: "b" }, { type: "image" }]), "a\nb\n");
+  assert.equal(systemPromptText(undefined), "");
+  assert.equal(systemPromptText({ text: "not counted as a bare object" }), "");
+});
+
+// ---- The registered handler, driven as omp drives it ----
+
 test("the handler falls back to native compaction for a region with no tool calls instead of installing the region verbatim as its own summary", async () => {
-  const handler = loadHandler();
-  const { notes, ctx } = uiCapture();
   const region = [userText("explain X"), assistantText("y".repeat(4000)), userText("more"), assistantText("z".repeat(4000))];
-  const result = await quietStderr(() => withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(compactEvent(region), ctx)));
+  const { result, seen, notes } = await runHandler(compactEvent(region));
   assert.equal(result, undefined);
-  assert.equal(notes.length, 1);
+  assert.equal(seen.urls.length, 0, "a text-only region needs no Jev request");
   assert.match(notes[0], /reduction 0% of the whole context below minimum/);
 });
 
 test("the handler reads TYPESAFE_API_KEY from $FM_HOME/.env when the environment lacks it, and reports unset when neither has it", async () => {
-  const handler = loadHandler();
   const region = [userText("explain X"), assistantText("y".repeat(4000))];
-
-  const bare = homeWithEnvFile("OTHER=1\n");
-  const unset = uiCapture();
-  await quietStderr(() => withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: undefined, FM_HOME: bare }, () => handler(compactEvent(region), unset.ctx)));
+  const unset = await runHandler(compactEvent(region), { env: { TYPESAFE_API_KEY: undefined, FM_HOME: homeWithEnvFile("OTHER=1\n") } });
   assert.match(unset.notes[0], /TYPESAFE_API_KEY unset/);
-
-  const keyed = homeWithEnvFile('export TYPESAFE_API_KEY="from-dot-env"\n');
-  const found = uiCapture();
-  await quietStderr(() => withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: undefined, FM_HOME: keyed }, () => handler(compactEvent(region), found.ctx)));
+  const found = await runHandler(compactEvent(region), { env: { TYPESAFE_API_KEY: undefined, FM_HOME: homeWithEnvFile('export TYPESAFE_API_KEY="from-dot-env"\n') } });
   assert.doesNotMatch(found.notes[0], /unset/, "a key in .env must get past the key check");
   assert.match(found.notes[0], /below minimum/, "and then reach the ordinary reduction gate");
 });
 
-test("the handler returns omp's compaction result with the previous summary leading the Jev-pruned summary, the <files> block from Set fileOps, and the audit; the environment key wins over .env", async () => {
-  const handler = loadHandler();
-  const region: OmpMessage[] = [
-    ...realWorldRegion,
-    userText("investigate the failing test"),
-    assistantToolCall("keep1", "read", { path: "important.ts" }),
-    toolResult("keep1", "the important content Jev should keep"),
-    assistantToolCall("drop1", "bash", { command: "ls -la" }),
-    toolResult("drop1", "drwxr-xr-x  2 x  x  64 Jan 1 00:00 .\n".repeat(20)),
-  ];
-  const home = homeWithEnvFile('TYPESAFE_API_KEY="from-dot-env"\n');
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
+test("the handler returns omp's compaction result with the previous summary leading the Jev-pruned summary, the <files> block from Set fileOps, and the audit with its budget; the environment key wins over .env", async () => {
+  const region: OmpMessage[] = [...realWorldRegion, ...droppableRegion(20)];
   const previousSummary = "EARLIER SUMMARY kept verbatim by compaction #1\n\n<files>\nold.ts (Read)\n</files>";
   const event = compactEvent(region, {
     previousSummary,
+    recentMessages: [userText("recent question"), assistantText("recent answer")],
     fileOps: { read: new Set(["important.ts", "notes.md"]), written: new Set(["notes.md"]), edited: new Set() },
   });
-
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "from-process-env", FM_HOME: home }, () => handler(event, ctx))));
-
+  const { result, seen, notes } = await runHandler(event, { env: { TYPESAFE_API_KEY: "from-process-env", FM_HOME: homeWithEnvFile('TYPESAFE_API_KEY="from-dot-env"\n') } });
   assert.deepEqual(notes, [], "a successful Jev run must not announce a fallback");
-  assert.equal(seen.headers.length, 1);
+  assert.equal(seen.urls.length, 1);
+  assert.equal(seen.urls[0], SYSTEM_ONE_URL);
   assert.match(seen.headers[0], /from-process-env/);
   assert.doesNotMatch(seen.headers[0], /from-dot-env/);
   assert.match(seen.bodies[0], /git status/, "included history reaches the Jev state");
@@ -491,71 +639,61 @@ test("the handler returns omp's compaction result with the previous summary lead
   const wholeContext = 1 - (previousSummary.length + record.charsAfter) / (previousSummary.length + record.charsBefore);
   assert.ok(Math.abs(record.reductionRatio - wholeContext) < 1e-9, "the recorded reduction is measured over the whole context, carried summary included");
   assert.ok(record.reductionRatio >= 0.25);
-  assert.equal(record.summaryTokenCap, 13107, "omp's default cap: min(floor(0.8 * 16384), 16384)");
-  assert.ok(record.summaryTokens > 0 && record.summaryTokens <= record.summaryTokenCap);
+  assert.equal(record.budget.contextWindow, CODEX_MAX_CONTEXT);
+  assert.equal(record.budget.trigger, 271999);
+  assert.equal(record.budget.progressCeiling, 217599);
+  assert.equal(record.budget.reserve, 40800);
+  assert.ok(record.budget.recentTokens > 0, "the recent messages omp keeps are counted against the budget");
+  assert.ok(record.budget.systemPromptTokens > 0, "the system prompt is counted against the budget");
+  assert.equal(record.budget.budgetTokens, 217599 - 40800 - record.budget.recentTokens - record.budget.systemPromptTokens);
+  assert.ok(record.summaryTokens > 0 && record.summaryTokens <= record.budget.budgetTokens);
+});
+
+test("the handler gives a split turn two separate Jev passes and gates on their combined character reduction", async () => {
+  const history = [userText("explain X"), assistantText("y".repeat(20000))];
+  const turnPrefix: OmpMessage[] = [userText("now check"), assistantToolCall("k", "read", { path: "a.ts" }), toolResult("k", "keep this"), assistantToolCall("d", "bash", { command: "ls" }), toolResult("d", "x".repeat(2500))];
+  const { result, seen, notes } = await runHandler(compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix }));
+  assert.equal(seen.urls.length, 1, "the text-only history needs no Jev request; the prefix needs one");
+  assert.equal(result, undefined, "dropping 2.5k of ~22.5k characters is below the 25% minimum for the whole region");
+  assert.match(notes[0], /below minimum/);
 });
 
 test("repeated compaction: once the carried previous summary dominates, the handler falls back to native compaction even though the new region itself shrank by over 90%", async () => {
-  const handler = loadHandler();
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
-  const event = compactEvent(droppableRegion(), { previousSummary: "carried verbatim summary ".repeat(2000) });
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
-  assert.equal(seen.headers.length, 1, "Jev was asked about the new region");
+  const { result, seen, notes } = await runHandler(compactEvent(droppableRegion(), { previousSummary: "carried verbatim summary ".repeat(2000) }));
+  assert.equal(seen.urls.length, 1, "Jev was asked about the new region");
   assert.equal(result, undefined, "a ~3% whole-context reduction hands the whole thing to native compaction, which rewrites and bounds it");
   assert.match(notes[0], /reduction \d% of the whole context below minimum/);
 });
 
-test("repeated compaction: a replacement above omp's native summary cap falls back to native compaction, and the same replacement within the cap is installed with the previous summary leading", async () => {
-  const handler = loadHandler();
-  const previousSummary = "carried verbatim summary ".repeat(80);
-  const run = async (settings: OmpCompactionSettings) => {
-    const seen = { headers: [] as string[], bodies: [] as string[] };
-    const capture = uiCapture();
-    const event = compactEvent(droppableRegion(), { previousSummary, settings });
-    const result = await quietStderr(() =>
-      withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-        withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, capture.ctx))));
-    return { result, notes: capture.notes };
-  };
+test("budget: a model whose context cannot hold any retained history under omp's reserve declines before contacting Jev, and an unknown context window declines too", async () => {
+  const tiny = await runHandler(compactEvent(droppableRegion()), { ctx: { model: { id: "small", contextWindow: 3000 } } });
+  assert.equal(tiny.result, undefined);
+  assert.equal(tiny.seen.urls.length, 0, "no transcript is sent for a result that could never be installed");
+  assert.match(tiny.notes[0], /no retained-context budget/);
+  const unknown = await runHandler(compactEvent(droppableRegion()), { ctx: { model: undefined } });
+  assert.equal(unknown.result, undefined);
+  assert.equal(unknown.seen.urls.length, 0);
+  assert.match(unknown.notes[0], /context window is unknown/);
+});
 
-  const capped = await run({ reserveTokens: 200 });
-  assert.equal(capped.result, undefined);
-  assert.match(capped.notes[0], /exceeds omp's 160-token summary cap/);
+test("budget: the same well-reduced replacement is refused when it exceeds a smaller model's retained-context budget and installed under Codex Max's, with the previous summary leading", async () => {
+  const previousSummary = "carried verbatim summary ".repeat(7200);
+  const event = () => compactEvent(droppableRegion(16000), { previousSummary });
+  const small = await runHandler(event(), { ctx: { model: { id: "gpt-small", contextWindow: 60000 } } });
+  assert.equal(small.seen.urls.length, 1, "Jev ran and the region shrank; only the installed size failed");
+  assert.equal(small.result, undefined);
+  assert.match(small.notes[0], /exceeds the \d+-token retained-context budget for a 60000-token model/);
 
-  const fitting = await run({});
-  assert.deepEqual(fitting.notes, [], "within the default cap nothing falls back");
-  assert.ok(fitting.result);
-  const record = fitting.result.compaction.preserveData.jevCompaction;
-  assert.equal(record.previousSummaryChars, previousSummary.length);
-  assert.equal(record.summaryTokenCap, 13107);
-  assert.ok(record.summaryTokens > 160 && record.summaryTokens <= 13107, `the same ~${record.summaryTokens}-token replacement is what the 160-token cap refused`);
+  const codexMax = await runHandler(event());
+  assert.deepEqual(codexMax.notes, [], "under Codex Max the same replacement fits");
+  assert.ok(codexMax.result);
+  const record = codexMax.result.compaction.preserveData.jevCompaction;
   assert.ok(record.reductionRatio >= 0.25);
-  assert.ok(fitting.result.compaction.summary.startsWith(previousSummary), "the carried summary still leads the installed replacement");
+  assert.ok(record.summaryTokens > 40000 && record.summaryTokens <= record.budget.budgetTokens, `~${record.summaryTokens} retained tokens is far past the 13107-token native summary cap this budget replaces`);
+  assert.ok(codexMax.result.compaction.summary.startsWith(previousSummary), "the carried summary still leads the installed replacement");
 });
 
-test("the handler gives a split turn two separate Jev passes and gates on their combined character reduction", async () => {
-  const handler = loadHandler();
-  const history = [userText("explain X"), assistantText("y".repeat(20000))];
-  const turnPrefix: OmpMessage[] = [
-    userText("now check"),
-    assistantToolCall("k", "read", { path: "a.ts" }),
-    toolResult("k", "keep this"),
-    assistantToolCall("d", "bash", { command: "ls" }),
-    toolResult("d", "x".repeat(2500)),
-  ];
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
-  const event = compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix });
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
-  assert.equal(seen.headers.length, 1, "the text-only history needs no Jev request; the prefix needs one");
-  assert.equal(result, undefined, "dropping 2.5k of ~22.5k characters is below the 25% minimum for the whole region");
-  assert.match(notes[0], /below minimum/);
-});
+// ---- Native history that a text-only summary cannot carry ----
 
 test("unretainableNativeHistory names the method-native history a text-only summary would drop, and nothing else", () => {
   assert.equal(unretainableNativeHistory(undefined), undefined);
@@ -566,9 +704,6 @@ test("unretainableNativeHistory names the method-native history a text-only summ
   assert.equal(unretainableNativeHistory({ openaiRemoteCompaction: "not an object" }), undefined, "omp's own readers ignore a non-object value, so there is nothing to lose");
 });
 
-// What omp hands the hook after a native OpenAI remote compaction: the entry's
-// summary is only a placeholder sentence, and the compacted history lives in
-// preserveData.openaiRemoteCompaction.replacementHistory.
 const openaiRemotePlaceholder = "Remote compaction preserved provider-native history for this session. Compaction processed 12345 input tokens.";
 const openaiRemotePreserveData = {
   openaiRemoteCompaction: {
@@ -579,149 +714,92 @@ const openaiRemotePreserveData = {
 };
 
 test("after a native OpenAI remote compaction the handler declines before contacting Jev, so native compaction keeps the replayed history the placeholder summary does not contain", async () => {
-  const handler = loadHandler();
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
-  const event = compactEvent(droppableRegion(), { previousSummary: openaiRemotePlaceholder, previousPreserveData: openaiRemotePreserveData });
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  const { result, seen, notes } = await runHandler(compactEvent(droppableRegion(), { previousSummary: openaiRemotePlaceholder, previousPreserveData: openaiRemotePreserveData }));
   assert.equal(result, undefined, "a text-only summary would install the placeholder sentence and lose everything compaction #1 preserved");
-  assert.equal(seen.headers.length, 0, "no transcript is sent to Jev for a result that could not be installed anyway");
+  assert.equal(seen.urls.length, 0, "no transcript is sent to Jev for a result that could not be installed anyway");
   assert.match(notes[0], /previous compaction's openaiRemoteCompaction history cannot be carried/);
 });
 
 test("after a native snapcompact compaction the handler declines the same way, since its archive frames live beside the summary text", async () => {
-  const handler = loadHandler();
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
-  const event = compactEvent(droppableRegion(), {
+  const { result, seen, notes } = await runHandler(compactEvent(droppableRegion(), {
     previousSummary: "Archived 40,000 chars of history onto 3 snapcompact frames",
     previousPreserveData: { snapcompact: { frames: [{ data: "...", mimeType: "image/png", cols: 80, rows: 40, chars: 3200 }], text: "" } },
-  });
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  }));
   assert.equal(result, undefined);
-  assert.equal(seen.headers.length, 0);
+  assert.equal(seen.urls.length, 0);
   assert.match(notes[0], /snapcompact history cannot be carried/);
 });
 
 test("the same later compaction proceeds and installs when the previous compaction was this extension's own, whose substance is the carried summary text", async () => {
-  const handler = loadHandler();
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture();
   const previousSummary = "user: earlier Jev-kept history\n\n<files>\nold.ts (Read)\n</files>";
-  const event = compactEvent(droppableRegion(), {
+  const { result, seen, notes } = await runHandler(compactEvent(droppableRegion(), {
     previousSummary,
     previousPreserveData: { jevCompaction: { model: "jev-latest", kept: 1, dropped: ["old-call"], charsBefore: 900, charsAfter: 90 } },
-  });
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k" }, () => handler(event, ctx))));
+  }));
   assert.deepEqual(notes, []);
-  assert.equal(seen.headers.length, 1, "Jev is asked about the new region");
+  assert.equal(seen.urls.length, 1, "Jev is asked about the new region");
   assert.ok(result);
   assert.ok(result.compaction.summary.startsWith(previousSummary), "the earlier Jev summary leads the installed replacement");
   assert.match(result.compaction.summary, /important content Jev should keep/);
 });
 
-test("secretsEnabledInConfig reads omp's Hide Secrets switch as config.yml states it, treats silence as off, and refuses to guess at forms it does not follow", () => {
-  assert.equal(secretsEnabledInConfig(""), false);
-  assert.equal(secretsEnabledInConfig("compaction:\n  thresholdTokens: 550000\n  methodOrder:\n    - remote\n    - shake\n"), false);
-  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: true\n"), true);
-  assert.equal(secretsEnabledInConfig("theme:\n  dark: x\nsecrets:\n  enabled: false # off for now\ncompaction:\n  thresholdTokens: 1\n"), false);
-  assert.equal(secretsEnabledInConfig("secrets.enabled: true\n"), true);
-  assert.equal(secretsEnabledInConfig("secrets:\n  patterns:\n    - AKIA\n  enabled: true\n"), true, "a sibling list inside the block must not hide the switch");
-  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: true\nsecrets.enabled: false\n"), false, "the last statement wins, as in omp's own layering");
-  assert.equal(secretsEnabledInConfig("secrets: { enabled: true }\n"), undefined, "a flow mapping is not followed, so the caller fails closed");
-  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: 'true'\n"), undefined);
-  assert.equal(secretsEnabledInConfig("secrets:\n  enabled: yes\n"), undefined);
-  assert.equal(secretsEnabledInConfig("secrets: &s\n  enabled: true\n"), undefined);
-});
+// ---- Privacy: the same event omp emits from a manual /compact and from
+// automatic threshold compaction, so one handler run stands for both. ----
 
-test("hideSecretsState layers omp's config files like omp does and fails closed on a file it cannot read", () => {
-  const off = agentDirWith("secrets:\n  enabled: false\n");
-  const on = agentDirWith("secrets:\n  enabled: true\n");
-  const silent = agentDirWith("compaction:\n  thresholdTokens: 550000\n");
-  assert.deepEqual(hideSecretsState([join(silent, "config.yml"), join(isolatedProject, ".omp", "config.yml")]), { state: "off" });
-  assert.deepEqual(hideSecretsState([join(on, "config.yml"), join(isolatedProject, ".omp", "config.yml")]), { state: "on", file: join(on, "config.yml") });
-  const projectOff = projectWith("secrets:\n  enabled: false\n");
-  assert.deepEqual(hideSecretsState([join(on, "config.yml"), join(projectOff, ".omp", "config.yml")]), { state: "off" }, "a project file that states the switch overrides the global one");
-  const projectOn = projectWith("secrets.enabled: true\n");
-  assert.deepEqual(hideSecretsState([join(off, "config.yml"), join(projectOn, ".omp", "config.yml")]), { state: "on", file: join(projectOn, ".omp", "config.yml") });
-  const flow = agentDirWith("secrets: { enabled: false }\n");
-  assert.deepEqual(hideSecretsState([join(flow, "config.yml")]), { state: "unreadable", file: join(flow, "config.yml") });
-  const asDirectory = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
-  mkdirSync(join(asDirectory, "config.yml"));
-  assert.deepEqual(hideSecretsState([join(asDirectory, "config.yml")]), { state: "unreadable", file: join(asDirectory, "config.yml") });
-});
-
-// A region carrying a credential-shaped value omp's Hide Secrets would redact
-// before any provider request; the hook receives it un-redacted.
-function regionWithSecret(): OmpMessage[] {
-  return [
-    ...droppableRegion(),
-    { role: "bashExecution", command: "cat .env", output: "AWS_SECRET_ACCESS_KEY=REDACTED-BY-OMP-NATIVELY", exitCode: 0, cancelled: false, truncated: false, timestamp: 9 },
-  ];
-}
-
-// omp emits the identical session_before_compact event from a manual /compact
-// and from automatic threshold compaction, so one handler run stands for both.
-async function runPrivacyCase(agentDir: string, cwd: string) {
-  const handler = loadHandler();
-  const seen = { headers: [] as string[], bodies: [] as string[] };
-  const { notes, ctx } = uiCapture(cwd);
-  const result = await quietStderr(() =>
-    withGlobalFetch(keepFirstDropRestFetch(seen), () =>
-      withEnv({ FM_JEV_COMPACTION: "1", TYPESAFE_API_KEY: "k", PI_CODING_AGENT_DIR: agentDir }, () => handler(compactEvent(regionWithSecret()), ctx))));
-  return { result, seen, notes };
-}
-
-test("privacy: with omp Hide Secrets on in the agent directory's config.yml, the handler declines before anything is sent, so the un-redacted region never reaches Jev", async () => {
-  const { result, seen, notes } = await runPrivacyCase(agentDirWith("secrets:\n  enabled: true\n"), isolatedProject);
+test("privacy: with omp itself reporting Hide Secrets on, the handler declines before anything is sent, having asked this very omp binary from the session cwd", async () => {
+  const { result, seen, notes, ompCall } = await runHandler(compactEvent(regionWithSecret()), { runtime: { mode: "on" } });
   assert.equal(result, undefined, "native compaction, which omp redacts, must run instead");
-  assert.equal(seen.headers.length, 0, "no request may leave the machine");
-  assert.match(notes[0], /Hide Secrets is on in .*config\.yml/);
+  assert.equal(seen.urls.length, 0, "no request may leave the machine");
+  assert.match(notes[0], /Hide Secrets is on \(omp config get secrets\.enabled\)/);
+  assert.equal(ompCall?.args, "config get secrets.enabled --json");
+  assert.equal(ompCall?.cwd, realpathSync(isolatedProject));
 });
 
-test("privacy: Hide Secrets on in the project's .omp/config.yml, or in a config.yaml, declines the same way", async () => {
-  const project = await runPrivacyCase(isolatedAgentDir, projectWith("secrets:\n  enabled: true\n"));
-  assert.equal(project.result, undefined);
-  assert.equal(project.seen.headers.length, 0);
-  assert.match(project.notes[0], /Hide Secrets is on in .*\.omp\/config\.yml/);
-
-  const yaml = await runPrivacyCase(agentDirWith("secrets:\n  enabled: true\n", "config.yaml"), isolatedProject);
-  assert.equal(yaml.result, undefined);
-  assert.equal(yaml.seen.headers.length, 0);
-  assert.match(yaml.notes[0], /Hide Secrets is on in .*config\.yaml/);
+test("privacy: a --config overlay on omp's own argv that turns Hide Secrets on declines the same way, even though omp's file-layer reader still says off", async () => {
+  const on = overlayFile("secrets:\n  enabled: true\n");
+  const { result, seen, notes } = await runHandler(compactEvent(regionWithSecret()), { runtime: { mode: "off", argv: ["--config", on, "--cwd", isolatedProject] } });
+  assert.equal(result, undefined);
+  assert.equal(seen.urls.length, 0);
+  assert.match(notes[0], /Hide Secrets is on \(--config overlay .*overlay\.yml\)/);
 });
 
-test("privacy: a config.yml the handler cannot read or follow declines before contacting Jev rather than assuming Hide Secrets is off", async () => {
-  const flow = await runPrivacyCase(agentDirWith("secrets: { enabled: false }\n"), isolatedProject);
-  assert.equal(flow.result, undefined);
-  assert.equal(flow.seen.headers.length, 0);
-  assert.match(flow.notes[0], /Hide Secrets could not be read from .*config\.yml/);
-
-  const unreadableDir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
-  mkdirSync(join(unreadableDir, "config.yml"));
-  const eisdir = await runPrivacyCase(unreadableDir, isolatedProject);
-  assert.equal(eisdir.result, undefined);
-  assert.equal(eisdir.seen.headers.length, 0);
-  assert.match(eisdir.notes[0], /could not be read/);
+test("privacy: whenever the effective switch cannot be established - omp's reader failing, answering garbage, missing, or an overlay touching secrets in an unfollowed form - the handler declines before contacting Jev", async () => {
+  for (const mode of ["fail", "garbage", "string", "missing"] as const) {
+    const { result, seen, notes } = await runHandler(compactEvent(regionWithSecret()), { runtime: { mode } });
+    assert.equal(result, undefined, mode);
+    assert.equal(seen.urls.length, 0, `${mode}: nothing may leave the machine on an unprovable state`);
+    assert.match(notes[0], /Hide Secrets could not be established/);
+  }
+  const bare = await runHandler(compactEvent(regionWithSecret()), { runtime: { mode: "off", argv: ["--config", overlayFile("secrets:\n  # enabled: false\n")] } });
+  assert.equal(bare.result, undefined);
+  assert.equal(bare.seen.urls.length, 0);
+  assert.match(bare.notes[0], /touches secrets in a form this gate does not follow/);
+  const missingOverlay = await runHandler(compactEvent(regionWithSecret()), { runtime: { mode: "off", argv: ["--config", join(isolatedProject, "no-such-overlay.yml")] } });
+  assert.equal(missingOverlay.result, undefined);
+  assert.equal(missingOverlay.seen.urls.length, 0);
+  assert.match(missingOverlay.notes[0], /could not be read/);
 });
 
-test("privacy: with Hide Secrets off, or absent, or overridden off by the project, the same region is sent to Jev and installed - the un-redacted disclosure is then the captain's documented opt-in", async () => {
-  for (const [agentDir, cwd] of [
-    [agentDirWith("secrets:\n  enabled: false\n"), isolatedProject],
-    [agentDirWith("compaction:\n  thresholdTokens: 550000\n"), isolatedProject],
-    [agentDirWith("secrets:\n  enabled: true\n"), projectWith("secrets:\n  enabled: false\n")],
-  ] as const) {
-    const { result, seen, notes } = await runPrivacyCase(agentDir, cwd);
+test("privacy: the actual Firstmate worker launch - omp's reader off and the tracked worker overlay on argv - proceeds, as does an overlay that turns an inherited on back off; the un-redacted disclosure is then the captain's documented opt-in", async () => {
+  const workerOverlay = join(repoRoot, ".omp", "fm-worker-overlay.yml");
+  assert.ok(existsSync(workerOverlay), "the overlay bin/fm-spawn.sh passes on every Firstmate-launched omp session");
+  for (const runtime of [
+    { mode: "off" as const, argv: ["--config", workerOverlay, "--auto-approve", "--cwd", isolatedProject] },
+    { mode: "off" as const, argv: [] },
+    { mode: "on" as const, argv: ["--config", overlayFile("secrets:\n  enabled: false\n")] },
+  ]) {
+    const { result, seen, notes } = await runHandler(compactEvent(regionWithSecret()), { runtime });
     assert.deepEqual(notes, []);
-    assert.equal(seen.headers.length, 1, "Jev is asked exactly once");
+    assert.equal(seen.urls.length, 1, "Jev is asked exactly once");
     assert.match(seen.bodies[0], /cat \.env/, "the raw region reaches Jev when omp itself would not redact it either");
     assert.ok(result);
     assert.match(result.compaction.summary, /REDACTED-BY-OMP-NATIVELY/);
   }
+});
+
+test("FM_JEV_ENDPOINT aims the handler's Jev requests at the given URL and is otherwise absent, so a real launch targets upstream", async () => {
+  const redirected = await runHandler(compactEvent(droppableRegion()), { env: { FM_JEV_ENDPOINT: "http://127.0.0.1:1/systemone" } });
+  assert.deepEqual(redirected.seen.urls, ["http://127.0.0.1:1/systemone"]);
+  const upstream = await runHandler(compactEvent(droppableRegion()));
+  assert.deepEqual(upstream.seen.urls, [SYSTEM_ONE_URL]);
 });

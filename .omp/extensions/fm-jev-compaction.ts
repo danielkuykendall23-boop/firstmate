@@ -85,11 +85,25 @@
 // already keeps regardless of method, and every decision (kept/truncated/
 // dropped, by omp tool-call id) is written to preserveData.jevCompaction for
 // audit, straight from the vendored library's own result.decisions/stats. On
-// any failure - missing key, network error, malformed Jev response, a
-// whole-context character reduction below MIN_REDUCTION_RATIO, or a
-// replacement above omp's own native summary token cap - this returns
-// undefined and visibly notifies a native-fallback status; it never reports
-// Jev success when Jev did not run.
+// any failure - Hide Secrets on or not provable, missing key, unknown model
+// capacity, network error, malformed Jev response, a whole-context character
+// reduction below MIN_REDUCTION_RATIO, or a replacement above the retained-
+// context budget - this returns undefined and visibly notifies a native-
+// fallback status; it never reports Jev success when Jev did not run.
+//
+// The retained-context budget is derived from omp's own arithmetic for the
+// active model rather than from the cap omp puts on an LLM-written summary:
+// omp's compaction-loop guard treats a compaction as progress only while the
+// context it leaves behind stays at or under 80% of the trigger it computes
+// for the model's context window (thresholdTokens clamped to the window),
+// so the installed replacement - carried summary, Jev-pruned region and
+// <files> block - must fit under that ceiling with the model's response
+// reserve, the recent messages omp keeps, and the system prompt already
+// counted. Whatever fits leaves at least a fifth of the trigger plus one
+// full response of headroom before the next compaction; whatever does not
+// is handed to native compaction, which rewrites and bounds the whole
+// context. Verbatim text the library cannot prune (user and assistant
+// prose) is never truncated to make a result fit.
 //
 // The key is TYPESAFE_API_KEY from the process environment, else the
 // TYPESAFE_API_KEY= line of $FM_HOME/.env read under the same rule as
@@ -100,16 +114,26 @@
 // applied to every native provider request, but the preparation omp hands a
 // session_before_compact handler is the raw, un-redacted region, and the
 // hook context exposes no redaction helper or settings reader. So before
-// anything is sent, the handler reads `secrets.enabled` from the config.yml
-// files omp itself layers - the agent directory's (PI_CODING_AGENT_DIR, else
-// ~/.omp/agent) and the project's .omp/config.yml - and declines when it is
-// on, or when a file exists that it cannot read or follow, so a region omp
-// would redact never reaches Jev un-redacted. A `--config` overlay or
-// `--config-override` flag is not visible here; docs/jev-compaction.md
-// "Activation" states that limit.
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+// anything is sent, the handler asks omp itself: it runs this very omp
+// binary's `config get secrets.enabled --json` as a child with the session's
+// cwd and inherited environment, so global/project precedence, the
+// config.yml/config.yaml choice, the project group-shadow rule and a
+// --profile agent directory are all decided by omp's own settings loader.
+// The one input that reader does not see is a `--config` overlay on this
+// process's own argv, so those files are read here with a deliberately
+// narrow rule: a top-level `secrets:` block with a plain boolean `enabled:`
+// child states the switch, an overlay that never mentions secrets states
+// nothing, and every other way of touching it is not followed. When the
+// switch is on, or when any of that cannot be established, the handler
+// declines before Jev is contacted; native compaction, which omp redacts,
+// runs instead.
+//
+// FM_JEV_ENDPOINT replaces the upstream System One URL so the repository's
+// live omp test can point a real session at a local fake endpoint; it is
+// not a tuning knob and is unset in every real launch.
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   collectToolCalls,
@@ -130,9 +154,16 @@ type HookUiContext = {
   setStatus?: (key: string, text: string) => void;
 };
 
+type HookModel = {
+  id?: string;
+  contextWindow?: number;
+};
+
 type HookContext = {
   ui?: HookUiContext;
   cwd?: string;
+  model?: HookModel;
+  getSystemPrompt?: () => unknown;
 };
 
 // The omp extension API surface this file uses, declared locally: omp ships
@@ -173,10 +204,13 @@ export type OmpFileOps = {
   edited: Iterable<string>;
 };
 
-// omp's compaction settings as the hook receives them; reserveTokens is the
-// one field the native summary cap below depends on.
+// omp's compaction settings group as the hook receives it; these are the
+// fields omp's own trigger and reserve arithmetic reads.
 export type OmpCompactionSettings = {
+  thresholdTokens?: number;
+  thresholdPercent?: number;
   reserveTokens?: number;
+  keepRecentTokens?: number;
   [key: string]: unknown;
 };
 
@@ -221,22 +255,17 @@ export type JevCompactionAudit = {
 };
 
 // The audit as installed: the region stats above, re-measured over the
-// complete replacement (carried previous summary included) with omp's own
-// summary cap beside the estimated size of what was installed.
+// complete replacement (carried previous summary included), with the
+// estimated size of what was installed beside the budget it had to fit.
 export type JevCompactionRecord = JevCompactionAudit & {
   previousSummaryChars: number;
   summaryTokens: number;
-  summaryTokenCap: number;
+  budget: RetainedBudget;
 };
 
 const JEV_MODEL = "jev-latest";
 const MIN_REDUCTION_RATIO = 0.25;
 const FILES_TAG_LIMIT = 20;
-// omp 18.2.5 caps every native summary at
-// min(floor(0.8 * compaction.reserveTokens), MAX_SUMMARY_TOKENS), with the
-// default reserve and MAX_SUMMARY_TOKENS both 16384.
-const NATIVE_MAX_SUMMARY_TOKENS = 16384;
-const NATIVE_DEFAULT_RESERVE_TOKENS = 16384;
 
 const extensionFile = fileURLToPath(import.meta.url);
 const root = resolve(dirname(extensionFile), "../..");
@@ -276,16 +305,49 @@ function resolveApiKey(): string {
   return process.env.TYPESAFE_API_KEY || envFileValue(`${fmHome()}/.env`, "TYPESAFE_API_KEY");
 }
 
-// ---- omp's Hide Secrets switch, read from the config files omp layers. ----
+// ---- omp's Hide Secrets switch: omp's own reader for the layered config
+// files, plus the --config overlays only this process can see. ----
 
-function ompAgentDir(): string {
-  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".omp", "agent");
+export type HideSecretsState = { state: "on" | "off"; source: string } | { state: "unprovable"; detail: string };
+
+const OMP_CONFIG_GET_TIMEOUT_MS = 15_000;
+
+/**
+ * omp's own `config get secrets.enabled --json`, run as a child of this very
+ * omp binary (process.execPath inside a session) with the session's cwd and
+ * inherited environment, so omp's settings loader decides global/project
+ * precedence, config.yml versus config.yaml, the project group-shadow rule,
+ * and a --profile agent directory (exported as PI_CODING_AGENT_DIR).
+ */
+export function ompConfiguredSecretsEnabled(cwd: string, execPath = process.execPath): { value: boolean } | { error: string } {
+  const run = spawnSync(execPath, ["config", "get", "secrets.enabled", "--json"], {
+    cwd,
+    encoding: "utf8",
+    timeout: OMP_CONFIG_GET_TIMEOUT_MS,
+    env: { ...process.env, OMP_SKIP_SETUP: "1" },
+  });
+  if (run.error) return { error: `omp config get did not run (${run.error.message})` };
+  if (run.status !== 0) return { error: `omp config get exited ${run.status ?? "by signal"}: ${(run.stderr || run.stdout || "").trim().slice(0, 200)}` };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(run.stdout);
+  } catch {
+    return { error: "omp config get returned non-JSON output" };
+  }
+  const record = parsed as { key?: unknown; value?: unknown } | null;
+  if (record?.key !== "secrets.enabled" || typeof record.value !== "boolean") return { error: "omp config get returned an unexpected shape for secrets.enabled" };
+  return { value: record.value };
 }
 
-/** The config.yml files omp reads, in omp's own layering order: the agent directory's, then the project's. */
-export function ompConfigFiles(agentDir: string, cwd: string): string[] {
-  const global = [join(agentDir, "config.yml"), join(agentDir, "config.yaml")];
-  return [global.find((file) => existsSync(file)) ?? global[0], join(cwd, ".omp", "config.yml")];
+/** Every `--config <file>` / `--config=<file>` overlay on omp's own argv, in order, resolved against the session's working directory. */
+export function overlayFilesFromArgv(argv: readonly string[], cwd: string): string[] {
+  const files: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--config" && i + 1 < argv.length) files.push(argv[++i]);
+    else if (arg.startsWith("--config=")) files.push(arg.slice("--config=".length));
+  }
+  return files.map((file) => (isAbsolute(file) ? file : resolve(cwd, file)));
 }
 
 type YamlMappingLine = { indent: number; key: string; value: string };
@@ -307,62 +369,74 @@ function yamlBoolean(value: string): boolean | undefined {
 }
 
 /**
- * omp's `secrets.enabled` as one config.yml states it: the boolean when the
- * file spells it plainly (a top-level `secrets:` block with an `enabled:`
- * key, or a flat `secrets.enabled:` key; the last statement wins), false
- * when the file says nothing about it, and undefined when it is written in
- * a form this reader does not follow (a flow mapping, an alias, a quoted or
- * non-boolean value), so the caller fails closed rather than guessing.
+ * What one `--config` overlay states about `secrets.enabled`: the boolean
+ * when a top-level `secrets:` block carries a plain boolean `enabled:` child
+ * (the last statement wins), "unstated" when the overlay never mentions
+ * secrets, and undefined for every other way of touching it - a bare or
+ * flow `secrets:` group, an alias, a dotted `secrets.` key, a quoted or
+ * non-boolean value - because omp's handling of those forms in an overlay is
+ * not established here and a wrong guess would be a silent bypass.
  */
-export function secretsEnabledInConfig(text: string): boolean | undefined {
-  let enabled = false;
-  let block: { indent: number; childIndent?: number } | undefined;
+export function overlaySecretsStatement(text: string): boolean | "unstated" | undefined {
+  let stated: boolean | "unstated" = "unstated";
+  let block: { indent: number; childIndent?: number; statedEnabled: boolean } | undefined;
+  const closeBlock = (): boolean => {
+    if (block && !block.statedEnabled) return false;
+    block = undefined;
+    return true;
+  };
   for (const raw of text.split(/\r?\n/)) {
     const line = yamlMappingLine(raw);
     if (line === undefined) continue;
-    if (block && line !== null && line.indent <= block.indent) block = undefined;
+    if (block && line !== null && line.indent <= block.indent && !closeBlock()) return undefined;
     if (block) {
       if (line === null) continue;
       block.childIndent ??= line.indent;
       if (line.indent === block.childIndent && line.key === "enabled") {
         const value = yamlBoolean(line.value);
         if (value === undefined) return undefined;
-        enabled = value;
+        stated = value;
+        block.statedEnabled = true;
       }
       continue;
     }
     if (line === null || line.indent !== 0) continue;
     if (line.key === "secrets") {
       if (line.value !== "") return undefined;
-      block = { indent: line.indent };
-    } else if (line.key === "secrets.enabled") {
-      const value = yamlBoolean(line.value);
-      if (value === undefined) return undefined;
-      enabled = value;
+      block = { indent: line.indent, statedEnabled: false };
+    } else if (line.key === "secrets.enabled" || line.key.startsWith("secrets.")) {
+      return undefined;
     }
   }
-  return enabled;
+  return closeBlock() ? stated : undefined;
 }
 
-export type HideSecretsState = { state: "off" } | { state: "on" | "unreadable"; file: string };
-
-/** Hide Secrets across omp's layered config files: a later file that states the switch overrides an earlier one, as in omp; an unreadable or unfollowable file wins outright. */
-export function hideSecretsState(files: readonly string[]): HideSecretsState {
-  let on: string | undefined;
-  for (const file of files) {
-    let text: string;
+/**
+ * omp's effective Hide Secrets switch for this session: omp's own answer for
+ * the layered config files, then each --config overlay in launch order, a
+ * later statement overriding an earlier one. Anything that cannot be
+ * established faithfully is "unprovable", and the handler declines on it.
+ */
+export function hideSecretsState(cwd: string, argv: readonly string[] = process.argv): HideSecretsState {
+  const configured = ompConfiguredSecretsEnabled(cwd);
+  if ("error" in configured) return { state: "unprovable", detail: configured.error };
+  let enabled = configured.value;
+  let source = "omp config get secrets.enabled";
+  for (const file of overlayFilesFromArgv(argv, cwd)) {
+    let overlay: string;
     try {
-      text = readFileSync(file, "utf8");
+      overlay = readFileSync(file, "utf8");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-      return { state: "unreadable", file };
+      return { state: "unprovable", detail: `--config overlay ${file} could not be read (${(error as NodeJS.ErrnoException).code ?? "error"})` };
     }
-    const enabled = secretsEnabledInConfig(text);
-    if (enabled === undefined) return { state: "unreadable", file };
-    if (enabled) on = file;
-    else if (/^\s*secrets(\.enabled)?\s*:/m.test(text)) on = undefined;
+    const statement = overlaySecretsStatement(overlay);
+    if (statement === undefined) return { state: "unprovable", detail: `--config overlay ${file} touches secrets in a form this gate does not follow` };
+    if (statement !== "unstated") {
+      enabled = statement;
+      source = `--config overlay ${file}`;
+    }
   }
-  return on ? { state: "on", file: on } : { state: "off" };
+  return { state: enabled ? "on" : "off", source };
 }
 
 function contentBlocks(content: unknown): OmpContentBlock[] {
@@ -542,25 +616,89 @@ export function unretainableNativeHistory(previousPreserveData: Record<string, u
   });
 }
 
-/** omp's own bound on a native summary, applied here to the complete replacement Jev would install. */
-export function nativeSummaryTokenCap(settings: OmpCompactionSettings): number {
-  return Math.min(Math.floor(0.8 * (settings.reserveTokens ?? NATIVE_DEFAULT_RESERVE_TOKENS)), NATIVE_MAX_SUMMARY_TOKENS);
+// ---- The retained-context budget, from omp's own trigger and reserve rules
+// for the active model (omp 18.2.8, verified in the installed binary):
+//   reserve  = max(floor(contextWindow * 0.15), compaction.reserveTokens ?? 16384)
+//   trigger  = thresholdTokens > 0 ? min(contextWindow - 1, thresholdTokens)
+//            : thresholdPercent > 0 ? floor(contextWindow * clamp(percent, 1..99) / 100)
+//            : max(0, min(contextWindow - 1, contextWindow - thresholdReserve))
+//   ceiling  = floor(trigger * 0.8), the most context a compaction may leave
+//              behind before omp's loop guard pauses automatic maintenance.
+
+const OMP_DEFAULT_RESERVE_TOKENS = 16384;
+const OMP_RESERVE_FRACTION = 0.15;
+const OMP_PROGRESS_FRACTION = 0.8;
+
+function effectiveReserve(contextWindow: number, settings: OmpCompactionSettings): number {
+  return Math.max(Math.floor(contextWindow * OMP_RESERVE_FRACTION), settings.reserveTokens ?? OMP_DEFAULT_RESERVE_TOKENS);
+}
+
+function thresholdReserve(contextWindow: number, settings: OmpCompactionSettings): number {
+  const reserve = effectiveReserve(contextWindow, settings);
+  const fifteenPercent = Math.max(1, Math.floor(contextWindow * OMP_RESERVE_FRACTION));
+  const unset = settings.reserveTokens === undefined;
+  return (unset && reserve >= contextWindow - fifteenPercent) || reserve >= contextWindow ? fifteenPercent : reserve;
+}
+
+/** The token count at which omp triggers compaction for this model and these settings. */
+export function triggerTokens(contextWindow: number, settings: OmpCompactionSettings): number {
+  const fixed = settings.thresholdTokens;
+  if (typeof fixed === "number" && Number.isFinite(fixed) && fixed > 0) return Math.min(contextWindow - 1, Math.max(1, fixed));
+  const percent = settings.thresholdPercent;
+  if (typeof percent !== "number" || !Number.isFinite(percent) || percent <= 0) {
+    return Math.max(0, Math.min(contextWindow - 1, contextWindow - thresholdReserve(contextWindow, settings)));
+  }
+  return Math.floor(contextWindow * (Math.min(99, Math.max(1, percent)) / 100));
+}
+
+/** The text of omp's system prompt as the hook receives it: a string, or an array of strings and `{ text }` parts (omp 18.2.8 hands an array of strings). */
+export function systemPromptText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((part) => (typeof part === "string" ? part : typeof (part as { text?: unknown } | null)?.text === "string" ? (part as { text: string }).text : ""))
+    .join("\n");
+}
+
+export type RetainedBudget = {
+  contextWindow: number;
+  trigger: number;
+  progressCeiling: number;
+  reserve: number;
+  recentTokens: number;
+  systemPromptTokens: number;
+  budgetTokens: number;
+};
+
+/**
+ * How much retained verbatim history the installed replacement may hold:
+ * omp's progress ceiling for this model, less the model's response reserve,
+ * the recent messages omp keeps beside the summary, and the system prompt.
+ * Whatever fits leaves at least a fifth of the trigger plus one full
+ * response of headroom before the next compaction and never trips omp's
+ * compaction-loop guard.
+ */
+export function retainedBudget(contextWindow: number, settings: OmpCompactionSettings, recentTokens: number, systemPromptTokens: number): RetainedBudget {
+  const trigger = triggerTokens(contextWindow, settings);
+  const progressCeiling = Math.floor(trigger * OMP_PROGRESS_FRACTION);
+  const reserve = effectiveReserve(contextWindow, settings);
+  return { contextWindow, trigger, progressCeiling, reserve, recentTokens, systemPromptTokens, budgetTokens: progressCeiling - reserve - recentTokens - systemPromptTokens };
 }
 
 /**
  * The region audit re-measured as installed: the carried previous summary
  * counts on both sides of the reduction, so a small region that shrank a lot
  * cannot pass once the verbatim carry dominates, and the whole replacement's
- * estimated size stands beside the native cap it must fit.
+ * estimated size stands beside the budget it must fit.
  */
-export function installedRecord(audit: JevCompactionAudit, previousSummary: string, summary: string, settings: OmpCompactionSettings): JevCompactionRecord {
+export function installedRecord(audit: JevCompactionAudit, previousSummary: string, summary: string, budget: RetainedBudget): JevCompactionRecord {
   const previousSummaryChars = previousSummary.length;
   return {
     ...audit,
     previousSummaryChars,
     reductionRatio: reduction(previousSummaryChars + audit.charsBefore, previousSummaryChars + audit.charsAfter),
     summaryTokens: estimateTokens(summary),
-    summaryTokenCap: nativeSummaryTokenCap(settings),
+    budget,
   };
 }
 
@@ -585,11 +723,11 @@ export function buildFilesTag(fileOps: OmpFileOps): string {
 
 // ---- Top-level: run the real vendored compact() against one omp region. ----
 
-export type JevRegionOptions = CompactOptions & { apiKey: string; fetchImpl?: typeof fetch };
+export type JevRegionOptions = CompactOptions & { apiKey: string; baseUrl?: string; fetchImpl?: typeof fetch };
 export type JevRegionResult = { text: string; audit: JevCompactionAudit };
 
 export async function compactOmpRegion(messages: readonly OmpMessage[], options: JevRegionOptions): Promise<JevRegionResult> {
-  const asker = new JevClient({ apiKey: options.apiKey, model: JEV_MODEL, fetch: options.fetchImpl });
+  const asker = new JevClient({ apiKey: options.apiKey, model: JEV_MODEL, baseUrl: options.baseUrl, fetch: options.fetchImpl });
   const libMessages = toLibraryMessages(messages);
   // The region omp hands the hook is already scoped to "not recent"; a
   // second preserveRecentMessages layer inside it would wrongly re-protect
@@ -623,10 +761,11 @@ export default function (pi: ExtensionAPI): void {
 
   pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
     const event = rawEvent as SessionBeforeCompactEvent;
+    const cwd = ctx.cwd ?? process.cwd();
 
-    const hideSecrets = hideSecretsState(ompConfigFiles(ompAgentDir(), ctx.cwd ?? process.cwd()));
-    if (hideSecrets.state === "on") return fallback(ctx, `omp Hide Secrets is on in ${hideSecrets.file} and the hook receives the un-redacted region`);
-    if (hideSecrets.state === "unreadable") return fallback(ctx, `omp Hide Secrets could not be read from ${hideSecrets.file}`);
+    const hideSecrets = hideSecretsState(cwd);
+    if (hideSecrets.state === "on") return fallback(ctx, `omp Hide Secrets is on (${hideSecrets.source}) and the hook receives the un-redacted region`);
+    if (hideSecrets.state === "unprovable") return fallback(ctx, `omp Hide Secrets could not be established: ${hideSecrets.detail}`);
 
     const apiKey = resolveApiKey();
     if (!apiKey) return fallback(ctx, "TYPESAFE_API_KEY unset");
@@ -638,7 +777,17 @@ export default function (pi: ExtensionAPI): void {
     const nativeHistory = unretainableNativeHistory(event.preparation.previousPreserveData);
     if (nativeHistory) return fallback(ctx, `the previous compaction's ${nativeHistory} history cannot be carried by a text-only summary`);
 
-    const options: JevRegionOptions = { apiKey };
+    const contextWindow = ctx.model?.contextWindow;
+    if (typeof contextWindow !== "number" || !(contextWindow > 0)) return fallback(ctx, "the active model's context window is unknown, so no retained-context budget can be derived");
+    const budget = retainedBudget(
+      contextWindow,
+      event.preparation.settings,
+      estimateTokens(renderLibraryMessages(toLibraryMessages(event.preparation.recentMessages))),
+      estimateTokens(systemPromptText(await ctx.getSystemPrompt?.())),
+    );
+    if (budget.budgetTokens <= 0) return fallback(ctx, `no retained-context budget: omp's ${budget.progressCeiling}-token progress ceiling is consumed by the response reserve, the recent messages, and the system prompt`);
+
+    const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined };
 
     let merged: JevRegionResult;
     try {
@@ -659,16 +808,16 @@ export default function (pi: ExtensionAPI): void {
     const filesTag = buildFilesTag(event.preparation.fileOps);
     const text = mergePreviousSummary(previousSummary, merged.text);
     const summary = filesTag ? `${text}\n\n${filesTag}` : text;
-    const record = installedRecord(merged.audit, previousSummary, summary, event.preparation.settings);
+    const record = installedRecord(merged.audit, previousSummary, summary, budget);
 
     if (record.reductionRatio < MIN_REDUCTION_RATIO) {
       return fallback(ctx, `reduction ${(record.reductionRatio * 100).toFixed(0)}% of the whole context below minimum`);
     }
-    if (record.summaryTokens > record.summaryTokenCap) {
-      return fallback(ctx, `replacement of ~${record.summaryTokens} tokens exceeds omp's ${record.summaryTokenCap}-token summary cap`);
+    if (record.summaryTokens > budget.budgetTokens) {
+      return fallback(ctx, `replacement of ~${record.summaryTokens} tokens exceeds the ${budget.budgetTokens}-token retained-context budget for a ${contextWindow}-token model`);
     }
 
-    const statusText = `Jev compaction: kept ${record.kept}, truncated ${record.truncated}, dropped ${record.dropped.length} of ${record.candidateCalls} calls (${(record.reductionRatio * 100).toFixed(0)}% reduction of the whole context, ~${record.summaryTokens} of ${record.summaryTokenCap} tokens)`;
+    const statusText = `Jev compaction: kept ${record.kept}, truncated ${record.truncated}, dropped ${record.dropped.length} of ${record.candidateCalls} calls (${(record.reductionRatio * 100).toFixed(0)}% reduction of the whole context, ~${record.summaryTokens} of ${budget.budgetTokens} budget tokens)`;
     console.error(`[fm-jev-compaction] ${statusText}`);
     ctx.ui?.setStatus?.("jev-compaction", statusText);
 
