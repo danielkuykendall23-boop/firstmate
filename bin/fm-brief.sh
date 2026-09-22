@@ -72,6 +72,10 @@
 # it carries the AGENTS.md authoring bar (widely useful knowledge only, pointers
 # over copied detail) and defers self-governance recognition and insertion to
 # fm-ensure-agents-md.sh's contract.
+# Ship and scout scaffolds carry a desktop-control section for
+# bin/fm-jev-desktop.sh, and ship scaffolds add an OMP-only Jev review loop
+# that runs before the delivery path and is skipped silently elsewhere;
+# docs/jev.md owns the tool, consent, and fallback contract.
 # Scaffolds carry no role scope: fm-spawn.sh supplies fm_brief_worker_role from
 # fm-dod-lib.sh to every ship/scout launch brief, so this file never becomes a
 # second owner of a contract that must stay current across relaunches.

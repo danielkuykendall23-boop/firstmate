@@ -34,9 +34,11 @@
 // preparation.recentMessages, after that boundary, are never touched by any
 // compaction method, Jev-guided or native, and the original journal entries
 // for the summarized region are never deleted from disk by omp itself: only
-// the rebuilt LLM context stops including them. Verified empirically against
-// live omp 18.2.5 (docs/verification/jev.md): a disposable synthetic session
-// with a probe hook dumped the real session_before_compact event, which is
+// the rebuilt LLM context stops including them. Verified against a real omp
+// process: tests/fm-jev-compaction-live-e2e.test.sh resumes synthetic
+// sessions through omp's own compact command and installs this handler's
+// replacement through the event itself (dated results and the omp version in
+// docs/verification/jev.md); the real session_before_compact event is
 // exactly { type, preparation: { firstKeptEntryId, messagesToSummarize,
 // turnPrefixMessages, recentMessages, isSplitTurn, tokensBefore, fileOps,
 // settings }, branchEntries, signal }, and omp's real assistant message
@@ -619,14 +621,15 @@ export function irreducibleReplacement(historyRegion: readonly OmpMessage[], tur
 
 // ---- Extension wiring. ----
 
-// Both channels are verified visible against a real omp 18.2.5 process
-// (docs/verification/jev.md):
-// ctx.ui.setStatus/notify surface as real extension_ui_request frames
-// (method "setStatus"/"notify") in the RPC stream itself, and
-// console.error surfaces on the process's own stderr, captured in the same
-// run when stderr is merged into the driver's log (the ordinary way any
-// real omp launcher captures a session's output). Neither channel silently
-// claims Jev ran when it did not.
+// Both channels are verified visible against a real omp process by
+// tests/fm-jev-compaction-live-e2e.test.sh, which asserts the setStatus
+// frame and the stderr line on every run (dated results in
+// docs/verification/jev.md): ctx.ui.setStatus/notify surface as real
+// extension_ui_request frames (method "setStatus"/"notify") in the RPC
+// stream itself, and console.error surfaces on the process's own stderr,
+// captured in the same run when stderr is merged into the driver's log (the
+// ordinary way any real omp launcher captures a session's output). Neither
+// channel silently claims Jev ran when it did not.
 function fallback(ctx: HookContext, reason: string): undefined {
   console.error(`[fm-jev-compaction] falling back to native omp compaction: ${reason}`);
   ctx.ui?.setStatus?.("jev-compaction", `Jev compaction skipped (${reason}) - using native compaction`);

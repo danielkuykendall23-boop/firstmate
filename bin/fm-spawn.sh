@@ -183,7 +183,12 @@
 #   never lists) passes through unvalidated with a stderr notice, and a bare
 #   fuzzy pattern is left to omp's own matcher. A crewmate or scout loads its
 #   per-task busy-state extension with -e from state/ (outside the worktree, so
-#   auto-discovery cannot load it a second time); a secondmate passes no -e at
+#   auto-discovery cannot load it a second time) plus the code root's .omp
+#   directory package (key-gated Jev compaction/review extensions and the
+#   reviewer definition, which register once per session even beside a
+#   worktree's own copies; docs/jev.md), with FM_HOME=<home> on the launch line
+#   so the extensions read that home's .env in-process and no credential enters
+#   the command; a secondmate passes no -e at
 #   all and relies on omp auto-discovering the home's tracked .omp/extensions/
 #   (verified, omp 18.1.11: a file named both ways loads twice, and discovery is
 #   cwd-only with no trust dialog).
