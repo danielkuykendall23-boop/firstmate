@@ -261,6 +261,14 @@
       "audience": "maintainer-architecture"
     },
     {
+      "path": ".omp/extensions/vendor/fast-jev-compaction/NOTICE.md",
+      "audience": "maintainer-architecture"
+    },
+    {
+      "path": ".omp/vendor/jev-review/NOTICE.md",
+      "audience": "maintainer-architecture"
+    },
+    {
       "path": "AGENTS.md",
       "audience": "agent-runtime"
     },
@@ -366,6 +374,10 @@
     },
     {
       "path": "docs/herdr-backend.md",
+      "audience": "operator-current"
+    },
+    {
+      "path": "docs/jev-compaction.md",
       "audience": "operator-current"
     },
     {

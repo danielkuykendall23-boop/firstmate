@@ -349,6 +349,7 @@ family_for_basename() {
     fm-grok-continuity-live-e2e.test.sh|\
     fm-cursor-primary-live-e2e.test.sh|\
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
+    fm-jev-compaction-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
     fm-herdr-version-floor-live-e2e.test.sh|\
@@ -1348,6 +1349,14 @@ families_for_changed_path() {
     tests/fm-backend-herdr-eventwait.test.py)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      ;;
+    .omp/extensions/fm-jev-compaction.ts|.omp/extensions/vendor/fast-jev-compaction/*|tests/fm-jev-compaction.node.test.ts)
+      # The Node suite is not a tests/*.test.sh file and the vendored library
+      # is referenced by no shell test, so both resolve to the wrapper here.
+      printf '%s\n' "__script__:fm-jev-compaction.test.sh"
+      ;;
+    .omp/vendor/jev-review/*|bin/fm-jev-review-setup.sh)
+      printf '%s\n' "__script__:fm-jev-review-setup.test.sh"
       ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
