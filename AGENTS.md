@@ -66,8 +66,8 @@ README.md            public overview and development notes
 .agents/skills/      firstmate-loaded internal skills, committed; each carries metadata.internal=true for installers
 .claude/skills       symlink to .agents/skills for claude compatibility
 .claude/mods/        Claude Code mods (function-hooks plugins), committed; Calm's module may load through CLAUDE_CODE_ENABLE_FUNCTION_HOOKS or tengu_plugin_hooks_modules, but activates only when CLAUDE_CODE_ENABLE_FUNCTION_HOOKS is exactly "1" and is otherwise a complete no-op (docs/calm.md)
-.omp/extensions/fm-jev-route.ts  primary OMP task-bound model/effort routing; docs/configuration.md "Primary routing"
 .omp/extensions/    Firstmate OMP extensions, shared lib/ and vendored compaction; Jev behavior: docs/jev.md
+.omp/extensions/fm-jev-route.ts  primary OMP task-bound model/effort routing; docs/configuration.md "Primary routing"
 .omp/agents/reviewer.md  read-only OMP reviewer with Jev evaluation; shared with worker extension roots
 skills/              standalone public installer-facing skills, committed; not loaded by firstmate
 bin/                 helper scripts, committed; read each script's header before first use
