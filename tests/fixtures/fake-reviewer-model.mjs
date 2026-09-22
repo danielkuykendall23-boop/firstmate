@@ -22,15 +22,18 @@ export function reviewerModel(evidence) {
     if (child) {
       evidence.childTools = tools;
       const scored = results.map((result) => evaluation(result.content)).find(Boolean);
-      if (!scored && !results.length) call = { name: "jev_review", arguments: { task: "Verify the new key gate is inert without a key", diff: "+ if (!apiKey) return;" } };
-      else if (!scored) { text = "Reviewer tool failed: " + JSON.stringify(results); evidence.childError = text; }
+      const absent = !tools.includes("jev_review");
+      if (!absent && !scored && !results.length) call = { name: "jev_review", arguments: { task: "Verify the new key gate is inert without a key", diff: "+ if (!apiKey) return;" } };
+      else if (!absent && !scored) { text = "Reviewer tool failed: " + JSON.stringify(results); evidence.childError = text; }
       else {
-        evidence.childEvaluation = scored;
+        if (scored) evidence.childEvaluation = scored;
         const yielded = request.messages.flatMap((message) => message.tool_calls ?? []).filter((call) => call.function?.name === "yield").length;
         const sections = [
-          ["jev_evaluation", scored],
+          ["jev_evaluation", scored ?? { unavailable: true, reason: "jev_review tool absent" }],
           ["overall_correctness", "correct"],
-          ["explanation", `Synthetic transport proof: correctness ${scored.metrics.correctness.score}/10, confidence ${scored.metrics.correctness.confidence}; scores do not authorize a merge.`],
+          ["explanation", scored
+            ? `Synthetic transport proof: correctness ${scored.metrics.correctness.score}/10, confidence ${scored.metrics.correctness.confidence}; scores do not authorize a merge.`
+            : "Synthetic transport proof: Jev unavailable; ordinary agent-led review continued without claiming Jev ran."],
           ["confidence", 0.91],
         ];
         if (yielded < sections.length) call = { name: "yield", arguments: { type: [sections[yielded][0]], data: sections[yielded][1] } };

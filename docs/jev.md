@@ -42,7 +42,7 @@ Permission to send relevant code is not permission to send credentials.
 Compaction failures visibly report native fallback through OMP UI status/notification and stderr without changing native method order.
 Review input, network or response failures return an explicit unavailable result, never invented scores; upstream validation errors and raw response bodies are not printed because they can echo input.
 The worker's review loop records unavailable Jev once and continues ordinary review.
-A missing key makes the tool absent, which the reviewer and worker instructions disclose.
+A missing key makes the tool absent: OMP drops the unregistered name from the reviewer definition rather than failing the spawn, and the reviewer and worker instructions disclose the fallback.
 Desktop failures pause Jev-driven actions instead of silently choosing another operator.
 `FM_JEV_ENDPOINT` is solely a local-fake verification seam shared by compaction and review; leave it unset for real requests.
 

@@ -28,6 +28,9 @@
 #   no-key      no hooks/tools or requests; native compaction still completes.
 #   review      duplicate-safe loading, actual read-only reviewer child and
 #               upstream baseline/rescore handling through a loopback model.
+#   review-no-key  no key: omp drops the unregistered jev_review from the
+#               reviewer definition; the child still spawns read-only,
+#               reports Jev unavailable through yield and completes.
 #   protected   native Hide Secrets blocks all review uploads.
 # The tool-heavy cases also plant an excludeFromContext bash execution
 # carrying a marker and prove it never reaches the fake endpoint.
@@ -167,6 +170,21 @@ test_real_reviewer_tool_and_rescore() {
   pass "review: duplicate loads register once; real reviewer child uses Jev and returns scores; upstream rescore delta is +5"
 }
 
+test_reviewer_without_key_continues_agent_led_review() {
+  local report
+  report=$(run_case review-no-key review 12 180000)
+  assert_equals 0 "$(field "$report" '.proof.errors | length')" "review-no-key: real OMP must load both extensions without a key"
+  assert_equals 0 "$(field "$report" '.proof.tools | length')" "review-no-key: no key must register no review tool"
+  assert_equals 0 "$(field "$report" '.endpoint.hits')" "review-no-key: nothing may reach the endpoint"
+  assert_equals false "$(field "$report" '.reviewEvidence.childTools | index("jev_review") != null')" "review-no-key: the unregistered tool must not reach the reviewer child"
+  assert_equals true "$(field "$report" '.reviewEvidence.childTools | index("read") != null')" "review-no-key: the reviewer child keeps its read tools"
+  assert_equals false "$(field "$report" '.reviewEvidence.childTools | index("edit") != null')" "review-no-key: reviewer must remain read-only"
+  assert_equals null "$(field "$report" '.reviewEvidence.missingTool')" "review-no-key: the child must not stall on the absent tool"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" 'status="completed"' "review-no-key: reviewer must finish without Jev"
+  assert_contains "$(field "$report" '.reviewEvidence.parentResult')" 'jev_review tool absent' "review-no-key: the structured result must carry the unavailable reason"
+  pass "review-no-key: omp drops the unregistered jev_review from the reviewer definition; the child spawns read-only, reports Jev unavailable and completes"
+}
+
 test_real_review_honors_secret_protection() {
   local report
   report=$(run_case review-protected review 12 180000 "--agentConfig=secrets:\n  enabled: true\n")
@@ -184,4 +202,5 @@ test_overlay_on_declines
 test_worker_overlay_proceeds
 test_no_key_preserves_native_compaction
 test_real_reviewer_tool_and_rescore
+test_reviewer_without_key_continues_agent_led_review
 test_real_review_honors_secret_protection

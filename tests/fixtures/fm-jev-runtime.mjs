@@ -21,7 +21,7 @@ cpSync(join(args.root, ".omp/extensions/fm-jev-review.ts"), join(project, ".omp/
 cpSync(join(args.root, ".omp/vendor"), join(project, ".omp/vendor"), { recursive: true });
 const fleet = join(caseDir, "fleet");
 mkdirSync(fleet, { recursive: true });
-if (args.case !== "no-key") writeFileSync(join(fleet, ".env"), "TYPESAFE_API_KEY=fake-live-key-never-valid\n");
+if (!args.case.endsWith("no-key")) writeFileSync(join(fleet, ".env"), "TYPESAFE_API_KEY=fake-live-key-never-valid\n");
 if (args.agentConfig) writeFileSync(join(agent, "config.yml"), args.agentConfig.replace(/\\n/g, "\n"));
 if (args.projectConfig) writeFileSync(join(project, ".omp", "config.yml"), args.projectConfig.replace(/\\n/g, "\n"));
 

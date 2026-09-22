@@ -31,6 +31,7 @@ Observed outcomes:
 | No key | Zero compaction hooks, review tools or Jev requests; native compaction completed. |
 | Duplicate extension copies | One compaction hook and one `jev_review` tool; no load errors; the file key was not exported into OMP's environment. |
 | Actual reviewer child | The child had `jev_review` but not `edit`, called the real upstream evaluator, and returned its evaluation in the optional `jev_evaluation` output field. |
+| Reviewer child without key | OMP dropped the unregistered `jev_review` name from the reviewer definition instead of failing the spawn; the child had its read tools but neither `jev_review` nor `edit`, made zero requests, returned an explicit unavailable reason in `jev_evaluation`, and completed. |
 | Baseline and rescore | Real upstream response handling produced correctness scores 4 and 9 and a comparison delta of +5 from deliberately different fake answers. |
 | Protected review | Zero endpoint hits and an explicit unavailable result naming native protection. |
 
@@ -56,6 +57,16 @@ No non-OMP launch contract was changed.
 Strict TypeScript checking passed for both extension entrypoints and their shared key, privacy and registration modules with TypeScript 7.0.2, NodeNext resolution, ES2022, Node 22 types and the bundled upstream Zod declarations.
 No language server was configured in this environment; the compiler check and actual OMP loader/schema execution supplied the type and runtime evidence instead.
 The upstream evaluation source is vendored without source edits and the in-process bundle uses Zod 4.6.5; [the vendoring notice](../../.omp/vendor/jev-review/NOTICE.md) owns checksums, licenses and the build command.
+
+On 2026-09-22 a clean `git archive` checkout reproduced both results from `.omp/vendor/jev-review` after `npm install` of its pinned development dependencies:
+
+```sh
+npm run build
+npx tsc --noEmit --strict --module nodenext --moduleResolution nodenext --target es2022 --types node --allowImportingTsExtensions --skipLibCheck ../../extensions/fm-jev-compaction.ts ../../extensions/fm-jev-review.ts
+```
+
+`cmp` found the rebuilt `dist/review.js` byte-identical to the tracked bundle, and the typecheck exited 0 through the tracked `dist/review.d.ts` chain into the vendored `src/config`, `src/evaluation` and `src/jev` sources.
+The root `.gitignore` excludes every `config/` directory; a narrow negation keeps only `.omp/vendor/jev-review/src/config/` tracked, so a fresh clone carries the complete upstream source.
 
 ## Desktop boundary
 
