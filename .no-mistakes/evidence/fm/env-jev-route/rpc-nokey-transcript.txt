@@ -1,0 +1,39 @@
+# omp/18.2.8 --mode rpc, no key; extension explicit -e .omp/extensions/fm-jev-route.ts
+# launch: omp --mode rpc --no-extensions --no-session --no-skills --no-rules --no-lsp --no-title --no-prewalk --auto-approve --tools todo --max-time 60 -e /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-jev-route-evidence-qn9fbawt/nokey/provider.mjs -e /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/extensions/fm-jev-route.ts
+<< ready
+<< extension_ui_request id=158923dc8b5cb2a3
+<< available_commands_update jev-route registered
+>> {"type": "get_state", "id": "nokey-1"}
+<< response id=nokey-1 success=True model=route-fake/initial thinkingLevel=low
+>> {"type": "prompt", "message": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.", "id": "nokey-2"}
+<< response id=nokey-2 success=True
+<< extension_ui_request id=158923dca51cb2a4 {"type": "extension_ui_request", "id": "158923dca51cb2a4", "method": "notify", "message": "Jev route: off - model unchanged", "notifyType": "info"}
+<< extension_ui_request id=158923dcc29cb2a5 {"type": "extension_ui_request", "id": "158923dcc29cb2a5", "method": "notify", "message": "Jev route: off - model unchanged", "notifyType": "info"}
+<< todo_reminder
+<< extension_ui_request id=158923dcc95cb2a6
+<< extension_ui_request id=158923dcc99cb2a7
+<< agent_end
+>> {"type": "get_state", "id": "nokey-3"}
+<< response id=nokey-3 success=True model=route-fake/initial thinkingLevel=low
+>> {"type": "prompt", "message": "Continue the same task; answer ROUTE_SMOKE_OK without tools.", "id": "nokey-4"}
+<< response id=nokey-4 success=True
+<< todo_reminder
+<< extension_ui_request id=158923dcca5cb2a8
+<< extension_ui_request id=158923dcca9cb2a9
+<< agent_end
+<< model_changed
+>> {"type": "set_model", "provider": "route-fake", "modelId": "manual", "id": "nokey-5"}
+<< response id=nokey-5 success=True
+>> {"type": "set_thinking_level", "level": "low", "id": "nokey-6"}
+<< response id=nokey-6 success=True
+>> {"type": "prompt", "message": "/jev-route Explicit selection must win", "id": "nokey-7"}
+<< response id=nokey-7 success=True
+<< extension_ui_request id=158923dcef5cb2aa {"type": "extension_ui_request", "id": "158923dcef5cb2aa", "method": "notify", "message": "Jev route: off - model unchanged", "notifyType": "info"}
+<< prompt_result id=nokey-7 agentInvoked=False
+>> {"type": "get_state", "id": "nokey-8"}
+<< response id=nokey-8 success=True model=route-fake/manual thinkingLevel=low
+<< extension_ui_request id=158923dcefdcb2ab
+# routing log (state/.jev-route.log):
+{"ts": "2026-09-22T04:22:48.212Z", "trigger": "session", "status": "off", "model": null, "effort": null, "rule": null, "confidence": null}
+{"ts": "2026-09-22T04:22:48.330Z", "trigger": "todo-init", "status": "off", "model": null, "effort": null, "rule": null, "confidence": null}
+{"ts": "2026-09-22T04:22:48.509Z", "trigger": "command", "status": "off", "model": null, "effort": null, "rule": null, "confidence": null}

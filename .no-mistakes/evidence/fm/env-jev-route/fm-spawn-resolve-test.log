@@ -1,0 +1,177 @@
+ok - clear uses resolved model and effort
+ok - explicit axes win over resolution
+ok - per-axis override preserves unresolved axes
+ok - legacy positional harness remains explicit
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/cross/project --mode no-mistakes --yolo off --resolve --harness claude 
+{
+  "model": "jev-fake",
+  "latency_ms": 0,
+  "tokens": null,
+  "rule": "rule_1",
+  "rule_when": "Implement the task reliably.",
+  "confidence": 0.95,
+  "probabilities": {
+    "rule_1": 0.95,
+    "default": 0.05
+  },
+  "status": "clear",
+  "note": "rule matched",
+  "candidates": [
+    {
+      "profile": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-astra",
+        "effort": "high",
+        "provider": "codex"
+      },
+      "provider": "codex",
+      "bounds": [
+        {
+          "scope": "all_models",
+          "status": "known",
+          "pct": 80,
+          "runway": "through_reset",
+          "spendPriority": 0.8
+        }
+      ],
+      "scope": "all_models",
+      "pct": 80,
+      "spendPriority": 0.8,
+      "runway": "through_reset",
+      "eligible": true,
+      "reason": "ok"
+    }
+  ],
+  "chosen": {
+    "profile": {
+      "harness": "omp",
+      "model": "openai-codex/gpt-6-astra",
+      "effort": "high",
+      "provider": "codex"
+    },
+    "provider": "codex",
+    "bounds": [
+      {
+        "scope": "all_models",
+        "status": "known",
+        "pct": 80,
+        "runway": "through_reset",
+        "spendPriority": 0.8
+      }
+    ],
+    "scope": "all_models",
+    "pct": 80,
+    "spendPriority": 0.8,
+    "runway": "through_reset",
+    "eligible": true,
+    "reason": "ok"
+  }
+}
+error: --resolve chose harness 'omp' with model 'openai-codex/gpt-6-astra', which the explicit harness 'claude' cannot interpret; pass --model for 'claude' or omit the harness
+ok - an explicit harness never adopts another harness's resolved model
+ok - scout supports resolution
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/off/project --mode no-mistakes --yolo off --resolve --harness omp --model custom/model --effort max 
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/off/home/.env)
+{"status":"off"}
+fm-spawn: dispatch resolution off; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/ambiguous/project --mode no-mistakes --yolo off --resolve 
+{
+  "model": "jev-fake",
+  "latency_ms": 0,
+  "tokens": null,
+  "rule": "rule_1",
+  "rule_when": "Implement the task reliably.",
+  "confidence": 0.3,
+  "probabilities": {
+    "rule_1": 0.95,
+    "default": 0.05
+  },
+  "status": "ambiguous",
+  "reason": "confidence 0.3 below floor 0.6",
+  "candidates": [
+    {
+      "profile": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-astra",
+        "effort": "high",
+        "provider": "codex"
+      },
+      "provider": "codex",
+      "bounds": [
+        {
+          "scope": "all_models",
+          "status": "known",
+          "pct": 80,
+          "runway": "through_reset",
+          "spendPriority": 0.8
+        }
+      ],
+      "scope": "all_models",
+      "pct": 80,
+      "spendPriority": 0.8,
+      "runway": "through_reset",
+      "eligible": true,
+      "reason": "ok"
+    }
+  ]
+}
+fm-spawn: dispatch resolution ambiguous; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/approval/project --mode no-mistakes --yolo off --resolve 
+{
+  "model": "jev-fake",
+  "latency_ms": 0,
+  "tokens": null,
+  "rule": "rule_1",
+  "rule_when": "Implement the task reliably.",
+  "confidence": 0.95,
+  "probabilities": {
+    "rule_1": 0.95,
+    "default": 0.05
+  },
+  "status": "escalate",
+  "reason": "rule requires the captain's explicit approval before dispatch",
+  "candidates": [
+    {
+      "profile": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-astra",
+        "effort": "high",
+        "provider": "codex"
+      },
+      "provider": "codex",
+      "bounds": [
+        {
+          "scope": "all_models",
+          "status": "known",
+          "pct": 80,
+          "runway": "through_reset",
+          "spendPriority": 0.8
+        }
+      ],
+      "scope": "all_models",
+      "pct": 80,
+      "spendPriority": 0.8,
+      "runway": "through_reset",
+      "eligible": true,
+      "reason": "ok"
+    }
+  ]
+}
+fm-spawn: dispatch resolution escalate; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/error/project --mode no-mistakes --yolo off --resolve 
+dispatch-resolve: error (http 503 after 0 ms: {"model":"jev-fake","answers":{"rule":{"choice":"rule_1","confidence":0.95,"probabilities":{"rule_1":0.95,"default":0.05}}}} )
+{"status":"error","reason":"http 503 after 0 ms: {\"model\":\"jev-fake\",\"answers\":{\"rule\":{\"choice\":\"rule_1\",\"confidence\":0.95,\"probabilities\":{\"rule_1\":0.95,\"default\":0.05}}}} "}
+fm-spawn: dispatch resolution error; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/malformed/project --mode no-mistakes --yolo off --resolve 
+error: malformed rules file: /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/malformed/home/config/crew-dispatch.json (not JSON)
+fm-spawn: dispatch resolution error; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+ok - all non-clear outcomes refuse without a launch
+ok - no-key fallback retains the explicit selection without --resolve
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/secondmate/project --mode no-mistakes --yolo off --resolve --secondmate 
+error: --resolve applies only to new single-task ship/scout spawns
+# fm-spawn exit=2 args=routing /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/relaunch/project --mode no-mistakes --yolo off --resolve --relaunch 
+error: --resolve applies only to new single-task ship/scout spawns
+# fm-spawn exit=2 args=routing=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-resolve.sUDsnh/batch/project --resolve --mode no-mistakes --yolo off 
+error: --resolve does not support batch pairs; resolve each written brief separately
+ok - resolution rejects secondmate, relaunch, and batch modes
+# all fm-spawn-resolve tests passed

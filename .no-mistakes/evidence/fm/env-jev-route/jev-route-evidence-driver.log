@@ -1,0 +1,6 @@
+ok - omp/18.2.8 rpc fake Jev endpoint (keyed): route-fake/initial/low -> route-fake/routed/high; manual retained: {'model': 'route-fake/manual', 'thinkingLevel': 'low'}; jev requests=3
+ok - omp/18.2.8 rpc no key: route-fake/initial/low -> route-fake/initial/low; manual retained: {'model': 'route-fake/manual', 'thinkingLevel': 'low'}; jev requests=0
+ok - omp/18.2.8 rpc secret protection on: route-fake/initial/low -> route-fake/initial/low; manual retained: {'model': 'route-fake/manual', 'thinkingLevel': 'low'}; jev requests=0
+ok - omp/18.2.8 interactive tui fake Jev endpoint (keyed) (auto-discovered from <home>/.omp/extensions (no -e)): chat models used=['routed', 'routed', 'routed', 'routed', 'routed']; jev requests=2; notice on screen=True
+ok - omp/18.2.8 interactive tui no key (explicit -e .omp/extensions/fm-jev-route.ts): chat models used=['initial', 'initial', 'initial', 'initial', 'initial']; jev requests=0; notice on screen=True
+ok - evidence complete

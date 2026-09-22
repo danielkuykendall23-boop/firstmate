@@ -1,0 +1,30 @@
+                                                                                                                        
+╭─── omp v18.2.8 ──────────────────────────────────────────────────────────────────────────────────╮                    
+│                          │ Tips                                                                  │                    
+│      Welcome back!       │ # for prompt actions                                                  │                    
+│                          │ / for commands                                                        │                    
+│       ████████████       │ ! to run bash                                                         │                    
+│          ██  ██          │ $ to run python                                                       │                    
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │                    
+│          ▒▒  ██          │ LSP Servers                                                           │                    
+│              ██          │ No LSP servers                                                        │                    
+│                          │                                                                       │                    
+│         initial          │                                                                       │                    
+│        route-fake        │                                                                       │                    
+│                          │ ───────────────────────────────────────────────────────────────────── │                    
+│                          │ Recent sessions                                                       │                    
+│                          │ No recent sessions                                                    │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯                    
+ Tip: Please use nerdfont 😭.                                                                                           
+                                                                                                                        
+                                                                                                                        
+ Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.                                                
+                                                                                                                        
+                                                                                                                        
+ Jev route: off - model unchanged                                                                                       
+                                                                                                                        
+  ⎋ Working…

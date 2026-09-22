@@ -1,0 +1,32 @@
+                                                                                                                        
+╭─── omp v18.2.8 ──────────────────────────────────────────────────────────────────────────────────╮                    
+│                          │ Tips                                                                  │                    
+│      Welcome back!       │ # for prompt actions                                                  │                    
+│                          │ / for commands                                                        │                    
+│       ████████████       │ ! to run bash                                                         │                    
+│          ██  ██          │ $ to run python                                                       │                    
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │                    
+│          ▒▒  ██          │ LSP Servers                                                           │                    
+│              ██          │ No LSP servers                                                        │                    
+│                          │                                                                       │                    
+│          routed          │                                                                       │                    
+│        route-fake        │                                                                       │                    
+│                          │ ───────────────────────────────────────────────────────────────────── │                    
+│                          │ Recent sessions                                                       │                    
+│                          │ No recent sessions                                                    │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯                    
+ Tip: Press ← ← to drill into a running or finished agent and inspect its tool calls and transcript                     
+                                                                                                                        
+                                                                                                                        
+ Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.                                                
+                                                                                                                        
+                                                                                                                        
+ Jev route: route-fake/routed high (rule_1, confidence 0.95)                                                            
+                                                                                                                        
+  ⎋ Working…                                                                                                            
+ ⠦ 0s > ◒ routed > 🗑 fm-jev-route-evidence-qn9fbawt/tui-keyed ▶─3%────────────────────────────────────╎────┃───────128K─
+╰─

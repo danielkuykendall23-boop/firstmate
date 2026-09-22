@@ -1,0 +1,26 @@
+                                                                                                                        
+╭─── omp v18.2.8 ──────────────────────────────────────────────────────────────────────────────────╮                    
+│                          │ Tips                                                                  │                    
+│      Welcome back!       │ # for prompt actions                                                  │                    
+│                          │ / for commands                                                        │                    
+│       ████████████       │ ! to run bash                                                         │                    
+│          ██  ██          │ $ to run python                                                       │                    
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │                    
+│          ▒▒  ██          │ LSP Servers                                                           │                    
+│              ██          │ No LSP servers                                                        │                    
+│                          │                                                                       │                    
+│         initial          │                                                                       │                    
+│        route-fake        │                                                                       │                    
+│                          │ ───────────────────────────────────────────────────────────────────── │                    
+│                          │ Recent sessions                                                       │                    
+│                          │ No recent sessions                                                    │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯                    
+ Tip: Press ← ← to drill into a running or finished agent and inspect its tool calls and transcript                     
+                                                                                                                        
+                                                                                                                        
+ π > ◔ initial > 🗑 fm-jev-route-evidence-qn9fbawt/tui-keyed ▶─3%─────────────────────────────────────╎─────┃───────128K─
+╰─

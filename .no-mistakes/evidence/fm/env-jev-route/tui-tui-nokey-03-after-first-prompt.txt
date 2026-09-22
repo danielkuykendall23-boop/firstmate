@@ -1,0 +1,40 @@
+│       ████████████       │ ! to run bash                                                         │                    
+│          ██  ██          │ $ to run python                                                       │                    
+│          ██  ██          │ ───────────────────────────────────────────────────────────────────── │                    
+│          ▒▒  ██          │ LSP Servers                                                           │                    
+│              ██          │ No LSP servers                                                        │                    
+│                          │                                                                       │                    
+│         initial          │                                                                       │                    
+│        route-fake        │                                                                       │                    
+│                          │ ───────────────────────────────────────────────────────────────────── │                    
+│                          │ Recent sessions                                                       │                    
+│                          │ No recent sessions                                                    │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+│                          │                                                                       │                    
+╰──────────────────────────┴───────────────────────────────────────────────────────────────────────╯                    
+ Tip: Please use nerdfont 😭.                                                                                           
+                                                                                                                        
+                                                                                                                        
+ Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.                                                
+                                                                                                                        
+ Jev route: off - model unchanged                                                                                       
+╭─ Todo                                                                                                                 
+╰                                                                                                                       
+ Jev route: off - model unchanged                                                                                       
+ ROUTE_SMOKE_OK                                                                                                         
+                                                                                                                        
+ ⚠ 1 incomplete todo - reminder 1/3                                                                                     
+                                                                                                                        
+   ☐ Prove routing through the real runtime                                                                             
+                                                                                                                        
+ ROUTE_SMOKE_OK                                                                                                         
+                                                                                                                        
+ TODO                                                                                                                   
+  ├─ Tasks · 0/1                                                                                                        
+  │  └─ ☐ Prove routing through the real runtime                                                                        
+  └─────                                                                                                                
+                                                                                                                        
+ π > ◔ initial > 🗑 fm-jev-route-evidence-qn9fbawt/tui-nokey ▶─3%─────────────────────────────────────╎─────┃───────128K─
+╰─

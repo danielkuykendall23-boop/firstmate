@@ -1,0 +1,5 @@
+ok - omp/18.2.8 rpc fake endpoint: initial/low -> routed/high; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 rpc no key: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 rpc secret protection on: initial/low -> initial/low; routine turn retained; explicit manual/low retained; saved config unchanged
+ok - omp/18.2.8 interactive tui fake endpoint: initial/low -> routed/high on the first prompt; todo boundary rerouted; both chat requests used routed; saved config unchanged
+ok - fake Jev requests=5; real OMP chat requests=18; real global config metadata unchanged; authenticated Jev proof pending

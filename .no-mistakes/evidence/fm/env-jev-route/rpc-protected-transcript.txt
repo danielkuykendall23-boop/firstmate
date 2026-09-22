@@ -1,0 +1,39 @@
+# omp/18.2.8 --mode rpc, secret protection on; extension explicit -e .omp/extensions/fm-jev-route.ts
+# launch: omp --mode rpc --no-extensions --no-session --no-skills --no-rules --no-lsp --no-title --no-prewalk --auto-approve --tools todo --max-time 60 -e /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-jev-route-evidence-qn9fbawt/protected/provider.mjs -e /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/extensions/fm-jev-route.ts
+<< ready
+<< extension_ui_request id=158923de71931bea
+<< available_commands_update jev-route registered
+>> {"type": "get_state", "id": "protected-1"}
+<< response id=protected-1 success=True model=route-fake/initial thinkingLevel=low
+>> {"type": "prompt", "message": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.", "id": "protected-2"}
+<< response id=protected-2 success=True
+<< extension_ui_request id=158923de87d31beb {"type": "extension_ui_request", "id": "158923de87d31beb", "method": "notify", "message": "Jev route: declined (secret protection on) - model unchanged", "notifyType": "info"}
+<< extension_ui_request id=158923dea2131bec {"type": "extension_ui_request", "id": "158923dea2131bec", "method": "notify", "message": "Jev route: declined (secret protection on) - model unchanged", "notifyType": "info"}
+<< todo_reminder
+<< extension_ui_request id=158923dea8931bed
+<< extension_ui_request id=158923dea9131bee
+<< agent_end
+>> {"type": "get_state", "id": "protected-3"}
+<< response id=protected-3 success=True model=route-fake/initial thinkingLevel=low
+>> {"type": "prompt", "message": "Continue the same task; answer ROUTE_SMOKE_OK without tools.", "id": "protected-4"}
+<< response id=protected-4 success=True
+<< todo_reminder
+<< extension_ui_request id=158923dea9d31bef
+<< extension_ui_request id=158923deaa531bf0
+<< agent_end
+<< model_changed
+>> {"type": "set_model", "provider": "route-fake", "modelId": "manual", "id": "protected-5"}
+<< response id=protected-5 success=True
+>> {"type": "set_thinking_level", "level": "low", "id": "protected-6"}
+<< response id=protected-6 success=True
+>> {"type": "prompt", "message": "/jev-route Explicit selection must win", "id": "protected-7"}
+<< response id=protected-7 success=True
+<< extension_ui_request id=158923dec8931bf1 {"type": "extension_ui_request", "id": "158923dec8931bf1", "method": "notify", "message": "Jev route: declined (secret protection on) - model unchanged", "notifyType": "info"}
+<< prompt_result id=protected-7 agentInvoked=False
+>> {"type": "get_state", "id": "protected-8"}
+<< response id=protected-8 success=True model=route-fake/manual thinkingLevel=low
+<< extension_ui_request id=158923dec9131bf2
+# routing log (state/.jev-route.log):
+{"ts": "2026-09-22T04:22:50.144Z", "trigger": "session", "status": "declined", "model": null, "effort": null, "rule": null, "confidence": null}
+{"ts": "2026-09-22T04:22:50.248Z", "trigger": "todo-init", "status": "declined", "model": null, "effort": null, "rule": null, "confidence": null}
+{"ts": "2026-09-22T04:22:50.402Z", "trigger": "command", "status": "declined", "model": null, "effort": null, "rule": null, "confidence": null}

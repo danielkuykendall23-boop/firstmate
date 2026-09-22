@@ -1,0 +1,82 @@
+# Worker spawn-time routing transcript
+# fm-spawn.sh + fm-dispatch-resolve.sh (real scripts), loopback fake Jev answer: rule_1 -> omp openai-codex/gpt-6-astra effort high
+# Rules file: config/crew-dispatch.json with one rule; key: TYPESAFE_API_KEY=fake in <home>/.env; quota-axi faked at 80% remaining
+
+### 1. --resolve with a clear Jev answer adopts the resolved model and effort
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve
+  spawned routing harness=omp kind=ship mode=no-mistakes yolo=off window=firstmate:fm-routing worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/clear/worktree
+  exit=0
+  resolver contacted Jev: yes
+  launched worker command (from the pane's staged launch file):
+    omp OMP_SKIP_SETUP=1 '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/clear/fakebin/omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/clear/worktree' --model 'openai-codex/gpt-6-astra' --thinking 'high' -e '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/clear/home/state/routing.omp-ext.ts' "$('/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/bin/fm-operational-input.sh' encode launch-brief < '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/clear/home/data/routing/launch-brief.md')"
+  task metadata (state/routing.meta): harness=omp kind=ship model=openai-codex/gpt-6-astra effort=high 
+
+### 2. Explicit --model/--effort win over the resolved axes
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve --harness omp --model custom/model --effort max
+  spawned routing harness=omp kind=ship mode=no-mistakes yolo=off window=firstmate:fm-routing worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/explicit/worktree
+  exit=0
+  resolver contacted Jev: yes
+  launched worker command (from the pane's staged launch file):
+    omp OMP_SKIP_SETUP=1 '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/explicit/fakebin/omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/explicit/worktree' --model 'custom/model' --thinking 'max' -e '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/explicit/home/state/routing.omp-ext.ts' "$('/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/bin/fm-operational-input.sh' encode launch-brief < '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/explicit/home/data/routing/launch-brief.md')"
+  task metadata (state/routing.meta): harness=omp kind=ship model=custom/model effort=max 
+
+### 3. Per-axis override: only --effort given, resolved model kept
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve --effort max
+  spawned routing harness=omp kind=ship mode=no-mistakes yolo=off window=firstmate:fm-routing worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/partial/worktree
+  exit=0
+  resolver contacted Jev: yes
+  launched worker command (from the pane's staged launch file):
+    omp OMP_SKIP_SETUP=1 '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/partial/fakebin/omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/partial/worktree' --model 'openai-codex/gpt-6-astra' --thinking 'max' -e '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/partial/home/state/routing.omp-ext.ts' "$('/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/bin/fm-operational-input.sh' encode launch-brief < '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/partial/home/data/routing/launch-brief.md')"
+  task metadata (state/routing.meta): harness=omp kind=ship model=openai-codex/gpt-6-astra effort=max 
+
+### 4. Explicit --harness claude with a resolved omp model refuses (harness-namespaced model ids)
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve --harness claude
+  error: --resolve chose harness 'omp' with model 'openai-codex/gpt-6-astra', which the explicit harness 'claude' cannot interpret; pass --model for 'claude' or omit the harness
+  exit=2
+  resolver contacted Jev: yes
+  launched worker command: none (refused before any worker allocation)
+
+### 5. Scout spawn resolves too
+$ bin/fm-spawn.sh routing <project> --scout --resolve
+  spawned routing harness=omp kind=scout window=firstmate:fm-routing worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/scout/worktree
+  exit=0
+  resolver contacted Jev: yes
+  launched worker command (from the pane's staged launch file):
+    omp OMP_SKIP_SETUP=1 '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/scout/fakebin/omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/scout/worktree' --model 'openai-codex/gpt-6-astra' --thinking 'high' -e '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/scout/home/state/routing.omp-ext.ts' "$('/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/bin/fm-operational-input.sh' encode launch-brief < '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/scout/home/data/routing/launch-brief.md')"
+  task metadata (state/routing.meta): harness=omp kind=scout model=openai-codex/gpt-6-astra effort=high 
+
+### 6. No key + --resolve refuses (never the no-key path), even with explicit axes
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve --harness omp --model custom/model --effort max
+  dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/off/home/.env)
+  {"status":"off"}
+  fm-spawn: dispatch resolution off; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+  exit=2
+  resolver contacted Jev: no
+  launched worker command: none (refused before any worker allocation)
+
+### 7. No key, documented fallback: launch the explicit selection without --resolve (no Jev call)
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --harness omp --model custom/model --effort max
+  spawned routing harness=omp kind=ship mode=no-mistakes yolo=off window=firstmate:fm-routing worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/fallback/worktree
+  exit=0
+  resolver contacted Jev: no
+  launched worker command (from the pane's staged launch file):
+    omp OMP_SKIP_SETUP=1 '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/fallback/fakebin/omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/fallback/worktree' --model 'custom/model' --thinking 'max' -e '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/fallback/home/state/routing.omp-ext.ts' "$('/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/bin/fm-operational-input.sh' encode launch-brief < '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-spawn-evidence.phyXs6/fallback/home/data/routing/launch-brief.md')"
+  task metadata (state/routing.meta): harness=omp kind=ship model=custom/model effort=max 
+
+### 8. Low-confidence (ambiguous) answer refuses before launch
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve
+  fm-spawn: dispatch resolution ambiguous; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+  exit=2
+  resolver contacted Jev: yes
+  launched worker command: none (refused before any worker allocation)
+
+### 9. Jev transport error refuses before launch
+$ bin/fm-spawn.sh routing <project> --mode no-mistakes --yolo off --resolve
+  dispatch-resolve: error (http 503 after 0 ms: {"model":"jev-fake","answers":{"rule":{"choice":"rule_1","confidence":0.95,"probabilities":{"rule_1":0.95,"default":0.05}}}} )
+  {"status":"error","reason":"http 503 after 0 ms: {\"model\":\"jev-fake\",\"answers\":{\"rule\":{\"choice\":\"rule_1\",\"confidence\":0.95,\"probabilities\":{\"rule_1\":0.95,\"default\":0.05}}}} "}
+  fm-spawn: dispatch resolution error; pass explicit --harness/--model/--effort without --resolve or fix the reported reason
+  exit=2
+  resolver contacted Jev: yes
+  launched worker command: none (refused before any worker allocation)
+
+# end of transcript

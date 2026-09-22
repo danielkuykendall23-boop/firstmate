@@ -1,0 +1,463 @@
+{
+  "omp": "omp/18.2.8",
+  "worktree": "/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA",
+  "sessions": [
+    {
+      "name": "keyed",
+      "label": "fake Jev endpoint (keyed)",
+      "shape": "explicit -e .omp/extensions/fm-jev-route.ts",
+      "version": "omp/18.2.8",
+      "initial": {
+        "model": "route-fake/initial",
+        "thinkingLevel": "low"
+      },
+      "after_first_prompt": {
+        "model": "route-fake/routed",
+        "thinkingLevel": "high"
+      },
+      "routing_log_after_first_prompt": [
+        {
+          "ts": "2026-09-22T04:22:46.183Z",
+          "trigger": "session",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        },
+        {
+          "ts": "2026-09-22T04:22:46.373Z",
+          "trigger": "todo-init",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        }
+      ],
+      "routing_log_rows_after_routine_turn": 2,
+      "after_manual_selection_and_jev_route_command": {
+        "model": "route-fake/manual",
+        "thinkingLevel": "low"
+      },
+      "routing_log_final": [
+        {
+          "ts": "2026-09-22T04:22:46.183Z",
+          "trigger": "session",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        },
+        {
+          "ts": "2026-09-22T04:22:46.373Z",
+          "trigger": "todo-init",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        },
+        {
+          "ts": "2026-09-22T04:22:46.554Z",
+          "trigger": "command",
+          "status": "clear",
+          "model": "route-fake/manual",
+          "effort": "low",
+          "rule": "rule_1",
+          "confidence": 0.95
+        }
+      ],
+      "jev_requests_this_session": 3,
+      "saved_agent_config": {
+        "bytes_unchanged": true,
+        "mtime_unchanged": true,
+        "sha256": "9f7b564e7725bacbffc308f2297b3904206d2a6f9d1c3505f6444f91de9b17b1"
+      },
+      "extension_errors": [],
+      "notices": [
+        {
+          "type": "extension_ui_request",
+          "id": "158923daa9c08dfd",
+          "method": "notify",
+          "message": "Jev route: route-fake/routed high (rule_1, confidence 0.95)",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923dad9408dfe",
+          "method": "notify",
+          "message": "Jev route: route-fake/routed high (rule_1, confidence 0.95)",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923db06808e03",
+          "method": "notify",
+          "message": "Jev route: route-fake/manual low (rule_1, confidence 0.95) - explicit choices retained",
+          "notifyType": "info"
+        }
+      ]
+    },
+    {
+      "name": "nokey",
+      "label": "no key",
+      "shape": "explicit -e .omp/extensions/fm-jev-route.ts",
+      "version": "omp/18.2.8",
+      "initial": {
+        "model": "route-fake/initial",
+        "thinkingLevel": "low"
+      },
+      "after_first_prompt": {
+        "model": "route-fake/initial",
+        "thinkingLevel": "low"
+      },
+      "routing_log_after_first_prompt": [
+        {
+          "ts": "2026-09-22T04:22:48.212Z",
+          "trigger": "session",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:48.330Z",
+          "trigger": "todo-init",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        }
+      ],
+      "routing_log_rows_after_routine_turn": 2,
+      "after_manual_selection_and_jev_route_command": {
+        "model": "route-fake/manual",
+        "thinkingLevel": "low"
+      },
+      "routing_log_final": [
+        {
+          "ts": "2026-09-22T04:22:48.212Z",
+          "trigger": "session",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:48.330Z",
+          "trigger": "todo-init",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:48.509Z",
+          "trigger": "command",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        }
+      ],
+      "jev_requests_this_session": 0,
+      "saved_agent_config": {
+        "bytes_unchanged": true,
+        "mtime_unchanged": true,
+        "sha256": "9f7b564e7725bacbffc308f2297b3904206d2a6f9d1c3505f6444f91de9b17b1"
+      },
+      "extension_errors": [],
+      "notices": [
+        {
+          "type": "extension_ui_request",
+          "id": "158923dca51cb2a4",
+          "method": "notify",
+          "message": "Jev route: off - model unchanged",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923dcc29cb2a5",
+          "method": "notify",
+          "message": "Jev route: off - model unchanged",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923dcef5cb2aa",
+          "method": "notify",
+          "message": "Jev route: off - model unchanged",
+          "notifyType": "info"
+        }
+      ]
+    },
+    {
+      "name": "protected",
+      "label": "secret protection on",
+      "shape": "explicit -e .omp/extensions/fm-jev-route.ts",
+      "version": "omp/18.2.8",
+      "initial": {
+        "model": "route-fake/initial",
+        "thinkingLevel": "low"
+      },
+      "after_first_prompt": {
+        "model": "route-fake/initial",
+        "thinkingLevel": "low"
+      },
+      "routing_log_after_first_prompt": [
+        {
+          "ts": "2026-09-22T04:22:50.144Z",
+          "trigger": "session",
+          "status": "declined",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:50.248Z",
+          "trigger": "todo-init",
+          "status": "declined",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        }
+      ],
+      "routing_log_rows_after_routine_turn": 2,
+      "after_manual_selection_and_jev_route_command": {
+        "model": "route-fake/manual",
+        "thinkingLevel": "low"
+      },
+      "routing_log_final": [
+        {
+          "ts": "2026-09-22T04:22:50.144Z",
+          "trigger": "session",
+          "status": "declined",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:50.248Z",
+          "trigger": "todo-init",
+          "status": "declined",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:22:50.402Z",
+          "trigger": "command",
+          "status": "declined",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        }
+      ],
+      "jev_requests_this_session": 0,
+      "saved_agent_config": {
+        "bytes_unchanged": true,
+        "mtime_unchanged": true,
+        "sha256": "41917303b1fcc226e6b71f8169a5cc8f7c8c4c295a71a65dedaa04aded8c85b5"
+      },
+      "extension_errors": [],
+      "notices": [
+        {
+          "type": "extension_ui_request",
+          "id": "158923de87d31beb",
+          "method": "notify",
+          "message": "Jev route: declined (secret protection on) - model unchanged",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923dea2131bec",
+          "method": "notify",
+          "message": "Jev route: declined (secret protection on) - model unchanged",
+          "notifyType": "info"
+        },
+        {
+          "type": "extension_ui_request",
+          "id": "158923dec8931bf1",
+          "method": "notify",
+          "message": "Jev route: declined (secret protection on) - model unchanged",
+          "notifyType": "info"
+        }
+      ]
+    },
+    {
+      "name": "tui-keyed",
+      "label": "fake Jev endpoint (keyed)",
+      "shape": "auto-discovered from <home>/.omp/extensions (no -e)",
+      "version": "omp/18.2.8",
+      "launch": "omp --no-session --no-skills --no-rules --no-lsp --no-title --no-prewalk --auto-approve --tools todo --max-time 60 -e /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-jev-route-evidence-qn9fbawt/tui-keyed/provider.mjs (cwd = fake Firstmate home)",
+      "chat_models_used": [
+        "routed",
+        "routed",
+        "routed",
+        "routed",
+        "routed"
+      ],
+      "jev_requests_this_session": 2,
+      "routing_log": [
+        {
+          "ts": "2026-09-22T04:22:54.134Z",
+          "trigger": "session",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        },
+        {
+          "ts": "2026-09-22T04:22:54.329Z",
+          "trigger": "todo-init",
+          "status": "clear",
+          "model": "route-fake/routed",
+          "effort": "high",
+          "rule": "rule_1",
+          "confidence": 0.95
+        }
+      ],
+      "saved_agent_config": {
+        "bytes_unchanged": true,
+        "mtime_unchanged": true,
+        "sha256": "9f7b564e7725bacbffc308f2297b3904206d2a6f9d1c3505f6444f91de9b17b1"
+      },
+      "notice_seen_on_screen": true,
+      "notice_lines": [
+        "Jev route: route-fake/routed high (rule_1, confidence 0.95)"
+      ]
+    },
+    {
+      "name": "tui-nokey",
+      "label": "no key",
+      "shape": "explicit -e .omp/extensions/fm-jev-route.ts",
+      "version": "omp/18.2.8",
+      "launch": "omp --no-extensions --no-session --no-skills --no-rules --no-lsp --no-title --no-prewalk --auto-approve --tools todo --max-time 60 -e /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-jev-route-evidence-qn9fbawt/tui-nokey/provider.mjs -e /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M33M6Z2AYKJ8HNKT0BDN6NZA/.omp/extensions/fm-jev-route.ts (cwd = fake Firstmate home)",
+      "chat_models_used": [
+        "initial",
+        "initial",
+        "initial",
+        "initial",
+        "initial"
+      ],
+      "jev_requests_this_session": 0,
+      "routing_log": [
+        {
+          "ts": "2026-09-22T04:23:01.044Z",
+          "trigger": "session",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        },
+        {
+          "ts": "2026-09-22T04:23:01.162Z",
+          "trigger": "todo-init",
+          "status": "off",
+          "model": null,
+          "effort": null,
+          "rule": null,
+          "confidence": null
+        }
+      ],
+      "saved_agent_config": {
+        "bytes_unchanged": true,
+        "mtime_unchanged": true,
+        "sha256": "9f7b564e7725bacbffc308f2297b3904206d2a6f9d1c3505f6444f91de9b17b1"
+      },
+      "notice_seen_on_screen": true,
+      "notice_lines": [
+        "Jev route: off - model unchanged"
+      ]
+    }
+  ],
+  "fake_jev_requests_total": 5,
+  "jev_request_shapes": [
+    {
+      "authorization": "Bearer [synthetic]",
+      "question_keys": [
+        "rule"
+      ],
+      "state": {
+        "task": {
+          "project": "keyed",
+          "brief": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK."
+        }
+      }
+    },
+    {
+      "authorization": "Bearer [synthetic]",
+      "question_keys": [
+        "rule"
+      ],
+      "state": {
+        "task": {
+          "project": "keyed",
+          "brief": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.\n\nProve routing through the real runtime"
+        }
+      }
+    },
+    {
+      "authorization": "Bearer [synthetic]",
+      "question_keys": [
+        "rule"
+      ],
+      "state": {
+        "task": {
+          "project": "keyed",
+          "brief": "Explicit selection must win"
+        }
+      }
+    },
+    {
+      "authorization": "Bearer [synthetic]",
+      "question_keys": [
+        "rule"
+      ],
+      "state": {
+        "task": {
+          "project": "tui-keyed",
+          "brief": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK."
+        }
+      }
+    },
+    {
+      "authorization": "Bearer [synthetic]",
+      "question_keys": [
+        "rule"
+      ],
+      "state": {
+        "task": {
+          "project": "tui-keyed",
+          "brief": "Complete the routing smoke task using todo, then answer ROUTE_SMOKE_OK.\n\nProve routing through the real runtime"
+        }
+      }
+    }
+  ],
+  "real_global_config": {
+    "path": "/Users/danielkuykendall/.omp/agent/config.yml",
+    "before": {
+      "mtime": 1789408342.084616,
+      "size": 610
+    },
+    "after": {
+      "mtime": 1789408342.084616,
+      "size": 610
+    },
+    "unchanged": true
+  }
+}
