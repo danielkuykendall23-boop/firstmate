@@ -11,7 +11,7 @@
 //     still tracked at before_agent_start / message_start exactly as on Pi.
 //   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
 //     actionable close persists the replacement handoff and the next owning
-//     session_start, in this process or a later one, replays it. Replaying a
+//     activation, in this process or a later one, replays it. Replaying a
 //     wake main has already drained is harmless (the queue is durable and the
 //     drain is idempotent); losing one across /new is not.
 //   - The Pi supervision branch is out of scope for omp: every actionable wake
@@ -21,13 +21,25 @@
 //     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
 //
 // Session-generation ownership (stated once here):
-// omp emits session_shutdown for ordinary same-process replacements (/new,
-// /resume, /fork) as well as terminal quit. This extension binds one generation
-// per session activation. Only the active live generation may start, stop,
-// rearm, or clear the arm child. An owning replacement session_start (or fresh
-// factory bind) arms its new generation without a model turn. A replacement
-// handoff carries actionable closes that were still pending delivery; its
-// durable state lives at state/extensions/omp-primary-watch/session-replacement-actionable.json.
+// A process can host several runners that each bind this extension: the
+// primary session and every in-process `task` subagent (omp gives a subagent its
+// own runner, auto-discovers this file for it, and runs it as the same OS
+// process that holds the session lock). Only the supervising runner - the one
+// omp initialized in the `tui` or `rpc` mode - may activate a generation, arm,
+// or deliver wakes; a subagent runner, which omp initializes in `print` mode
+// (verified live on omp 18.2.10 with and without --no-session; its hasUI is
+// false, but an rpc primary reports hasUI true, so hasUI is not the signal),
+// stays inert, and its fm_watch_arm_omp refuses by naming the mode it saw.
+// omp emits session_shutdown when it disposes a runner and session_switch for
+// in-process /new, /resume, and /fork (18.2.10 emits only session_switch there).
+// This extension binds one generation per activation. Only the active live
+// generation may start, stop, rearm, or clear the arm child. An owning
+// session_start or session_switch - or the supervising runner's own
+// fm_watch_arm_omp - activates a fresh generation when the previous one was
+// stopped, so a shutdown the runner outlives never leaves the tool refusing. A
+// replacement handoff carries actionable closes that were still pending
+// delivery; its durable state lives at
+// state/extensions/omp-primary-watch/session-replacement-actionable.json.
 // Stale callbacks from a prior generation are no-ops against the active replacement.
 //
 // Delivery versus consumption (stated once here):
@@ -141,6 +153,10 @@ const armReadyTimeoutMs = positiveInteger(
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
+// The runner modes omp initializes a long-lived primary session in; every other
+// mode (a task subagent's `print` above all) is inert. See the session-generation
+// ownership note in the header.
+const supervisingModes: Record<string, true> = { tui: true, rpc: true };
 
 let nextGenerationId = 0;
 let nextHandoffId = 0;
@@ -202,6 +218,14 @@ function pidAlive(pid: string): boolean {
   } catch {
     return false;
   }
+}
+
+// The mode omp initialized the calling runner in, read from an event, command,
+// or tool context (omp's session_start context inherits it through its
+// prototype), or "" when the context carries none.
+function runnerMode(ctx: unknown): string {
+  if (typeof ctx !== "object" || ctx === null || !("mode" in ctx)) return "";
+  return typeof ctx.mode === "string" ? ctx.mode : "";
 }
 
 function lockOwnership(): LockOwnership {
@@ -484,8 +508,41 @@ const cleanupOnProcessExit = () => {
 process.once("exit", cleanupOnProcessExit);
 
 export default function (pi: ExtensionAPI) {
+  // A bind never activates: only an event or call proving this runner is the
+  // supervising session does, so an in-process subagent's bind stays inert.
   let generation = createGeneration();
-  activateGeneration(generation);
+  let observedMode = "";
+  let supervisingRunner = false;
+
+  // Learns this runner's role from any context that carries omp's runner mode;
+  // a context without one keeps the verdict already learned.
+  function observeRunner(ctx: unknown): boolean {
+    const mode = runnerMode(ctx);
+    if (mode) {
+      observedMode = mode;
+      supervisingRunner = supervisingModes[mode] === true;
+    }
+    return supervisingRunner;
+  }
+
+  function activateSupervisingGeneration(): void {
+    if (generation.stopping) generation = createGeneration();
+    activateGeneration(generation);
+  }
+
+  // fm_watch_arm_omp and /fm-watch-arm-omp: the supervising runner re-activates
+  // its generation (a fresh one after a shutdown it outlived) and arms; any
+  // other runner refuses and names the mode it saw.
+  function armFromRunner(ctx: unknown): ArmResult {
+    if (!observeRunner(ctx)) {
+      return {
+        ok: false,
+        message: `watcher: not armed - this omp runner is not the supervising session (mode=${observedMode || "unknown"}); only the tui or rpc primary arms the watcher, never a task subagent`,
+      };
+    }
+    activateSupervisingGeneration();
+    return activateOwnedWatch(generation);
+  }
 
   async function sendWake(
     owner: SessionGeneration,
@@ -1028,14 +1085,24 @@ export default function (pi: ExtensionAPI) {
     consumeWake(generation, userMessageText(message.content));
   });
 
-  pi.on?.("session_start", async () => {
-    if (generation.stopping) generation = createGeneration();
-    activateGeneration(generation);
+  async function activateOwningSession(ctx: unknown): Promise<void> {
+    if (!observeRunner(ctx)) return;
+    activateSupervisingGeneration();
     markLoaded();
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
+  }
+  pi.on?.("session_start", async (_event, ctx) => {
+    await activateOwningSession(ctx);
+  });
+  pi.on?.("session_switch", async (_event, ctx) => {
+    // A runner that kept its live generation across the switch keeps its arm
+    // child; only a switch after a shutdown this runner outlived re-activates.
+    if (generationIsLive(generation)) return;
+    await activateOwningSession(ctx);
   });
   pi.on?.("session_shutdown", async () => {
+    if (!supervisingRunner) return;
     // omp carries no shutdown reason (verified: `reason` is undefined), so the
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.
@@ -1046,7 +1113,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand?.("fm-watch-arm-omp", {
     description: "Arm firstmate watcher supervision through the omp extension instead of foreground bash.",
     handler: async (_args, ctx) => {
-      const result = activateOwnedWatch(generation);
+      const result = armFromRunner(ctx);
       ctx?.ui?.notify?.(result.message, result.ok ? "info" : "warning");
     },
   });
@@ -1060,8 +1127,8 @@ export default function (pi: ExtensionAPI) {
       "Call fm_watch_arm_omp only for the first required cycle or after a notification says the cycle is missing, failed, or unhealthy. Do not call it after ordinary work, turn completion, or ordinary signal, stale, check, or heartbeat handling because the omp extension owns re-arming. Never run bin/fm-watch-arm.sh through bash.",
     ],
     parameters: Type.Object({}),
-    execute: async () => {
-      const result = activateOwnedWatch(generation);
+    execute: async (_toolCallId: string, _params: unknown, _signal: unknown, _onUpdate: unknown, ctx?: unknown) => {
+      const result = armFromRunner(ctx);
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
