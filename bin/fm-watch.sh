@@ -1939,7 +1939,9 @@ fm_active_check_stop() {
 
 # Stop-signal dispositions, installed with the EXIT trap below. HUP and TERM
 # keep bash's native fatal-signal handling, which runs watcher_cleanup through
-# the EXIT trap and then exits on every supported bash. A trap body such as
+# the EXIT trap and then exits on every supported bash (bash 3.2 also needs the
+# SIGCHLD ticker started beside WATCHER_PID to act on a signal that arrives
+# during a blocked command-substitution read). A trap body such as
 # 'exit 1' is not reliable for them: bash 5.2 runs a pending trap inside the
 # parse of the next command substitution, the body then fails to parse ("trap:
 # line 2: unexpected EOF while looking for matching `)'", or nothing at all),
