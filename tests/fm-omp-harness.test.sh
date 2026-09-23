@@ -522,6 +522,42 @@ EOF
   pass ".omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down"
 }
 
+test_turnend_guard_extension_relays_stale_beacon_recheck() {
+  local repo home out status
+  repo="$TMP_ROOT/guard-stale/repo"; home="$TMP_ROOT/guard-stale/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+cat >/dev/null
+printf '●  WATCHER BEACON STALE - RECHECK BEFORE REPAIRING\n●  1 task(s) in flight, but watcher pid 53358 alive, beacon stale 928s - possible system sleep; recheck after one poll.\n' >&2
+exit 2
+SH
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-arm-pretool-check.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-cd-pretool-check.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-sessionstart-run.sh"
+  chmod +x "$repo/bin/"*.sh
+  out=$(FM_HOME="$home" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+const handlers = new Map();
+const pi = { on(e, h) { handlers.set(e, h); }, sendMessage() {} };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+const r = await handlers.get("session_stop")({ type: "session_stop", stop_hook_active: false }, {});
+if (r?.continue !== true) throw new Error(`stale-beacon recheck did not compel a continuation: ${JSON.stringify(r)}`);
+const context = r.additionalContext;
+if (!context.startsWith("⁣FIRSTMATE_OP: v1 turn-end-guard: WATCHER BEACON STALE")) throw new Error(`recheck context lost its recheck preamble: ${context}`);
+if (/supervision is off|TURN WOULD END BLIND/i.test(context)) throw new Error(`recheck context still claims supervision is off: ${context}`);
+if (!context.includes("watcher pid 53358 alive, beacon stale 928s")) throw new Error(`recheck context dropped the guard text: ${context}`);
+await handlers.get("session_shutdown")({}, {});
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp turn-end guard stale-beacon relay: $out"
+  [ -z "$out" ] || fail "omp guard stale-beacon test printed output: $out"
+  pass ".omp turn-end guard: a stale-but-alive watcher is relayed as a recheck, not as supervision off"
+}
+
 test_watch_extension_arms_and_delivers() {
   local repo home out status
   repo="$TMP_ROOT/watch/repo"; home="$TMP_ROOT/watch/home"
@@ -737,5 +773,6 @@ test_busy_extension_lifecycle
 test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation
+test_turnend_guard_extension_relays_stale_beacon_recheck
 test_watch_extension_arms_and_delivers
 test_calm_extension_presents_only_observed_run_state

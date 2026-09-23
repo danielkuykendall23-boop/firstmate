@@ -230,14 +230,14 @@ block_stop() {
   [ -e "$STATE/.afk" ] && afk=1
   x_mode=0
   [ -f "$CONFIG/x-mode.env" ] && x_mode=1
+  reason=$("$SCRIPT_DIR/fm-supervision-instructions.sh" --afk "$afk" --x-mode "$x_mode" --repair-line 2>/dev/null \
+    || printf '%s\n' 'tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn')
   if lock_desc=$(fm_watcher_stale_beacon_reason "$STATE" "$WATCH" "$GRACE" "$FM_HOME"); then
     header='WATCHER BEACON STALE - RECHECK BEFORE REPAIRING'
-    reason='The watcher process is alive, so do not repair yet: wait one poll interval, rerun the supervision check, and repair watcher supervision only if the beacon is still stale then.'
+    reason="The watcher process is alive, so do not repair yet: wait one poll interval and rerun the supervision check. If the beacon is still stale then, repair with: $reason"
   else
     header='TURN WOULD END BLIND - SUPERVISION IS OFF'
     lock_desc="no live watcher holds this home lock (last beat: $FM_SUP_BEACON_DESC)"
-    reason=$("$SCRIPT_DIR/fm-supervision-instructions.sh" --afk "$afk" --x-mode "$x_mode" --repair-line 2>/dev/null \
-      || printf '%s\n' 'tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn')
   fi
   rule='━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
   {
