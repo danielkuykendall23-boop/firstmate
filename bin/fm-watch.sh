@@ -2311,6 +2311,7 @@ watcher_cleanup() {
   fm_active_check_stop || cleanup_status=1
   fm_check_output_cleanup
   fm_custom_check_snapshot_cleanup
+  [ -z "${WATCHER_SIGNAL_TICKER_PID:-}" ] || kill "$WATCHER_SIGNAL_TICKER_PID" 2>/dev/null || true
   if [ "$owns_lock" -eq 1 ] \
     && ! fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" downtime; then
     echo "watcher: recovery state could not be persisted; retaining stale lock evidence" >&2
@@ -2324,6 +2325,15 @@ watcher_stop_signals
 # ${BASHPID:-$$} from this same main shell). Read directly, never via a command
 # substitution, so it matches the stored holder pid for the self-eviction check.
 WATCHER_PID=${BASHPID:-$$}
+# Bash 3.2 (stock macOS) does not act on a fatal HUP or TERM that arrives while
+# this shell is blocked reading a command substitution (a hung pane capture);
+# it retries the read and exits only when the read ends or a SIGCHLD arrives.
+# A ticker child sends SIGCHLD every second so one stop signal still ends the
+# watcher. It stops once this watcher is gone; watcher_cleanup also stops it.
+if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+  ( while kill -CHLD "$WATCHER_PID" 2>/dev/null; do sleep 1; done ) </dev/null >/dev/null 2>&1 &
+  WATCHER_SIGNAL_TICKER_PID=$!
+fi
 printf '%s\n' "$FM_HOME" > "$WATCH_LOCK/fm-home" || true
 printf '%s\n' "$WATCH_PATH" > "$WATCH_LOCK/watcher-path" || true
 # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
