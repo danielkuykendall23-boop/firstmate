@@ -186,14 +186,20 @@ budget_reset_if_ours() {
 }
 
 emit_repair_followup() {  # <reason> <arm-tail> <attempt>
-  local reason=$1 arm_tail=$2 attempt_count=$3 prior count body encoded response
+  local reason=$1 arm_tail=$2 attempt_count=$3 prior count body encoded response header
   park_still_ours || exit 0
   budget_read
   [ "$BUDGET_COUNT" -lt "$BLOCK_BUDGET" ] || exit 0
   prior=$BUDGET_COUNT
   count=$((prior + 1))
 
-  body="TURN WOULD END BLIND - supervision is off. The hook-owned watcher park could not establish a live cycle after $attempt_count bounded attempts (nag $count of $BLOCK_BUDGET).
+  header="TURN WOULD END BLIND - supervision is off. The hook-owned watcher park could not establish a live cycle after $attempt_count bounded attempts (nag $count of $BLOCK_BUDGET)."
+  case "$reason" in
+    *'WATCHER BEACON STALE - RECHECK BEFORE REPAIRING'*)
+      header="WATCHER BEACON STALE - the watcher process is alive but its beacon is stale. Follow the recheck instruction below before ending the turn (attempt $attempt_count of the park, nag $count of $BLOCK_BUDGET)." ;;
+  esac
+
+  body="$header
 $arm_tail
 
 $reason"
