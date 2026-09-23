@@ -882,6 +882,44 @@ test_secondmate_relaunch_picks_up_the_configured_harness_pin() {
   pass "fm-control relaunch: a secondmate relaunch re-resolves its durable configured harness pin"
 }
 
+test_secondmate_relaunch_clears_the_deliberate_stop_marker() {
+  local dir home out rc
+  dir=$(new_case smstopmarker sm8)
+  home="$dir/home"
+  mkdir -p "$home/data/sm8"
+  printf '# secondmate brief\n' > "$home/data/sm8/brief.md"
+  fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+  mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin"
+  printf 'sm8\n' > "$dir/smhome/.fm-secondmate-home"
+  printf '# agents\n' > "$dir/smhome/AGENTS.md"
+  {
+    echo "window=fmses:fm-sm8"
+    echo "endpoint_task_id=sm8"
+    echo "worktree=$dir/smhome"
+    echo "project=$dir/smhome"
+    echo "harness=claude"
+    echo "kind=secondmate"
+    echo "mode=secondmate"
+    echo "yolo=off"
+    echo "model=default"
+    echo "effort=default"
+    echo "home=$dir/smhome"
+    # Simulates a secondmate previously stopped on purpose through
+    # `fm-control.sh <id> exit` (bin/fm-control.sh's `exit` verb doc).
+    echo "secondmate_stopped_by=control-exit"
+    echo "secondmate_stopped_at=1234567890"
+  } > "$home/state/sm8.meta"
+  printf '%s\n' "fm-sm8" > "$dir/fake/windows"
+  printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+  out=$(run_control "$dir" sm8 relaunch); rc=$?
+  expect_code 0 "$rc" "a marked secondmate should still relaunch"$'\n'"$out"
+  [ -z "$(meta_field "$dir" sm8 secondmate_stopped_by)" ] \
+    || fail "relaunch should clear the deliberate-stop marker, got secondmate_stopped_by=$(meta_field "$dir" sm8 secondmate_stopped_by)"
+  [ -z "$(meta_field "$dir" sm8 secondmate_stopped_at)" ] \
+    || fail "relaunch should clear the deliberate-stop marker, got secondmate_stopped_at=$(meta_field "$dir" sm8 secondmate_stopped_at)"
+  pass "fm-control relaunch: a secondmate relaunch clears a prior deliberate-stop marker"
+}
+
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop() {
   local dir home out rc
   dir=$(new_case invalid-effort sm6)
@@ -2218,6 +2256,7 @@ test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter
 test_secondmate_relaunch_picks_up_the_configured_harness_pin
+test_secondmate_relaunch_clears_the_deliberate_stop_marker
 test_secondmate_relaunch_ignores_invalid_configured_effort_before_stop
 test_secondmate_relaunch_onto_a_crewmate_only_adapter_refuses_before_stop
 test_explicit_secondmate_harness_ignores_configured_profile_axes
