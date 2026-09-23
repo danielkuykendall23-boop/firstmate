@@ -886,6 +886,8 @@ test_secondmate_relaunch_clears_the_deliberate_stop_marker() {
   local dir home out rc
   dir=$(new_case smstopmarker sm8)
   home="$dir/home"
+  mkdir -p "$home/config"
+  printf 'claude\n' > "$home/config/secondmate-harness"
   mkdir -p "$home/data/sm8"
   printf '# secondmate brief\n' > "$home/data/sm8/brief.md"
   fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
