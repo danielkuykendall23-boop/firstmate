@@ -32,9 +32,10 @@
 # always predates spawn_gen, so an exited or parked worker's pane, which still
 # holds its transcript and is the pane bin/fm-control.sh relaunch adopts, is
 # never closed here; a task whose metadata names some other endpoint keeps its
-# projection untouched as well. bin/fm-spawn.sh --relaunch recreates a Herdr
-# endpoint this cleanup has retired, so the task record, local copy, branch,
-# and steering inbox stay exactly as they were.
+# projection untouched as well. A later bin/fm-control.sh relaunch reclaims a
+# task whose endpoint this cleanup retired by recreating it flat in the same
+# worktree (bin/fm-spawn.sh --relaunch), so the task record, local copy,
+# branch, and steering inbox stay exactly as they were.
 # Topology is first checked from one locked API snapshot, then every mutation
 # prerequisite is immediately rechecked before the existing exact-pane
 # focus-preserving close helper is called.

@@ -1206,13 +1206,13 @@ evidence: herdr=0.9.0-preview.2026-09-09-5a244caa60b0 protocol=22 default-sessio
 Observed guarantee: a record-less journal-correlated idle shell and a metadata-backed one whose shell the server restored after the recorded launch second were both closed after restoration, the restored husk's task record was left byte-identical, a pane created after the restart with a record minted after its shell started (the launch-shell shape a parked worker leaves) and a pane whose record names another endpoint were both preserved, the exact non-target focus and default fleet session remained unchanged, the dry run reported the same four verdicts while touching nothing, and a repeat run was a no-op.
 On this 0.9.0 build `pane process-info` reports the executable name for a `/bin/sh` pane (`bash` here, `dash` on Debian) with `argv0` still `sh`, so the idle-shell proof now requires both identities to be recognized shells rather than equal; the 0.7.5 run predates that field change.
 
-The gone-endpoint relaunch recreate ran on 2026-09-18 against the same 0.9.0-preview build through `tests/fm-control-herdr-smoke.test.sh`:
+The gone-endpoint reclaim of a retired husk's task ran on 2026-09-23 against the same 0.9.0-preview build through `tests/fm-control-herdr-smoke.test.sh`:
 
 ```text
-ok - real herdr: a gone endpoint is recreated as a fresh projected space in the recorded worktree and the control plane reports the republished endpoint
+ok - real herdr: a gone endpoint is recreated flat in the recorded worktree and the control plane reports the republished endpoint
 ```
 
-Observed guarantee: with the recorded pane closed and the named server still running, `bin/fm-control.sh <id> relaunch --harness codex` did not refuse on the missing agent, `bin/fm-spawn.sh --relaunch` created a new endpoint (projected when the home's parent workspace resolved, flat with the ordinary absent-parent warning when the emptied parent had already been removed), moved its shell into the recorded worktree, republished the record with the new workspace, tab, and pane, and the control plane's success line named that republished endpoint after confirming the replacement alive; the local copy survived untouched.
+Observed guarantee: with the recorded pane closed and the named server still running, `bin/fm-control.sh <id> relaunch --harness codex` did not refuse on the missing agent, `bin/fm-spawn.sh --relaunch` created one fresh endpoint flat in the home container with its shell in the recorded worktree, republished the record with the new workspace, tab, and pane, and the control plane's success line named that republished endpoint after confirming the replacement alive; the local copy survived untouched.
 
 ### Workspace-removal focus safety
 

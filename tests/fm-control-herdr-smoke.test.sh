@@ -378,10 +378,10 @@ herdr pane get "$NEW_PANE" --session "$SESSION" >/dev/null 2>&1 \
 [ -d "$WT" ] || fail "the relaunch must never remove the task's local copy"
 NEW_WS=$(sed -n 's/^herdr_workspace_id=//p' "$HOME_DIR/state/hsmoke.meta" | tail -1)
 NEW_WS_LABEL=$(herdr workspace get "$NEW_WS" --session "$SESSION" 2>/dev/null | jq -r '.result.workspace.label // empty')
-case "$NEW_WS_LABEL" in
-  "└ hsmoke · p:"*) pass "real herdr: a gone endpoint is recreated as a fresh projected space in the recorded worktree and the control plane reports the republished endpoint" ;;
-  firstmate) pass "real herdr: a gone endpoint is recreated flat in the recorded worktree and the control plane reports the republished endpoint" ;;
-  *) fail "the recreated endpoint landed in an unexpected workspace: $NEW_WS ($NEW_WS_LABEL)" ;;
-esac
+# The reclaim deliberately recreates flat, in the home container, never as a
+# new projected space (bin/fm-spawn.sh --relaunch; docs/agent-control.md).
+[ "$NEW_WS_LABEL" = firstmate ] \
+  || fail "the recreated endpoint landed outside the home container: $NEW_WS ($NEW_WS_LABEL)"
+pass "real herdr: a gone endpoint is recreated flat in the recorded worktree and the control plane reports the republished endpoint"
 
 fm_backend_herdr_kill "$NEW_T" 2>/dev/null || true
