@@ -39,7 +39,7 @@ Hold-for-return is the default and the only reach profile this release records: 
    - **omp**: stop here too.
      The away daemon is no longer launched on the omp primary either, and `bin/fm-afk-launch.sh start` refuses on this harness; `.omp/extensions/fm-primary-omp-watch.ts` (`docs/supervision-protocols/omp.md`) keeps owning watcher continuity and delivering every wake to this same conversation exactly as when attended.
      There is no supervision branch here to relocate authority to: the record changes only how this conversation treats a captain-owned decision point (hold for return, or the answer the away words already gave), never who delivers or triages a wake.
-     `/quiet` on omp provides no token-saving for the same reason: there is no triage layer to route routine wakes around, so quiet only changes how a decision point is treated, exactly as away mode does.
+     `/quiet` needs nothing extra on omp either: every wake already reaches this conversation exactly as when attended, so quiet-while-present is already the attended posture's own shape there.
    - **Harness WITH a native in-pane tracked-background tool** (claude's background bash, grok's background tool): run `bin/fm-afk-launch.sh start-native`, then run `FM_AFK_STATE_PREPARED=1 bin/fm-afk-start.sh` through that native tool.
      This is a deliberate no-separate-terminal exception because the harness-hosted job creates no terminal or layout mutation, and a shell launcher cannot invoke a harness-native background tool.
      If the native launch fails, run `bin/fm-afk-launch.sh stop` to roll back the prepared lifecycle.
@@ -96,7 +96,7 @@ Destructive, irreversible, and security-sensitive actions are never pre-authoriz
 
 ## The daemon, where it still runs
 
-On the harnesses that still launch the daemon (every verified harness except Pi and pi-signed), the mechanics below are unchanged.
+On the harnesses that still launch the daemon (every verified harness except Pi, pi-signed, and omp), the mechanics below are unchanged.
 
 ### Operational prefix contract
 
