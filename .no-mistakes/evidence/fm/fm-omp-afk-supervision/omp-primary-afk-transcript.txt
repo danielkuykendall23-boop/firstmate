@@ -1,0 +1,37 @@
+$ bin/fm-harness.sh
+omp
+
+$ bin/fm-afk-launch.sh propose --words 'merge the windows fix when green'
+Away posture read-back (proposed, not yet confirmed):
+  entered: 2026-09-23T09:23:53Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    merge the windows fix when green
+Say go to confirm; restate your instructions first if this reading is not what you meant.
+rc=0
+
+$ bin/fm-afk-launch.sh confirm
+Away posture confirmed at 2026-09-23T09:24:08Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+rc=0
+
+$ bin/fm-afk-launch.sh start   (FM_SUPERVISOR_BACKEND=herdr FM_SUPERVISOR_TARGET=fake)
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+rc=1
+
+$ bin/fm-afk-launch.sh start-native
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+rc=1
+
+--- state after refusals ---
+.afk-contract
+no daemon process for this home
+
+$ bin/fm-afk-launch.sh stop
+fm-afk-launch: away-posture record archived at /tmp/fm-afk-omp-home.zzkb8F/state/afk-contracts/1790155448.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+rc=0
+--- state after stop ---
+afk-contracts
+1790155448.afk-contract

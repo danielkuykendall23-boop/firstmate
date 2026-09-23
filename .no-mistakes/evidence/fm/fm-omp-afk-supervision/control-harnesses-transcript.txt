@@ -1,0 +1,34 @@
+=== claude primary (real Claude Code ancestry, no omp ancestor) ===
+$ bin/fm-harness.sh -> claude
+confirm rc=0
+$ bin/fm-afk-launch.sh start-native
+rc=0
+state: .afk .afk-contract .afk-daemon-terminal 
+daemon-terminal record: none	-	native
+fm-afk-launch: away-posture record archived at /tmp/fm-afk-ctl.rrf59z/state/afk-contracts/1790156213.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+stop rc=0; state: afk-contracts 
+
+=== FM_OMP_HARNESS=omp leaked into a claude process with NO omp ancestor ===
+$ bin/fm-harness.sh -> claude
+confirm rc=0
+$ bin/fm-afk-launch.sh start-native
+rc=0
+state: .afk .afk-contract .afk-daemon-terminal 
+daemon-terminal record: none	-	native
+fm-afk-launch: away-posture record archived at /tmp/fm-afk-ctl.3nfZo3/state/afk-contracts/1790156329.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+stop rc=0; state: afk-contracts 
+
+=== pi primary (PI_CODING_AGENT=true) ===
+$ bin/fm-harness.sh -> claude
+confirm rc=0
+$ bin/fm-afk-launch.sh start-native
+rc=0
+state: .afk .afk-contract .afk-daemon-terminal 
+daemon-terminal record: none	-	native
+fm-afk-launch: away-posture record archived at /tmp/fm-afk-ctl.JQdLyS/state/afk-contracts/1790156438.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+stop rc=0; state: afk-contracts 
+
+# NOTE: the 'pi primary' leg above was not a valid Pi control: real Claude Code ancestry outranks the PI_CODING_AGENT marker in bin/fm-harness.sh, so it detected claude. Pi refusal is covered by tests/fm-afk-launch.test.sh unit_pi_and_omp_never_launch_the_daemon.

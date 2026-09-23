@@ -63,9 +63,9 @@ ok - record read: malformed record fails closed without acting on a partial id
 fm-afk-launch: daemon terminal record is malformed; refusing to act on it
 fm-afk-launch: malformed daemon terminal record; refusing to stop away mode
 ok - stop: malformed terminal record preserves away state and fails closed
-fm-afk-launch: failed to create detached tmux daemon session 'fm-afk-daemon-825691582-34869-29184-1790151945'
+fm-afk-launch: failed to create detached tmux daemon session 'fm-afk-daemon-2973094436-4091-15980-1790156151'
 ok - tmux launch: planned exact target is recorded before creation and removed on failure
-fm-afk-launch: failed to create detached tmux daemon session 'fm-afk-daemon-574489013-37492-27524-1790151951'
+fm-afk-launch: failed to create detached tmux daemon session 'fm-afk-daemon-4200425633-4773-17701-1790156158'
 ok - tmux launch: unique names eliminate collision teardown
 ok - stop validation: malformed record causes no daemon or state side effects
 ok - launcher lock: incomplete metadata fails acquisition and releases lock
@@ -82,7 +82,7 @@ ok - clear failure: native entry aborts and restores prior state
 fm-afk-launch: reconciling leaked daemon terminal tmux:exact-session
 fm-afk-launch: terminal close command failed, but exact absence was confirmed
 ok - confirmed absence: cleanup succeeds and removes the stale record
-fm-afk-launch: rollback restoration incomplete; backup retained at /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-afk-restore-fail.jDJpsy/state/.afk-launch-backup.mCbaYm
+fm-afk-launch: rollback restoration incomplete; backup retained at /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-afk-restore-fail.PcbViG/state/.afk-launch-backup.v6pwk3
 ok - rollback restore: incomplete restoration retains its recovery backup
 fm-afk-launch: a confirmed away-posture record is required; run propose and confirm before starting the daemon
 ok - flag failure: lifecycle aborts without active state
