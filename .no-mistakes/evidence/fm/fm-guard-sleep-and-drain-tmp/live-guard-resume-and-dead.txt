@@ -1,0 +1,16 @@
+### 3. Grok adapter relaying real guard while watcher frozen+stale
+exit=0
+
+### 4. watcher resumed (SIGCONT), beacon age now 1s -> recheck
+exit=0
+
+### 5. watcher killed (dead pid 30282), beacon stale
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 934s ago).
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+exit=2
+
+### 6. Grok adapter, dead watcher
+exit=0

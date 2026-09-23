@@ -1,0 +1,7 @@
+[base 0315f03 (before fix)] prepared file present mid-drain: .status-presentation.prepared.1pGr3n
+[base 0315f03 (before fix)] drain exit after TERM to its process group: 143
+[base 0315f03 (before fix)] leaked .status-presentation.prepared.* files after interruption: 1 .status-presentation.prepared.1pGr3n
+
+[target c3f2f30 (after fix)] prepared file present mid-drain: .status-presentation.prepared.AraZfJ
+[target c3f2f30 (after fix)] drain exit after TERM to its process group: 143
+[target c3f2f30 (after fix)] leaked .status-presentation.prepared.* files after interruption: 0 

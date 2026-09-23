@@ -1,0 +1,6 @@
+base run1: 20.53s
+base run2: 24.58s
+base run3: 18.7s
+home run1: 16.84s
+home run2: 20.53s
+home run3: 14.42s

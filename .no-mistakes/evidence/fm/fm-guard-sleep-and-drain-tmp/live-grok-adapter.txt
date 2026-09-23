@@ -1,0 +1,21 @@
+### Grok adapter (legacy resume path), real guard, watcher pid 79730 frozen, beacon ~928s
+adapter exit=0
+--- prompt grok would receive:
+⁣FIRSTMATE_OP: v1 turn-end-guard: WATCHER BEACON STALE - the watcher process is alive but its beacon is stale. Follow the recheck instruction below before ending the turn.
+
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER BEACON STALE - RECHECK BEFORE REPAIRING
+●  1 task(s) in flight, but watcher pid 79730 alive, beacon stale 954s - possible system sleep; recheck after one poll.
+●  The watcher process is alive, so do not repair yet: wait one poll interval and rerun the supervision check. If the beacon is still stale then, repair with: watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+### Grok adapter, watcher pid 79730 dead
+adapter exit=0
+--- prompt grok would receive:
+⁣FIRSTMATE_OP: v1 turn-end-guard: TURN WOULD END BLIND - supervision is off. Repair missing watcher supervision according to the session-start operating block before ending the turn.
+
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  TURN WOULD END BLIND - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher holds this home lock (last beat: 934s ago).
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

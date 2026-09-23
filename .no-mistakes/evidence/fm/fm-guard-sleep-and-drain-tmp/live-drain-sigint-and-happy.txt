@@ -1,0 +1,20 @@
+[base, SIGINT] prepared file present mid-drain: .status-presentation.prepared.UikOSy
+[base, SIGINT] drain exit after INT to its process group: 130
+[base, SIGINT] leaked .status-presentation.prepared.* files after interruption: 1 .status-presentation.prepared.UikOSy
+[target, SIGINT] prepared file present mid-drain: .status-presentation.prepared.1BBADJ
+[target, SIGINT] drain exit after INT to its process group: 130
+[target, SIGINT] leaked .status-presentation.prepared.* files after interruption: 0 
+
+[target, uninterrupted drain] stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task1 note: captain said use REST not RPC
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+exit=0
+(eval):6: no matches found: /tmp/fmdrainstate.N4Vf/.status-presentation.prepared.*
+[target, uninterrupted] residue: 0

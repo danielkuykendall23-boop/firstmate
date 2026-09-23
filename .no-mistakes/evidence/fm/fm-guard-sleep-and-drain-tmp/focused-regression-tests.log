@@ -1,0 +1,15 @@
+== fm-turnend-guard.test.sh test_hook_blocks_with_live_lock_and_stale_beacon test_hook_blocks_when_unhealthy_in_primary
+ok - fm-turnend-guard: blocks on a live watcher lock with an ancient beacon and reports the alive-but-stale reason distinctly
+ok - fm-turnend-guard: blocks with the exact required reason in the primary when unhealthy
+rc=0
+== fm-wake-queue.test.sh test_interrupted_status_presentation_leaves_no_prepared_temp_file
+ok - an interrupted drain leaves no status-presentation.prepared.* residue behind
+rc=0
+== fm-cursor-primary.test.sh test_park_repair_nag_is_bounded test_park_repair_nag_uses_recheck_framing_for_stale_beacon
+ok - cursor park: the repair nag is bounded and then goes quiet
+ok - cursor park: a stale-but-alive beacon gets the recheck framing, not the supervision-is-off alarm
+rc=0
+== fm-omp-harness.test.sh test_turnend_guard_extension_compels_one_continuation test_turnend_guard_extension_relays_stale_beacon_recheck
+ok - .omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down
+ok - .omp turn-end guard: a stale-but-alive watcher is relayed as a recheck, not as supervision off
+rc=0

@@ -1,0 +1,10 @@
+### 1. healthy live watcher pid 30282, fresh beacon
+exit=0
+
+### 2. watcher SIGSTOPped (simulated Mac sleep), pid alive: TN  , beacon aged 930s
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER BEACON STALE - RECHECK BEFORE REPAIRING
+●  1 task(s) in flight, but watcher pid 30282 alive, beacon stale 960s - possible system sleep; recheck after one poll.
+●  The watcher process is alive, so do not repair yet: wait one poll interval and rerun the supervision check. If the beacon is still stale then, repair with: watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+exit=2
