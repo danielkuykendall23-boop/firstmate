@@ -1,0 +1,32 @@
+== [BEFORE fix, bc93010] detected primary harness (real ancestry detection, parent comm=omp): omp
+$ fm-afk-launch.sh propose --words 'merge the fix when green'
+  Away posture read-back (proposed, not yet confirmed):
+    entered: 2026-09-23T07:08:14Z
+    expected return: not given
+    spend cap: 4 concurrent workers
+    reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+    your words (verbatim):
+      merge the fix when green
+  Say go to confirm; restate your instructions first if this reading is not what you meant.
+$ fm-afk-launch.sh confirm
+  Away posture confirmed at 2026-09-23T07:08:29Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+  rc=0
+$ fm-afk-launch.sh start   (what /afk step 4 runs)
+  fm-afk-launch: no non-visible daemon-launch primitive for backend 'unsupported' yet (supported: herdr, tmux)
+  rc=1
+$ fm-afk-launch.sh start-native
+  rc=0
+-- state after entry:
+  .afk
+  .afk-contract
+  .afk-daemon-terminal
+  .afk-daemon-terminal: none	-	native
+$ fm-afk-launch.sh stop
+  fm-afk-launch: away-posture record archived at /tmp/ompdemo-home.s9vT/state/afk-contracts/1790147309.afk-contract
+  fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+  rc=0
+-- state after stop:
+  afk-contracts
+  
+  /tmp/ompdemo-home.s9vT/state/afk-contracts:
+  1790147309.afk-contract

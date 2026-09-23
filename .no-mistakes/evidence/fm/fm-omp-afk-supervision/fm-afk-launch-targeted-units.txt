@@ -1,0 +1,25 @@
+ok - clear-stale: removes escalations buffer, sidecar, and wedge marker
+ok - clear-stale: leaves the durable wake-queue intact (no pending work dropped)
+ok - propose: the read-back carries the words verbatim with the expected return and spend cap, and writes only a proposal
+ok - propose: the retired --grant flag is refused by name
+ok - confirm: records the posture, announces hold-for-return only, and launches no daemon
+ok - propose: refuses while the prior return catch-up is pending
+ok - pi: start refuses to launch the daemon and writes no state
+ok - pi: start-native refuses to prepare a daemon
+ok - pi-signed: start refuses to launch the daemon and writes no state
+ok - pi-signed: start-native refuses to prepare a daemon
+ok - omp: start refuses to launch the daemon and writes no state
+ok - omp: start-native refuses to prepare a daemon
+skip: tmux not found (non-refusing harness still launches)
+ok - daemon entry: a pending proposal cannot bypass captain confirmation
+ok - daemon entry: an explicitly confirmed record permits lifecycle preparation
+ok - stop: clears the away flag and archives the posture record under its entry time
+ok - native lifecycle: launcher owns state with no terminal
+ok - native lifecycle: uniform stop clears state without closing a terminal
+ok - herdr e2e: captain tab pane count unchanged after start (no split)
+ok - herdr e2e: daemon launched in a separate non-visible workspace
+ok - herdr e2e: daemon pane is NOT in the captain's tab
+ok - herdr e2e: daemon terminal scoped to the lab session
+ok - herdr e2e: captain tab pane count restored after stop
+ok - herdr e2e: daemon workspace removed by exact id on stop
+ok - herdr e2e: record + .afk cleared on stop
