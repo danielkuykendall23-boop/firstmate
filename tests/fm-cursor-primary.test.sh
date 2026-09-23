@@ -318,6 +318,49 @@ test_park_repair_nag_is_bounded() {
   pass "cursor park: the repair nag is bounded and then goes quiet"
 }
 
+# Finding cursor-adapter-still-says-supervision-off: the shared guard's
+# alive-but-stale-beacon recheck case (bin/fm-turnend-guard.sh's
+# fm_watcher_stale_beacon_reason path) must not reach the Cursor agent
+# wrapped in the "supervision is off" alarm the missing/dead-watcher case
+# uses - it needs the same recheck framing the Grok, OMP, Pi, and OpenCode
+# adapters already carry.
+test_park_repair_nag_uses_recheck_framing_for_stale_beacon() {
+  local dir out body
+  dir=$(make_primary_dir "$TMP_ROOT/park-nag-stale-beacon")
+  : > "$dir/state/task1.meta"
+  write_arm_fixture "$dir" failed
+  cat > "$dir/bin/fm-turnend-guard.sh" <<'SH'
+#!/usr/bin/env bash
+{
+  printf 'WATCHER BEACON STALE - RECHECK BEFORE REPAIRING\n'
+  printf '1 task(s) in flight, but watcher pid 53358 alive, beacon stale 928s - possible system sleep; recheck after one poll.\n'
+  printf 'The watcher process is alive, so do not repair yet: wait one poll interval and rerun the supervision check. If the beacon is still stale then, repair with: fixture repair line\n'
+} >&2
+exit 2
+SH
+  chmod +x "$dir/bin/fm-turnend-guard.sh"
+  out=$(run_park "$dir")
+  [ "$(kind_of_followup "$out")" = turn-end-guard ] \
+    || fail "a stale-but-alive beacon should still reach the agent as a turn-end-guard follow-up, got: $out"
+  body=$(followup_of "$out")
+  case "$body" in
+    *'supervision is off'*) fail "a stale-but-alive beacon must not claim supervision is off: $body" ;;
+  esac
+  case "$body" in
+    *'WATCHER BEACON STALE'*) ;;
+    *) fail "expected the recheck framing in the follow-up, got: $body" ;;
+  esac
+  case "$body" in
+    *'do not repair yet'*) ;;
+    *) fail "expected the recheck instruction to reach the agent, got: $body" ;;
+  esac
+  case "$body" in
+    *'repair with: fixture repair line'*) ;;
+    *) fail "expected the conditional repair-line follow-up to reach the agent, got: $body" ;;
+  esac
+  pass "cursor park: a stale-but-alive beacon gets the recheck framing, not the supervision-is-off alarm"
+}
+
 test_park_repair_nag_requires_a_persisted_budget() {
   local dir out
   dir=$(make_primary_dir "$TMP_ROOT/park-nag-write-failure")
@@ -688,6 +731,7 @@ test_park_silent_when_nothing_in_flight
 test_park_delivers_actionable_wake_as_followup
 test_park_never_exits_two
 test_park_repair_nag_is_bounded
+test_park_repair_nag_uses_recheck_framing_for_stale_beacon
 test_park_repair_nag_requires_a_persisted_budget
 test_park_nag_budget_resets_after_a_real_wake
 test_park_loop_ceiling_warns_once_then_goes_quiet

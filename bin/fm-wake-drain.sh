@@ -554,6 +554,18 @@ print_status_sections() {
   [ -n "$snapshot" ] || return 0
   acknowledged=$(status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented") || return 1
   prepared=$(mktemp "$STATE/.status-presentation.prepared.XXXXXX") || return 1
+  # This function only ever runs inside the (print_status_presentation)
+  # subshell its one caller wraps it in below, and bash resets every
+  # inherited EXIT/INT/TERM trap on entering a subshell - a kill delivered to
+  # that subshell process dies by the default disposition, never touching the
+  # outer script's own trap on $DRAIN_TMP-style globals. Arm a fresh trap
+  # scoped to this subshell process so an interruption still removes the
+  # scratch file; it is confined to the subshell and never reaches the
+  # parent's own trap table.
+  # shellcheck disable=SC2064 # Expand $prepared now: it is fixed for the rest of this call.
+  trap "rm -f -- '$prepared' 2>/dev/null" EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
   if ! {
     print_unread_status_section "$snapshot" \
       && print_status_outcome_backstop_section "$snapshot" \
@@ -564,8 +576,12 @@ print_status_sections() {
     return 1
   fi
   # Prepare every section before presentation, but do not commit its receipt
-  # until the prepared bytes reach stdout. If the consumer closes or fails,
-  # leave the receipt behind so the next drain can recover the presentation.
+  # until the prepared bytes reach stdout: a consumer that closes or fails
+  # mid-read leaves the commit undone, so the next drain recomputes and
+  # re-presents from status_presentation_snapshot rather than trusting stale
+  # prepared bytes. $prepared (cleaned by the subshell-local trap above on
+  # any interruption) is scratch for that one write, never a receipt a later
+  # drain reads back.
   if ! command cat "$prepared"; then
     rm -f -- "$prepared"
     return 1
