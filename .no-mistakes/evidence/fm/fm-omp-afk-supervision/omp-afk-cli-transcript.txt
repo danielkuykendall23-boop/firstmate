@@ -1,0 +1,74 @@
+## harness override: omp (as on the OMP primary)
+$ fm-afk-launch.sh propose --words "merge fix when green"
+Away posture read-back (proposed, not yet confirmed):
+  entered: 2026-09-23T08:28:38Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    merge fix when green
+Say go to confirm; restate your instructions first if this reading is not what you meant.
+rc=0
+$ fm-afk-launch.sh confirm
+Away posture confirmed at 2026-09-23T08:28:54Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+rc=0
+$ fm-afk-launch.sh start
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+rc=1
+$ fm-afk-launch.sh start-native
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+rc=1
+## state after start attempts:
+.
+..
+.afk-contract
+$ fm-afk-launch.sh stop
+fm-afk-launch: away-posture record archived at /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.nk9Ddx0F8M/state/afk-contracts/1790152134.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+rc=0
+## state after stop:
+.
+..
+afk-contracts
+
+/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.nk9Ddx0F8M/state/afk-contracts:
+.
+..
+1790152134.afk-contract
+
+## contrast: harness override codex (daemon still allowed)
+$ fm-afk-launch.sh propose --words go
+Away posture read-back (proposed, not yet confirmed):
+  entered: 2026-09-23T08:29:56Z
+  expected return: not given
+  spend cap: 4 concurrent workers
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words (verbatim):
+    go
+Say go to confirm; restate your instructions first if this reading is not what you meant.
+rc=0
+$ fm-afk-launch.sh confirm
+Away posture confirmed at 2026-09-23T08:30:06Z: hold-for-return only. No phone channel is configured; anything that needs you waits for your return. Your away instructions are recorded verbatim; the away session will carry them out where it can, and anything it is unsure of, or that needs you, waits for your return. Destructive, irreversible, and security-sensitive actions are never pre-authorizable, whatever the words say. Expected return: not given. Spend cap: 4 concurrent workers.
+rc=0
+$ fm-afk-launch.sh start-native
+rc=0
+## state:
+.
+..
+.afk
+.afk-contract
+.afk-daemon-terminal
+
+## regression check: BASE commit bc93010 launcher, harness omp
+$ fm-afk-launch.sh propose --words go
+rc=0
+$ fm-afk-launch.sh confirm
+rc=0
+$ fm-afk-launch.sh start-native
+rc=0
+## state (base prepares daemon on omp):
+.
+..
+.afk
+.afk-contract
+.afk-daemon-terminal
