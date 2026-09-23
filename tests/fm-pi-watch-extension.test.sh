@@ -4103,11 +4103,11 @@ import { pathToFileURL } from "node:url";
 
 const armMod = await import(pathToFileURL(process.env.ARM_PLUGIN).href);
 const guardMod = await import(pathToFileURL(process.env.GUARD_PLUGIN).href);
-let promptBody = "";
+const prompts = [];
 const client = {
   session: {
     promptAsync: async (request) => {
-      promptBody = request.body.parts[0].text;
+      prompts.push(request.body.parts[0].text);
     },
   },
 };
@@ -4123,9 +4123,6 @@ const guardHooks = await guardMod.FmPrimaryTurnendGuard({
 });
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 await guardHooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
-for (let i = 0; i < 250 && !existsSync(process.env.FM_ARM_LOG); i += 1) {
-  await new Promise((resolve) => setTimeout(resolve, 20));
-}
 if (!existsSync(process.env.FM_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
@@ -4134,15 +4131,13 @@ if (!readFileSync(process.env.FM_ARM_LOG, "utf8").includes("args=--restart")) {
   console.error("watch arm was not asked to restart into an owned child");
   process.exit(1);
 }
-for (let i = 0; i < 250 && !existsSync(process.env.FM_GUARD_LOG); i += 1) {
-  await new Promise((resolve) => setTimeout(resolve, 20));
-}
 if (!existsSync(process.env.FM_GUARD_LOG)) {
   console.error("turn-end guard was suppressed by an external healthy watcher");
   process.exit(1);
 }
-if (!promptBody.includes("TURN WOULD END BLIND")) {
-  console.error(`missing blind-turn prompt: ${promptBody}`);
+const guardPrompts = prompts.filter((text) => text.startsWith("\u2063FIRSTMATE_OP: v1 turn-end-guard: "));
+if (guardPrompts.length !== 1 || !guardPrompts[0].includes("TURN WOULD END BLIND")) {
+  console.error(`expected one blind-turn guard prompt, got ${JSON.stringify(prompts)}`);
   process.exit(1);
 }
 EOF
