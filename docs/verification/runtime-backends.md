@@ -1195,6 +1195,8 @@ HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
 ```
 
 Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pane childless idle shell was closed after restoration while the exact non-target focus and default fleet session remained unchanged, and a repeat run was a no-op.
+On Herdr 0.9.0-preview.2026-09-09-5a244caa60b0 protocol 22 `pane process-info` reports the executable name for a `/bin/sh` pane (`bash` on macOS, `dash` on Debian) with `argv0` still `sh`, so the idle-shell proof requires both identities to be recognized shells rather than equal.
+The suite now also proves an in-flight task's server-restored husk survives cleanup while its task record exists and is retired by the housekeeping run once the record is gone; that revision has not yet been re-run against a real lab.
 
 ### Workspace-removal focus safety
 

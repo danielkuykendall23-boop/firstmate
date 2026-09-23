@@ -2524,6 +2524,8 @@ case "${1:-} ${2:-}" in
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
     elif [ -e "${FM_FAKE_HERDR_CLOSED:?}" ]; then
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":false},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":true}]}}'
+    elif [ "${FM_FAKE_HERDR_NO_PROJECTION:-0}" = 1 ]; then
+      printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
     else
       printf '%s\n' '{"result":{"workspaces":[{"workspace_id":"w1","active_tab_id":"w1:t2","label":"firstmate/task-x1 · p:AbCdEfGhIjKlMnOpQrStUv","focused":false},{"workspace_id":"w2","active_tab_id":"w2:t2","label":"2ndmate-bravo","focused":true},{"workspace_id":"w3","active_tab_id":"w3:t1","label":"2ndmate-alpha","focused":false}]}}'
     fi
@@ -2556,7 +2558,9 @@ case "${1:-} ${2:-}" in
       printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
       exit 1
     fi
-    printf '%s\n' '{"result":{"pane":{"pane_id":"w1:p2","tab_id":"w1:t2","workspace_id":"w1"}}}'
+    pane=$3; workspace=${pane%%:*}
+    printf '{"result":{"pane":{"pane_id":"%s","tab_id":"%s:t%s","workspace_id":"%s"}}}\n' \
+      "$pane" "$workspace" "${pane##*:p}" "$workspace"
     ;;
   "tab get")
     printf '%s\n' '{"result":{"tab":{"tab_id":"w2:t2","workspace_id":"w2"}}}'
@@ -2641,6 +2645,100 @@ test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
   assert_grep "exact-tab restoration failed" "$case_dir/stderr" \
     "herdr-projection-restore-failure: teardown swallowed the focus helper's restore warning"
   pass "herdr projection teardown surfaces failed focus restoration without turning confirmed cleanup into a hard failure"
+}
+
+# A task relaunched flat after its projected space was closed keeps an old
+# journal while its endpoint lives in another workspace. Teardown must retire
+# that journal when no space carries its token any more (it correlates nothing
+# and would force a same-id relaunch flat forever), and must keep it when the
+# token still names a space, which the housekeeping cleanup owns.
+configure_herdr_flat_endpoint_with_journal() {  # <case-dir>
+  local case_dir=$1
+  configure_herdr_projection_teardown_case "$case_dir"
+  sed -i.bak \
+    -e 's/^window=.*/window=fmtest:w2:p5/' \
+    -e 's/^herdr_workspace_id=.*/herdr_workspace_id=w2/' \
+    -e 's/^herdr_tab_id=.*/herdr_tab_id=w2:t5/' \
+    -e 's/^herdr_pane_id=.*/herdr_pane_id=w2:p5/' \
+    "$case_dir/state/task-x1.meta"
+  rm -f "$case_dir/state/task-x1.meta.bak"
+}
+
+test_herdr_flat_teardown_retires_journal_whose_space_is_gone() {
+  local case_dir log closed restored
+  case_dir=$(make_case herdr-flat-stale-journal)
+  write_meta "$case_dir" local-only ship
+  configure_herdr_flat_endpoint_with_journal "$case_dir"
+  log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
+
+  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+    FM_FAKE_HERDR_NO_PROJECTION=1 \
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "herdr-flat-stale-journal: teardown failed"
+  [ -e "$closed" ] \
+    || fail "herdr-flat-stale-journal: regression did not exercise the flat endpoint close"
+  [ ! -e "$case_dir/state/task-x1.meta" ] \
+    || fail "herdr-flat-stale-journal: teardown did not complete"
+  [ ! -e "$case_dir/state/task-x1.herdr-presentation" ] \
+    || fail "herdr-flat-stale-journal: a journal no space carries survived teardown"
+  assert_not_contains "$(cat "$case_dir/stderr")" "presentation journal" \
+    "herdr-flat-stale-journal: a retired stale journal must not warn"
+  pass "herdr flat teardown retires a presentation journal whose space is already gone"
+}
+
+test_herdr_flat_teardown_keeps_journal_that_still_names_a_space() {
+  local case_dir log closed restored
+  case_dir=$(make_case herdr-flat-live-journal)
+  write_meta "$case_dir" local-only ship
+  configure_herdr_flat_endpoint_with_journal "$case_dir"
+  log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
+
+  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "herdr-flat-live-journal: teardown failed"
+  [ ! -e "$case_dir/state/task-x1.meta" ] \
+    || fail "herdr-flat-live-journal: teardown did not complete"
+  [ -e "$case_dir/state/task-x1.herdr-presentation" ] \
+    || fail "herdr-flat-live-journal: teardown retired a journal whose token still names a space"
+  assert_grep "retaining it for the guarded housekeeping cleanup" "$case_dir/stderr" \
+    "herdr-flat-live-journal: teardown did not say why the journal was kept"
+  assert_not_contains "$(cat "$log")" "pane close w1:p2" \
+    "herdr-flat-live-journal: teardown touched the projection's own pane"
+  pass "herdr flat teardown keeps a presentation journal whose token still names a space"
+}
+
+test_herdr_flat_teardown_keeps_journal_bound_to_another_session() {
+  local case_dir log closed restored journal
+  case_dir=$(make_case herdr-flat-other-session-journal)
+  write_meta "$case_dir" local-only ship
+  configure_herdr_flat_endpoint_with_journal "$case_dir"
+  journal="$case_dir/state/task-x1.herdr-presentation"
+  printf '%s\n' \
+    'version=2' \
+    'task_id=task-x1' \
+    'projection_id=AbCdEfGhIjKlMnOpQrStUv' \
+    "home=$case_dir" \
+    'session=othersession' \
+    'workspace_id=w7' \
+    'tab_id=w7:t1' \
+    'pane_id=w7:p1' \
+    'parent_workspace_id=w1' \
+    'parent_label=firstmate' \
+    'workspace_label=└ task-x1 · p:AbCdEfGhIjKlMnOpQrStUv' \
+    'task_label=fm-task-x1' > "$journal"
+  log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
+
+  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+    FM_FAKE_HERDR_NO_PROJECTION=1 \
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "herdr-flat-other-session-journal: teardown failed"
+  [ ! -e "$case_dir/state/task-x1.meta" ] \
+    || fail "herdr-flat-other-session-journal: teardown did not complete"
+  [ -e "$journal" ] \
+    || fail "herdr-flat-other-session-journal: teardown retired a journal whose space lives in another session"
+  assert_grep "retaining it for the guarded housekeeping cleanup" "$case_dir/stderr" \
+    "herdr-flat-other-session-journal: teardown did not say why the journal was kept"
+  pass "herdr flat teardown keeps a presentation journal bound to a session other than the endpoint's"
 }
 
 # --- Fix 1: conclude/abort the task's own parked no-mistakes run before the
@@ -3688,6 +3786,9 @@ test_forced_teardown_retains_nested_secondmate_home_when_grandchild_close_unconf
 test_herdr_projection_teardown_retires_journal_only_after_confirmed_close
 test_herdr_projection_teardown_retains_journal_when_close_unconfirmed
 test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
+test_herdr_flat_teardown_retires_journal_whose_space_is_gone
+test_herdr_flat_teardown_keeps_journal_that_still_names_a_space
+test_herdr_flat_teardown_keeps_journal_bound_to_another_session
 test_squash_merged_branch_deleted_allows
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows

@@ -1382,7 +1382,7 @@ fm_backend_herdr_pid_is_bare_shell() {  # <ps-bin> <pid>
 # when the exact pane provably holds one lone idle recognized shell: pane
 # process-info agrees on the pane id, the shell pid is both the foreground
 # process group and the sole foreground process, the foreground process name
-# and argv0 resolve to the same recognized shell, the operating-system
+# and argv0 each resolve to a recognized shell, the operating-system
 # process table shows exactly that one shell row with no child process, and
 # the shell sits in a sleeping or idle state.
 # An idle interactive shell transiently hosts short-lived prompt helpers
@@ -1391,8 +1391,8 @@ fm_backend_herdr_pid_is_bare_shell() {  # <ps-bin> <pid>
 # samples), so the proof retries strict single samples for a bounded settle
 # window and succeeds on the first fully clean one; a genuinely busy pane
 # fails every sample and still refuses.
-# This is the single owner of the idle-shell proof; the session-start
-# projection cleanup and every pane-death close path both rely on it.
+# This is the single owner of the idle-shell proof; the projection cleanup
+# and every pane-death close path both rely on it.
 fm_backend_herdr_pane_idle_shell_pid() {  # <session> <pane-id>
   local attempt=0 max_attempts=${FM_BACKEND_HERDR_IDLE_SHELL_PROOF_POLLS:-10}
   while :; do
@@ -1437,8 +1437,12 @@ fm_backend_herdr_pane_idle_shell_sample() {  # <session> <pane-id>
   shell_name=${name##*/}
   argv0=${argv0#-}
   argv0=${argv0##*/}
-  [ "$argv0" = "$shell_name" ] || return 1
+  # Both identities must be recognized shells, but need not be the same one:
+  # a pane launched as /bin/sh carries argv0 "sh" while Herdr 0.9.0 reports
+  # the executable name (bash on macOS, dash on Debian), and a pane whose
+  # foreground is anything but a shell under either name still refuses.
   case "$shell_name" in sh|bash|zsh|dash|ksh|fish) ;; *) return 1 ;; esac
+  case "$argv0" in sh|bash|zsh|dash|ksh|fish) ;; *) return 1 ;; esac
 
   ps_bin=${FM_HERDR_PS_BIN:-ps}
   command -v "$ps_bin" >/dev/null 2>&1 || return 1
@@ -2949,6 +2953,27 @@ fm_backend_herdr_projection_endpoint_matches_journal() {  # <session> <workspace
   matches=$(printf '%s' "$list" | jq -r --arg suffix " · p:$token" \
     '.result.workspaces[]? | select((.label | type) == "string" and (.label | endswith($suffix))) | .workspace_id' 2>/dev/null)
   [ "$matches" = "$workspace_id" ]
+}
+
+# fm_backend_herdr_projection_token_absent: read-only proof that a journal
+# correlates no space at all. True only when the journal parses, a version 2
+# journal binds exactly the named session, one workspace list of that session
+# succeeds and parses, and no workspace label there carries the journal's
+# token anywhere. A failed or unparseable read, or a journal bound to another
+# session, is never absence. This verdict never authorizes a Herdr mutation;
+# teardown uses it only to retire a journal that has nothing left to correlate.
+fm_backend_herdr_projection_token_absent() {  # <session> <journal> <task-id>
+  local session=$1 journal=$2 id=$3 token list
+  fm_backend_herdr_projection_journal_snapshot "$journal" "$id" || return 1
+  [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 1 ] \
+    || [ "$FM_BACKEND_HERDR_JOURNAL_SESSION" = "$session" ] || return 1
+  token=$FM_BACKEND_HERDR_JOURNAL_PROJECTION_ID
+  [ -n "$token" ] || return 1
+  list=$(fm_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
+  printf '%s' "$list" | jq -e --arg token "p:$token" '
+    (.result.workspaces | type) == "array"
+    and ([.result.workspaces[] | select((.label | type) == "string" and (.label | contains($token)))] | length) == 0
+  ' >/dev/null 2>&1
 }
 
 # fm_backend_herdr_parse_target: split "<session>:<pane_id>" (pane_id itself
