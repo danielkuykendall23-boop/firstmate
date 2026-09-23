@@ -1,0 +1,11 @@
+### PRE-FIX 687ab2e (no SIGCHLD ticker)
+[term-1] bash=3.2.57(1)-release watcher=26805 blocked=yes fm-watch-procs-before: 26805 44951 
+[term-1] SIGTERM: watcher exited after ~62s; lock-present=no
+[term-1] fm-watch-procs-after (ticker survivors): []
+[term-2] bash=3.2.57(1)-release watcher=64581 blocked=yes fm-watch-procs-before: 64581 75341 
+[term-2] SIGTERM: watcher exited after ~60s; lock-present=no
+[term-2] fm-watch-procs-after (ticker survivors): []
+[term-3] bash=3.2.57(1)-release watcher=95097 blocked=yes fm-watch-procs-before: 10372 95097 
+[term-3] SIGTERM: watcher exited after ~64s; lock-present=no
+[term-3] fm-watch-procs-after (ticker survivors): []
+FOCUS-DONE

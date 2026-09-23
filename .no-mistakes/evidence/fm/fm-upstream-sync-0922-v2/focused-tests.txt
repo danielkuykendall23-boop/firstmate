@@ -1,0 +1,16 @@
+=== fm-crew-state (bash: 3.2.57(1)-release)
+ok - terminal passed run is authoritative
+ok - terminal passed-with-override run reads done like a clean pass
+FOCUS-DONE
+/bin/bash tests/.nmfocus-$f.test.sh  0.47s user 0.59s system 1% cpu 1:18.66 total
+=== fm-teardown (bash: 3.2.57(1)-release)
+ok - a run that lands on passed-with-override after abort is still recognized as terminal
+FOCUS-DONE
+/bin/bash tests/.nmfocus-$f.test.sh  1.28s user 1.86s system 1% cpu 4:40.07 total
+=== fm-watch-triage (bash: 3.2.57(1)-release)
+/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M36SFN68CEPZK8T5BMYZJ3BT/bin/fm-wake-lib.sh: line 554: 97923 Terminated: 15          ( while kill -CHLD "$WATCHER_PID" 2> /dev/null; do
+    sleep 1;
+done ) < /dev/null > /dev/null 2>&1
+ok - TERM stops a watcher blocked inside a poll and still runs its cleanup
+FOCUS-DONE
+/bin/bash tests/.nmfocus-$f.test.sh  1.31s user 2.04s system 1% cpu 4:13.14 total

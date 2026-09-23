@@ -1,0 +1,3 @@
+ok - TERM stops a watcher blocked inside a poll and still runs its cleanup
+FOCUS-DONE
+/bin/bash tests/.nmfocus-fm-watch-triage.test.sh  1.34s user 2.06s system 1% cpu 3:58.84 total

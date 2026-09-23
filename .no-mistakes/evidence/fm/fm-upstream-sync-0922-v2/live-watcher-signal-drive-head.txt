@@ -1,0 +1,15 @@
+### HEAD beaabe5 (with bash 3.2 SIGCHLD ticker)
+[term-1] bash=3.2.57(1)-release watcher=34209 blocked=yes fm-watch-procs-before: 34209 40674 52710 
+[term-1] SIGTERM: watcher exited after ~7s; lock-present=no
+[term-1] fm-watch-procs-after (ticker survivors): [52710 ]
+[term-2] bash=3.2.57(1)-release watcher=56797 blocked=yes fm-watch-procs-before: 56797 61901 78288 
+[term-2] SIGTERM: watcher exited after ~7s; lock-present=no
+[term-2] fm-watch-procs-after (ticker survivors): [78288 ]
+[term-3] bash=3.2.57(1)-release watcher=81200 blocked=yes fm-watch-procs-before: 81200 85542 98345 
+[term-3] SIGTERM: watcher exited after ~8s; lock-present=no
+[term-3] fm-watch-procs-after (ticker survivors): [98345 ]
+[kill-1] bash=3.2.57(1)-release watcher=298 blocked=yes fm-watch-procs-before: 298 8174 18544 
+tests/.nmfocus-fm-watch-triage.test.sh: line 6070:   298 Killed: 9               PATH="$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$fifo" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" 2> "$dir/watch.err"
+[kill-1] SIGKILL: watcher exited after ~1s; lock-present=yes
+[kill-1] fm-watch-procs-after (ticker survivors): [18544 ]
+FOCUS-DONE

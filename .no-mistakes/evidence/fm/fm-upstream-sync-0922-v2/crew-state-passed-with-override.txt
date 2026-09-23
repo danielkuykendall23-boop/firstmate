@@ -1,0 +1,27 @@
+### HEAD
+--- no-mistakes axi status fixture:
+run:
+  id: "01RUN"
+  branch: fm/feat-override
+  status: completed
+  head: "86e74e2be5bb6bac01003ef285cadf90ad9fa568"
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+outcome: passed-with-override
+ci_override_reason: "live checks not all passed: Lint (fail)"
+--- bin/fm-crew-state.sh feat-override output:
+state: done · source: run-step · run passed: PR merged
+
+### PRE-FIX 12acf58^
+--- no-mistakes axi status fixture:
+run:
+  id: "01RUN"
+  branch: fm/feat-override
+  status: completed
+  head: "9f48d2ca9232d9c2bb7e791df4569bc3af2c3bf1"
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+outcome: passed-with-override
+ci_override_reason: "live checks not all passed: Lint (fail)"
+--- bin/fm-crew-state.sh feat-override output:
+state: unknown · source: run-step · outcome: passed-with-override
