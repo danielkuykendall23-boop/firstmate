@@ -1,0 +1,42 @@
+
+==== 1. secondmate record before the stop ====
+window=firstmate:fm-sm-phone
+kind=secondmate
+harness=claude
+home=$TMP/e2e/sm-phone
+worktree=$TMP/e2e/sm-phone
+endpoint_task_id=sm-phone
+project=$TMP/e2e/sm-phone
+
+==== 2. captain: bin/fm-control.sh sm-phone exit   (agent 'claude' is live in the pane) ====
+stopped sm-phone harness=claude backend=tmux endpoint=firstmate:fm-sm-phone worktree=$TMP/e2e/sm-phone
+rc=0
+typed into pane: /exit   pane foreground now: zsh
+
+==== 3. secondmate record after the stop ====
+window=firstmate:fm-sm-phone
+kind=secondmate
+harness=claude
+home=$TMP/e2e/sm-phone
+worktree=$TMP/e2e/sm-phone
+endpoint_task_id=sm-phone
+project=$TMP/e2e/sm-phone
+secondmate_stopped_by=control-exit
+secondmate_stopped_at=1790137301
+
+==== 4. next session start: bin/fm-bootstrap.sh (pane is a bare zsh = dead endpoint) ====
+SECONDMATE_LIVENESS: secondmate sm-phone: skipped: deliberately stopped (control-exit at 1790137301)
+tmux kill-window/new-window calls by the sweep: 0
+
+==== 5. control: same dead endpoint WITHOUT the marker (pre-fix behavior) ====
+tmux calls by the sweep:
+kill-window -t =firstmate:=fm-sm-phone
+new-window -dP -F #{window_id} -t firstmate: -n fm-sm-phone -c $TMP/e2e/sm-phone
+
+==== 6. remote secondmate (e.g. DGX Spark) carrying the marker ====
+SECONDMATE_LIVENESS: secondmate sm-phone: skipped: deliberately stopped (control-exit at 1790137301)
+ssh calls: 0   tmux calls: 0
+
+==== 6b. same remote record WITHOUT the marker (sweep does reach out to the remote) ====
+SECONDMATE_LIVENESS: secondmate sm-phone: skipped: remote readiness failed on dgx-spark: error: no safe secondmate registry at $TMP/e2e/home/data/secondmates.md
+ssh calls: 0
