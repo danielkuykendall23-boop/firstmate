@@ -72,27 +72,6 @@ WT_REAL=$(cd "$WT" && pwd -P)
 . "$ROOT/bin/fm-backend.sh"
 fm_backend_source herdr || fail "fm_backend_source herdr failed"
 
-# The inert test harness. It is on PATH before the lab server starts so every
-# pane the server later creates - including one a relaunch recreates - can
-# resolve it without the test typing an export into that pane first. By
-# default it records the launch and exits at once, leaving a shell the later
-# sections type into; when "$SCRATCH/codex-stay" exists it registers itself
-# with Herdr and stays resident under argv0 "codex", which is what lets the
-# control plane's alive wait confirm a replacement it launched.
-FAKEBIN="$SCRATCH/fakebin"
-mkdir -p "$FAKEBIN"
-SLEEP_BIN=$(command -v sleep) || fail "sleep not found"
-cat > "$FAKEBIN/codex" <<EOF
-#!/usr/bin/env bash
-: > "$SCRATCH/codex-launched"
-[ -e "$SCRATCH/codex-stay" ] || exit 0
-herdr pane report-agent "\$HERDR_PANE_ID" --source fm-control-smoke --agent codex \\
-  --state idle --session "\$HERDR_SESSION" >/dev/null 2>&1 || true
-exec -a codex "$SLEEP_BIN" 900
-EOF
-chmod +x "$FAKEBIN/codex"
-export PATH="$FAKEBIN:$PATH"
-
 CONTAINER_RAW=$(fm_backend_herdr_container_ensure "$WT") || fail "container_ensure failed"
 CONTAINER=${CONTAINER_RAW%%$'\t'*}
 SEEDED_TAB_ID=${CONTAINER_RAW#*$'\t'}
@@ -175,6 +154,13 @@ STATE=$(fm_backend_agent_state herdr "$SESSION:$PANE_ID")
   || version_fail "a malformed endpoint target does not stay unreadable"
 pass "real herdr $HERDR_VERSION: a gone session reads recoverable while a live pane and a malformed target do not"
 
+FAKEBIN="$SCRATCH/fakebin"
+mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/codex" <<EOF
+#!/usr/bin/env bash
+: > "$SCRATCH/codex-launched"
+EOF
+chmod +x "$FAKEBIN/codex"
 printf -v FAKEBIN_Q '%q' "$FAKEBIN"
 printf -v PROJ_Q '%q' "$PROJ"
 fm_backend_herdr_send_text_line "$SESSION:$PANE_ID" "export PATH=$FAKEBIN_Q:\$PATH" \
@@ -339,49 +325,3 @@ esac
 pass "real herdr: an agent behind an unproven composer fails closed instead of typing an exit command into it"
 
 fm_backend_herdr_kill "$SESSION:$PANE_ID" 2>/dev/null || true
-
-# --- the endpoint is gone: relaunch recreates it in the recorded worktree -----
-#
-# This is the shape bin/fm-herdr-session-cleanup.sh leaves after retiring a
-# server-restored husk: the task record still names a pane that no longer
-# exists under a running named session. The control plane must not die on
-# "nothing to stop", the launch owner must create a fresh endpoint rather than
-# refuse, the replacement must start in the SAME recorded worktree, and the
-# republished record must be what the control plane reports.
-for _ in $(seq 1 50); do
-  [ "$(fm_backend_agent_state herdr "$SESSION:$PANE_ID")" = missing ] && break
-  sleep 0.1
-done
-[ "$(fm_backend_agent_state herdr "$SESSION:$PANE_ID")" = missing ] \
-  || version_fail "a closed pane under a running session reads '$(fm_backend_agent_state herdr "$SESSION:$PANE_ID")' rather than 'missing'"
-rm -f "$SCRATCH/codex-launched"
-: > "$SCRATCH/codex-stay"
-OUT=$(FM_CONTROL_LAUNCH_WAIT=30 run_control hsmoke relaunch --harness codex --note "endpoint retired by session-start cleanup") \
-  || fail "a gone Herdr endpoint under a running session should be recreated by relaunch: $OUT"
-NEW_T=$(sed -n 's/^window=//p' "$HOME_DIR/state/hsmoke.meta" | tail -1)
-[ -n "$NEW_T" ] && [ "$NEW_T" != "$SESSION:$PANE_ID" ] \
-  || fail "the relaunch did not republish a fresh endpoint (window=$NEW_T)"
-NEW_PANE=${NEW_T#*:}
-case "$OUT" in
-  *"relaunched hsmoke harness=codex from=claude"*"endpoint=$NEW_T worktree=$WT"*) : ;;
-  *) fail "relaunch should report the recreated endpoint it re-read from the record, got: $OUT" ;;
-esac
-herdr pane get "$NEW_PANE" --session "$SESSION" >/dev/null 2>&1 \
-  || fail "the recreated endpoint $NEW_T does not exist"
-[ "$(sed -n 's/^herdr_pane_id=//p' "$HOME_DIR/state/hsmoke.meta" | tail -1)" = "$NEW_PANE" ] \
-  || fail "the republished record's herdr_pane_id does not match its window"
-[ -e "$SCRATCH/codex-launched" ] || fail "the replacement harness was not launched in the recreated endpoint"
-[ "$(fm_backend_herdr_current_path "$SESSION:$NEW_PANE" 2>/dev/null || true)" = "$WT_REAL" ] \
-  || fail "the recreated endpoint's shell is not in the recorded worktree"
-[ "$(fm_backend_agent_state herdr "$NEW_T")" = alive ] \
-  || fail "the replacement agent in the recreated endpoint does not read alive"
-[ -d "$WT" ] || fail "the relaunch must never remove the task's local copy"
-NEW_WS=$(sed -n 's/^herdr_workspace_id=//p' "$HOME_DIR/state/hsmoke.meta" | tail -1)
-NEW_WS_LABEL=$(herdr workspace get "$NEW_WS" --session "$SESSION" 2>/dev/null | jq -r '.result.workspace.label // empty')
-# The reclaim deliberately recreates flat, in the home container, never as a
-# new projected space (bin/fm-spawn.sh --relaunch; docs/agent-control.md).
-[ "$NEW_WS_LABEL" = firstmate ] \
-  || fail "the recreated endpoint landed outside the home container: $NEW_WS ($NEW_WS_LABEL)"
-pass "real herdr: a gone endpoint is recreated flat in the recorded worktree and the control plane reports the republished endpoint"
-
-fm_backend_herdr_kill "$NEW_T" 2>/dev/null || true

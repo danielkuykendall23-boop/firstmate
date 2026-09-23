@@ -2707,6 +2707,40 @@ test_herdr_flat_teardown_keeps_journal_that_still_names_a_space() {
   pass "herdr flat teardown keeps a presentation journal whose token still names a space"
 }
 
+test_herdr_flat_teardown_keeps_journal_bound_to_another_session() {
+  local case_dir log closed restored journal
+  case_dir=$(make_case herdr-flat-other-session-journal)
+  write_meta "$case_dir" local-only ship
+  configure_herdr_flat_endpoint_with_journal "$case_dir"
+  journal="$case_dir/state/task-x1.herdr-presentation"
+  printf '%s\n' \
+    'version=2' \
+    'task_id=task-x1' \
+    'projection_id=AbCdEfGhIjKlMnOpQrStUv' \
+    "home=$case_dir" \
+    'session=othersession' \
+    'workspace_id=w7' \
+    'tab_id=w7:t1' \
+    'pane_id=w7:p1' \
+    'parent_workspace_id=w1' \
+    'parent_label=firstmate' \
+    'workspace_label=└ task-x1 · p:AbCdEfGhIjKlMnOpQrStUv' \
+    'task_label=fm-task-x1' > "$journal"
+  log="$case_dir/herdr.log"; closed="$case_dir/closed"; restored="$case_dir/restored"; : > "$log"
+
+  FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
+    FM_FAKE_HERDR_NO_PROJECTION=1 \
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "herdr-flat-other-session-journal: teardown failed"
+  [ ! -e "$case_dir/state/task-x1.meta" ] \
+    || fail "herdr-flat-other-session-journal: teardown did not complete"
+  [ -e "$journal" ] \
+    || fail "herdr-flat-other-session-journal: teardown retired a journal whose space lives in another session"
+  assert_grep "retaining it for the guarded housekeeping cleanup" "$case_dir/stderr" \
+    "herdr-flat-other-session-journal: teardown did not say why the journal was kept"
+  pass "herdr flat teardown keeps a presentation journal bound to a session other than the endpoint's"
+}
+
 # --- Fix 1: conclude/abort the task's own parked no-mistakes run before the
 # worker is removed, and Fix 2: reap leaked descendant processes rooted under
 # the task's own worktree/tasktmp - both exercised through the real teardown
@@ -3754,6 +3788,7 @@ test_herdr_projection_teardown_retains_journal_when_close_unconfirmed
 test_herdr_projection_teardown_surfaces_restore_failure_without_blocking_cleanup
 test_herdr_flat_teardown_retires_journal_whose_space_is_gone
 test_herdr_flat_teardown_keeps_journal_that_still_names_a_space
+test_herdr_flat_teardown_keeps_journal_bound_to_another_session
 test_squash_merged_branch_deleted_allows
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows

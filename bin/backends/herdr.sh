@@ -1378,51 +1378,6 @@ fm_backend_herdr_pid_is_bare_shell() {  # <ps-bin> <pid>
   return 1
 }
 
-# fm_backend_herdr_pid_start_epoch: print the epoch second at which <pid>
-# started, derived from <ps-bin>'s elapsed-time column ("[[dd-]hh:]mm:ss"),
-# which both BSD and procps ps render identically; a missing or malformed
-# column fails. Second granularity: callers compare against a recorded epoch
-# with their own margin rather than for equality.
-# The session-start projection cleanup uses it to tell a shell the Herdr server
-# restored after a restart (started after the task's recorded launch) from the
-# shell firstmate launched the worker into (started before it).
-fm_backend_herdr_pid_start_epoch() {  # <ps-bin> <pid>
-  local etime days=0 hours minutes seconds first second third now
-  case "$2" in ''|*[!0-9]*) return 1 ;; esac
-  etime=$("$1" -p "$2" -o etime= 2>/dev/null) || return 1
-  etime=$(printf '%s' "$etime" | tr -d '[:space:]')
-  [ -n "$etime" ] || return 1
-  case "$etime" in
-    *-*) days=${etime%%-*}; etime=${etime#*-} ;;
-  esac
-  IFS=: read -r first second third <<EOF
-$etime
-EOF
-  if [ -n "$third" ]; then
-    hours=$first; minutes=$second; seconds=$third
-  else
-    hours=0; minutes=$first; seconds=$second
-  fi
-  case "$days$hours$minutes$seconds" in ''|*[!0-9]*) return 1 ;; esac
-  [ -n "$minutes" ] && [ -n "$seconds" ] || return 1
-  now=$(date +%s) || return 1
-  printf '%s\n' "$((now - (10#$days * 86400 + 10#$hours * 3600 + 10#$minutes * 60 + 10#$seconds)))"
-}
-
-# fm_backend_herdr_pane_shell_pid: print the shell pid Herdr reports for the
-# exact <pane-id> from one process-info read, with no idle or childless proof.
-# A caller that only needs to know WHICH shell sits in the pane - to compare
-# its start second against a recorded launch - reads this before paying for
-# fm_backend_herdr_pane_idle_shell_pid's settle retries.
-fm_backend_herdr_pane_shell_pid() {  # <session> <pane-id>
-  local info
-  info=$(fm_backend_herdr_cli "$1" pane process-info --pane "$2" 2>/dev/null) || return 1
-  printf '%s' "$info" | jq -er --arg pane "$2" '
-    select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
-    | .result.process_info.shell_pid | select(type == "number" and . > 1) | floor
-  ' 2>/dev/null
-}
-
 # fm_backend_herdr_pane_idle_shell_pid: print the shell pid of <pane-id> only
 # when the exact pane provably holds one lone idle recognized shell: pane
 # process-info agrees on the pane id, the shell pid is both the foreground
@@ -3001,14 +2956,18 @@ fm_backend_herdr_projection_endpoint_matches_journal() {  # <session> <workspace
 }
 
 # fm_backend_herdr_projection_token_absent: read-only proof that a journal
-# correlates no space at all. True only when the journal parses, one workspace
-# list of the named session succeeds and parses, and no workspace label there
-# carries the journal's token anywhere. A failed or unparseable read is never
-# absence. This verdict never authorizes a Herdr mutation; teardown uses it
-# only to retire a journal that has nothing left to correlate.
+# correlates no space at all. True only when the journal parses, a version 2
+# journal binds exactly the named session, one workspace list of that session
+# succeeds and parses, and no workspace label there carries the journal's
+# token anywhere. A failed or unparseable read, or a journal bound to another
+# session, is never absence. This verdict never authorizes a Herdr mutation;
+# teardown uses it only to retire a journal that has nothing left to correlate.
 fm_backend_herdr_projection_token_absent() {  # <session> <journal> <task-id>
   local session=$1 journal=$2 id=$3 token list
-  token=$(fm_backend_herdr_projection_journal_token "$journal" "$id") || return 1
+  fm_backend_herdr_projection_journal_snapshot "$journal" "$id" || return 1
+  [ "$FM_BACKEND_HERDR_JOURNAL_VERSION" = 1 ] \
+    || [ "$FM_BACKEND_HERDR_JOURNAL_SESSION" = "$session" ] || return 1
+  token=$FM_BACKEND_HERDR_JOURNAL_PROJECTION_ID
   [ -n "$token" ] || return 1
   list=$(fm_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
   printf '%s' "$list" | jq -e --arg token "p:$token" '

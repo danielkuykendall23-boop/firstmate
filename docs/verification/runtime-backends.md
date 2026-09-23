@@ -1187,32 +1187,16 @@ The projected spawn in that run used the historical empty opt-in file, so a home
 One concurrent cross-home recovery case refused under contention on a loaded machine and passed on an immediate rerun; recovery-path presentation lock contention is a deliberate hard refusal rather than a flat fallback, which default-on now makes reachable from any Herdr home.
 That run measured the default-on projection on Herdr 0.8.0 only, while the focus-flash regression below was last run on 0.7.5 before the flip, so neither run covered a defective release under default-on projection; the version floor and the focus-flash suite's Part C close that gap.
 
-The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17, and again on 2026-09-18 against Herdr 0.9.0-preview.2026-09-09-5a244caa60b0 protocol 22 on macOS aarch64 after the metadata-backed restored-husk case and the dry run were added:
+The restored-shell session-start cleanup ran on 2026-07-24 against Herdr 0.7.5 protocol 17:
 
 ```sh
 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
   tests/fm-herdr-session-cleanup-e2e.test.sh
 ```
 
-```text
-ok - real named lab reproduced the exact restored one-tab one-pane childless no-agent shell shape
-ok - real named lab dry run inventories every owned projection with the verdict the locked run applies and mutates nothing
-ok - real named lab cleanup closes only the exact stale pane and preserves exact focus
-ok - real named lab cleanup retires a metadata-backed server-restored husk, keeps its task record, and preserves the launch-shell and moved-record panes
-ok - real named lab cleanup is idempotent and leaves the default fleet session to the teardown tripwire
-evidence: herdr=0.9.0-preview.2026-09-09-5a244caa60b0 protocol=22 default-session-tripwire=armed
-```
-
-Observed guarantee: a record-less journal-correlated idle shell and a metadata-backed one whose shell the server restored after the recorded launch second were both closed after restoration, the restored husk's task record was left byte-identical, a pane created after the restart with a record minted after its shell started (the launch-shell shape a parked worker leaves) and a pane whose record names another endpoint were both preserved, the exact non-target focus and default fleet session remained unchanged, the dry run reported the same four verdicts while touching nothing, and a repeat run was a no-op.
-On this 0.9.0 build `pane process-info` reports the executable name for a `/bin/sh` pane (`bash` here, `dash` on Debian) with `argv0` still `sh`, so the idle-shell proof now requires both identities to be recognized shells rather than equal; the 0.7.5 run predates that field change.
-
-The gone-endpoint reclaim of a retired husk's task ran on 2026-09-23 against the same 0.9.0-preview build through `tests/fm-control-herdr-smoke.test.sh`:
-
-```text
-ok - real herdr: a gone endpoint is recreated flat in the recorded worktree and the control plane reports the republished endpoint
-```
-
-Observed guarantee: with the recorded pane closed and the named server still running, `bin/fm-control.sh <id> relaunch --harness codex` did not refuse on the missing agent, `bin/fm-spawn.sh --relaunch` created one fresh endpoint flat in the home container with its shell in the recorded worktree, republished the record with the new workspace, tab, and pane, and the control plane's success line named that republished endpoint after confirming the replacement alive; the local copy survived untouched.
+Observed guarantee: one exact home-local, journal-correlated, one-tab and one-pane childless idle shell was closed after restoration while the exact non-target focus and default fleet session remained unchanged, and a repeat run was a no-op.
+On Herdr 0.9.0-preview.2026-09-09-5a244caa60b0 protocol 22 `pane process-info` reports the executable name for a `/bin/sh` pane (`bash` on macOS, `dash` on Debian) with `argv0` still `sh`, so the idle-shell proof requires both identities to be recognized shells rather than equal.
+The suite now also proves an in-flight task's server-restored husk survives cleanup while its task record exists and is retired by the housekeeping run once the record is gone; that revision has not yet been re-run against a real lab.
 
 ### Workspace-removal focus safety
 

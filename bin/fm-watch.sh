@@ -2293,9 +2293,8 @@ resurface_after_downtime() {
 
 # Bounded Herdr presentation housekeeping on the slow-check cadence.
 # bin/fm-herdr-session-cleanup.sh retires a projected space only under its own
-# per-candidate locks and proofs - a record-less projection, or a task record
-# naming a pane whose shell the Herdr server restored after the recorded
-# launch - and preserves every live, parked, or exited worker. Running that
+# per-candidate locks and proofs - only a projection whose task record is
+# gone - and preserves every task that still has a record. Running that
 # same locked entry point here, once per CHECK_INTERVAL inside the
 # lock-owning session, is what lets a space that becomes provably unused
 # mid-session disappear without a new session, a daemon, or a per-poll sweep.

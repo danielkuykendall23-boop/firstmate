@@ -55,34 +55,6 @@ if (
 fi
 pass "process proof reads Linux Herdr argv arrays and rejects malformed executable identities"
 
-# The start-epoch parser reads every ps elapsed-time shape the proof can meet.
-ETIME_PS="$TMP_ROOT/etime-ps"
-cat > "$ETIME_PS" <<'SH'
-#!/usr/bin/env bash
-case "$*" in
-  "-p 11 -o etime=") printf '   05:06\n' ;;
-  "-p 12 -o etime=") printf '01:02:03\n' ;;
-  "-p 13 -o etime=") printf '2-01:02:03\n' ;;
-  "-p 14 -o etime=") printf 'garbage\n' ;;
-  *) exit 1 ;;
-esac
-SH
-chmod +x "$ETIME_PS"
-now=$(date +%s)
-check_start_epoch() { # <pid> <expected-elapsed>
-  local started
-  started=$(fm_backend_herdr_pid_start_epoch "$ETIME_PS" "$1") || fail "start epoch parser rejected pid $1"
-  [ $((now - started - $2)) -le 1 ] && [ $((now - started - $2)) -ge -1 ] \
-    || fail "start epoch parser miscomputed pid $1: now=$now started=$started expected elapsed $2"
-}
-check_start_epoch 11 $((5 * 60 + 6))
-check_start_epoch 12 $((3600 + 2 * 60 + 3))
-check_start_epoch 13 $((2 * 86400 + 3600 + 2 * 60 + 3))
-fm_backend_herdr_pid_start_epoch "$ETIME_PS" 14 >/dev/null 2>&1 && fail "start epoch parser accepted a malformed elapsed time"
-fm_backend_herdr_pid_start_epoch "$ETIME_PS" 15 >/dev/null 2>&1 && fail "start epoch parser accepted an absent pid"
-fm_backend_herdr_pid_start_epoch "$ETIME_PS" x1 >/dev/null 2>&1 && fail "start epoch parser accepted a non-numeric pid"
-pass "pid start-epoch parser reads mm:ss, hh:mm:ss, and dd-hh:mm:ss and refuses malformed input"
-
 TOKEN=AbCdEfGhIjKlMnOpQrStUv
 ID=task
 WS=w2
@@ -109,10 +81,6 @@ fm_backend_herdr_pane_idle_shell_pid() {
   printf 'strict\n' >> "$PROOF_LOG"
   [ ! -e "$FIXTURE_DIR/process-unsafe" ] && printf '67\n'
 }
-fm_backend_herdr_pane_shell_pid() { [ ! -e "$FIXTURE_DIR/shell-pid-unreadable" ] && printf '67\n'; }
-# The metadata-backed proof reads the proved shell's start second; the fixture
-# file names it, and an absent file makes the read fail like an exited pid.
-fm_backend_herdr_pid_start_epoch() { cat "$FIXTURE_DIR/shell-start" 2>/dev/null; }
 fm_backend_herdr_projection_focus_snapshot() {
   [ ! -e "$FIXTURE_DIR/focus-unreadable" ] || return 1
   printf 'w1\t%s' "$(cat "$FIXTURE_DIR/active-tab")"
@@ -320,78 +288,48 @@ reset_fixture; : > "$FIXTURE_DIR/race"; assert_preserved "revalidation race"
 reset_fixture; printf '%s\n' "$TAB" > "$FIXTURE_DIR/active-tab"; assert_preserved "active target"
 reset_fixture; : > "$FIXTURE_DIR/focus-refuse"; assert_preserved "focus refusal"
 
-# --- a task record that still names the pane: server-restored husks only ------
-LAUNCH_EPOCH=1700000000
+# --- a task record that still exists: the space is never retired ----------------
 write_meta() { # [window-pane] [herdr-pane]
   local window_pane=${1:-$PANE} herdr_pane=${2:-$PANE}
   {
     printf 'window=test:%s\n' "$window_pane"
     printf 'endpoint_task_id=%s\n' "$ID"
     printf 'worktree=%s/wt\nproject=%s/proj\nharness=claude\nkind=ship\n' "$TMP_ROOT" "$TMP_ROOT"
-    printf 'spawn_gen=s%s.4242.7\n' "$LAUNCH_EPOCH"
+    printf 'spawn_gen=s1700000000.4242.7\n'
     printf 'backend=herdr\nherdr_session=test\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$WS" "$TAB" "$herdr_pane"
   } > "$FM_STATE_OVERRIDE/$ID.meta"
 }
-restored_fixture() {
+recorded_fixture() {
   reset_fixture
   write_meta
-  printf '%s\n' "$((LAUNCH_EPOCH + 3600))" > "$FIXTURE_DIR/shell-start"
 }
 
-restored_fixture
+# The husk a Herdr server restart leaves: no agent, one idle childless shell,
+# and a task record still naming the pane. The in-flight task keeps its space.
+recorded_fixture
 META_BEFORE=$(cat "$FM_STATE_OVERRIDE/$ID.meta")
 WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
-[ ! -e "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "restored husk cleanup kept the journal"
-[ "$(wc -l < "$CLOSE_LOG" | tr -d ' ')" = 1 ] || fail "restored husk cleanup did not close exactly once"
-[ "$(cat "$FM_STATE_OVERRIDE/$ID.meta")" = "$META_BEFORE" ] || fail "restored husk cleanup edited the task record"
-[ "$(sed -n '3p' "$LOCK_LOG")" = "$FM_STATE_OVERRIDE/.meta-$ID.lock" ] || fail "task record lock was not acquired third: $(cat "$LOCK_LOG")"
-[ ! -e "$FM_STATE_OVERRIDE/.meta-$ID.lock" ] || fail "task record lock was not released"
-case "$WARNINGS" in *"relaunch recreates its endpoint"*) ;; *) fail "restored husk cleanup did not report the retired space: $WARNINGS" ;; esac
-pass "a server-restored husk whose record names the pane closes under the record lock and keeps its record"
-
-restored_fixture; printf '%s\n' "$((LAUNCH_EPOCH - 3))" > "$FIXTURE_DIR/shell-start"
-WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
-[ ! -s "$CLOSE_LOG" ] || fail "launch shell was closed"
-[ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "launch shell cleanup retired the journal"
-[ -z "$WARNINGS" ] || fail "a parked launch-shell pane must be preserved silently, got: $WARNINGS"
-[ ! -s "$PROOF_LOG" ] || fail "a launch shell paid for the settle-retry idle-shell proof"
-pass "the shell firstmate launched into (parked or exited worker) is preserved silently without the settle-retry proof"
-restored_fixture; : > "$FIXTURE_DIR/shell-pid-unreadable"
-WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
-[ ! -s "$CLOSE_LOG" ] || fail "a pane whose shell could not be read was closed"
-[ -z "$WARNINGS" ] || fail "an unreadable pane shell on a record-backed pane must be preserved silently, got: $WARNINGS"
-pass "an unreadable pane shell keeps a record-backed projection"
-restored_fixture; printf '%s\n' "$((LAUNCH_EPOCH + FM_HERDR_CLEANUP_RESTORED_MARGIN))" > "$FIXTURE_DIR/shell-start"
-assert_preserved "shell started inside the restored-shell margin"
-restored_fixture; rm -f "$FIXTURE_DIR/shell-start"; assert_preserved "unreadable shell start"
-restored_fixture; printf 'live\n' > "$FIXTURE_DIR/agent"
-WARNINGS=$(fm_herdr_session_cleanup 2>&1 >/dev/null)
-[ ! -s "$CLOSE_LOG" ] || fail "live worker pane was closed"
-[ -z "$WARNINGS" ] || fail "an in-flight live worker must be preserved silently, got: $WARNINGS"
-[ ! -s "$PROOF_LOG" ] || fail "a live worker paid for the idle-shell proof"
-pass "a live worker whose record names the pane is preserved silently without a process probe"
-restored_fixture; write_meta w9:p1 w9:p1; assert_preserved "record naming another endpoint"
-restored_fixture; write_meta "$PANE" w9:p1; assert_preserved "record with inconsistent pane identity"
-restored_fixture; printf 'window=test:%s\n' "$PANE" >> "$FM_STATE_OVERRIDE/$ID.meta"; assert_preserved "record with a doubled endpoint field"
-restored_fixture; sed -i.bak '/^spawn_gen=/d' "$FM_STATE_OVERRIDE/$ID.meta"; rm -f "$FM_STATE_OVERRIDE/$ID.meta.bak"; assert_preserved "record without a launch generation"
-restored_fixture; sed -i.bak 's/^backend=herdr$/backend=tmux/' "$FM_STATE_OVERRIDE/$ID.meta"; rm -f "$FM_STATE_OVERRIDE/$ID.meta.bak"; assert_preserved "record on another backend"
-restored_fixture; mkdir "$FM_STATE_OVERRIDE/.meta-$ID.lock"; assert_preserved "busy task record lock"; rm -rf "$FM_STATE_OVERRIDE/.meta-$ID.lock"
+[ ! -s "$CLOSE_LOG" ] || fail "an in-flight task's husk space was closed"
+[ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "an in-flight task's journal was retired"
+[ "$(cat "$FM_STATE_OVERRIDE/$ID.meta")" = "$META_BEFORE" ] || fail "cleanup edited the task record"
+[ -z "$WARNINGS" ] || fail "an in-flight task's space must be preserved silently, got: $WARNINGS"
+[ ! -s "$PROOF_LOG" ] || fail "an in-flight task's pane paid for the idle-shell proof"
+pass "an in-flight task's husk space whose record still exists survives cleanup silently"
+recorded_fixture; printf 'live\n' > "$FIXTURE_DIR/agent"; assert_preserved "a live worker whose record names the pane"
+recorded_fixture; write_meta w9:p1 w9:p1; assert_preserved "a record naming another endpoint"
 
 # --- dry run: the same verdicts, no locks, no mutation --------------------------
-restored_fixture
+reset_fixture
 INVENTORY=$(fm_herdr_session_cleanup --dry-run 2>/dev/null)
 [ "$(printf '%s\n' "$INVENTORY" | awk -F'\t' -v ws="$WS" '$2 == ws { print $1 "\t" $3 "\t" $4 }')" = "$(printf 'close\t%s\t%s' "$ID" "$PANE")" ] \
-  || fail "dry run did not mark the restored husk close with its identity: $INVENTORY"
+  || fail "dry run did not mark the record-less projection close with its identity: $INVENTORY"
 [ -z "$(printf '%s\n' "$INVENTORY" | awk -F'\t' '$2 == "w1"')" ] || fail "dry run listed the home workspace: $INVENTORY"
 [ ! -s "$CLOSE_LOG" ] || fail "dry run closed a pane"
 [ ! -s "$LOCK_LOG" ] || fail "dry run took a lock: $(cat "$LOCK_LOG")"
 [ -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation" ] || fail "dry run retired the journal"
-restored_fixture; printf '%s\n' "$((LAUNCH_EPOCH - 3))" > "$FIXTURE_DIR/shell-start"
+recorded_fixture
 [ "$(fm_herdr_session_cleanup --dry-run 2>/dev/null | awk -F'\t' -v ws="$WS" '$2 == ws { print $1 }')" = keep ] \
-  || fail "dry run did not keep the launch shell"
-reset_fixture
-[ "$(fm_herdr_session_cleanup --dry-run 2>/dev/null | awk -F'\t' -v ws="$WS" '$2 == ws { print $1 }')" = close ] \
-  || fail "dry run did not mark the record-less projection close"
+  || fail "dry run did not keep an in-flight task's space"
 reset_fixture; rm -f "$FM_STATE_OVERRIDE/$ID.herdr-presentation"; write_v1 other-task
 [ "$(fm_herdr_session_cleanup --dry-run 2>/dev/null | awk -F'\t' -v ws="$WS" '$2 == ws { print $1 }')" = keep ] \
   || fail "dry run did not keep a projection no home-local journal correlates"
@@ -411,7 +349,7 @@ reset_fixture; : > "$FIXTURE_DIR/duplicate-token"; assert_agreed_keep "a token t
 reset_fixture; printf '%s\n' "$TAB" > "$FIXTURE_DIR/active-tab"; assert_agreed_keep "the active target tab"
 reset_fixture; : > "$FIXTURE_DIR/error-api-snapshot"; assert_agreed_keep "an unreadable snapshot"
 reset_fixture; printf '2\n' > "$FIXTURE_DIR/panes"; assert_agreed_keep "a second pane"
-restored_fixture; write_meta "$PANE" w9:p1; assert_agreed_keep "a record with inconsistent pane identity"
+recorded_fixture; assert_agreed_keep "a task whose record still exists"
 reset_fixture; write_v2 "$FM_HOME" "$WS" "$TAB" "$PANE"
 [ "$(dry_run_verdict)" = close ] || fail "dry run did not mark an exactly bound v2 journal close"
 fm_herdr_session_cleanup >/dev/null 2>&1
