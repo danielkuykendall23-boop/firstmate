@@ -55,6 +55,34 @@ Both tracked primary extensions under `.omp/extensions/` loaded by auto-discover
 omp's `session_start` payload carries no reason field, so the adapter derives the source: the first start of the process is `startup` (or `resume` from a `--continue`/`--resume` launch line) and a later in-process start is `clear`; `tests/fm-omp-harness.test.sh` pins that mapping over a fake omp API.
 A file named both by `-e` and by auto-discovery loads twice (two factory calls, doubled `session_stop` continuations), which is why the secondmate launch names no `-e` and the per-task worker extension lives in `state/`.
 
+### omp in-process subagent runners, 2026-09-23
+
+omp runs a `task` subagent as another runner of the primary's own process, auto-discovers `.omp/extensions/` for it, and calls the extension factory again against the same shared module, so `.omp/extensions/fm-primary-omp-watch.ts` arms only from the runner omp initialized in `tui` or `rpc` mode.
+A probe extension recording every runner's context on omp/18.2.10 (macOS arm64, `openai-codex/gpt-6-astra`) observed these values:
+
+| Runner | `ctx.mode` | `ctx.hasUI` | Subagent session file |
+|---|---|---|---|
+| Interactive primary (`omp --no-session`) | `tui` | `true` | - |
+| rpc primary (`omp --mode rpc`, with and without `--no-session`) | `rpc` | `true` | - |
+| `task` subagent of the rpc primary with a session | `print` | `false` | nested under the parent session directory, header `parentSession` set |
+| `task` subagent of the rpc primary with `--no-session` | `print` | `false` | a temporary `omp-task-*` file with no `parentSession` |
+
+Neither `hasUI` nor the session-file layout separates the two roles on every launch shape, and `mode` does.
+On the same build an interactive `/new` raised `session_before_switch` and then `session_switch` with reason `new` on the same runner, with no `session_shutdown` or `session_start`.
+
+`FM_OMP_LIVE_E2E=1 tests/fm-omp-primary-live-e2e.test.sh` refreshes this evidence; its subagent stage had a subagent call `fm_watch_arm_omp` and then had the primary call it after the subagent ended:
+
+```text
+ok - omp omp/18.2.10: a task subagent runner stayed inert - the primary's watcher survived its start and shutdown and the primary still owns the arm
+# omp omp/18.2.10 model=openai-codex/gpt-6-astra: every live omp primary assertion passed
+```
+
+The same run against the previous extension build failed at that stage, because the subagent's session_start had armed its own watcher:
+
+```text
+not ok - a task subagent's fm_watch_arm_omp was not refused; the reply was: watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+```
+
 ### Run-tier source vocabulary and context-reset injection
 
 The run tier depends on three facts only the vendor can supply: the session-open source it reports, whether hook stdout reaches model context on a context-RESET open rather than only a cold one, and whether a worker the hook detaches survives the hook returning.
