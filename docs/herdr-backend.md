@@ -141,6 +141,7 @@ Forced secondmate cleanup recursively preflights every Herdr child endpoint and 
 Durable task records are erased only once the exact pane is confirmed gone through its structured presence: after every close path, only a structured not-found response counts as gone, while a present or unknown result retains every record with a visible, retryable error.
 Missing or malformed endpoint identity and missing confirmation machinery are ambiguity, never proof of a gone pane, and refuse record removal the same way.
 If lock, snapshot, pane identity, or restoration is ambiguous, cleanup warns and preserves the journal for manual inspection.
+When a task's endpoint is not its projection, task cleanup retires the journal with the task's other records only when one locked workspace list of the endpoint's session shows no space carrying the journal's token, because such a journal correlates nothing and would otherwise make a later task with the same id launch flat; a journal that still names some space stays for the housekeeping cleanup below, which retires it with its space once the record is gone.
 
 Recovery is deliberately conservative and presentation-only.
 An existing journal suppresses another projected create.

@@ -3000,6 +3000,23 @@ fm_backend_herdr_projection_endpoint_matches_journal() {  # <session> <workspace
   [ "$matches" = "$workspace_id" ]
 }
 
+# fm_backend_herdr_projection_token_absent: read-only proof that a journal
+# correlates no space at all. True only when the journal parses, one workspace
+# list of the named session succeeds and parses, and no workspace label there
+# carries the journal's token anywhere. A failed or unparseable read is never
+# absence. This verdict never authorizes a Herdr mutation; teardown uses it
+# only to retire a journal that has nothing left to correlate.
+fm_backend_herdr_projection_token_absent() {  # <session> <journal> <task-id>
+  local session=$1 journal=$2 id=$3 token list
+  token=$(fm_backend_herdr_projection_journal_token "$journal" "$id") || return 1
+  [ -n "$token" ] || return 1
+  list=$(fm_backend_herdr_cli "$session" workspace list 2>/dev/null) || return 1
+  printf '%s' "$list" | jq -e --arg token "p:$token" '
+    (.result.workspaces | type) == "array"
+    and ([.result.workspaces[] | select((.label | type) == "string" and (.label | contains($token)))] | length) == 0
+  ' >/dev/null 2>&1
+}
+
 # fm_backend_herdr_parse_target: split "<session>:<pane_id>" (pane_id itself
 # contains a colon, e.g. "w1:p2") on the FIRST colon only. Sets
 # FM_BACKEND_HERDR_SESSION and FM_BACKEND_HERDR_PANE for the caller.

@@ -3455,6 +3455,7 @@ fi
 
 HERDR_PRESENTATION_JOURNAL="$STATE/$ID.herdr-presentation"
 HERDR_PRESENTATION_RETIRE_CANDIDATE=0
+HERDR_PRESENTATION_STALE_JOURNAL=0
 HERDR_PRESENTATION_SESSION=
 HERDR_PRESENTATION_PANE=
 if [ "$BACKEND" = herdr ] \
@@ -3471,6 +3472,16 @@ if [ "$BACKEND" = herdr ] \
        "$HERDR_PRESENTATION_SESSION" "$HERDR_PRESENTATION_WORKSPACE" \
        "$HERDR_PRESENTATION_JOURNAL" "$ID"; then
     HERDR_PRESENTATION_RETIRE_CANDIDATE=1
+  elif [ -f "$HERDR_PRESENTATION_JOURNAL" ] && [ ! -L "$HERDR_PRESENTATION_JOURNAL" ] \
+     && teardown_herdr_session_lock_held "$TEARDOWN_HERDR_SESSION" \
+     && fm_backend_herdr_projection_token_absent \
+       "$TEARDOWN_HERDR_SESSION" "$HERDR_PRESENTATION_JOURNAL" "$ID"; then
+    # The endpoint is not the projection and no space in this session carries
+    # the journal's token (the space was already closed, by hand or by an
+    # earlier cleanup), so the journal correlates nothing; keeping it would
+    # only make a later task with this id launch flat. It is retired with the
+    # other per-task records, after the confirmed-gone gate below.
+    HERDR_PRESENTATION_STALE_JOURNAL=1
   fi
 fi
 
@@ -3507,9 +3518,9 @@ if [ "$HERDR_PRESENTATION_RETIRE_CANDIDATE" = 1 ]; then
   else
     echo "warning: exact herdr task-pane close could not be confirmed for $ID; retaining the presentation journal and attempting no workspace cleanup" >&2
   fi
-elif [ "$BACKEND" = herdr ] \
+elif [ "$BACKEND" = herdr ] && [ "$HERDR_PRESENTATION_STALE_JOURNAL" != 1 ] \
      && { [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ]; }; then
-  echo "warning: herdr presentation journal for $ID remains quarantined; no workspace cleanup was attempted" >&2
+  echo "warning: herdr presentation journal for $ID still names a space outside its endpoint, or could not be checked; retaining it for the guarded housekeeping cleanup" >&2
 fi
 # A refused, skipped, or failed Herdr close must never erase a live task's
 # durable endpoint identity: unless the exact pane is confirmed gone, retain
@@ -3587,6 +3598,9 @@ fi
 remove_pr_poll_artifacts "$STATE" "$ID" || exit 1
 retire_busy_state "$STATE" "$ID" "$BUSY_GEN" || exit 1
 status_retire_presentation_task "$STATE" "$ID" || exit 1
+if [ "$HERDR_PRESENTATION_STALE_JOURNAL" = 1 ]; then
+  rm -f "$HERDR_PRESENTATION_JOURNAL"
+fi
 rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.grok-turnend-token" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
