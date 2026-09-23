@@ -1,0 +1,43 @@
+ok - process proof reads Linux Herdr argv arrays and rejects malformed executable identities
+ok - exact stale projection closes one exact pane under task then presentation locks
+ok - successful cleanup is idempotent on repeat
+ok - malformed title preserves the candidate
+ok - missing token preserves the candidate
+ok - malformed journal preserves the candidate
+ok - duplicate token preserves the candidate
+ok - duplicate title token preserves the candidate
+ok - zero journal match preserves the candidate
+ok - multiple journal matches preserves the candidate
+ok - cross-home journal preserves the candidate
+ok - v2 workspace binding mismatch preserves the candidate
+ok - v2 tab binding mismatch preserves the candidate
+ok - v2 pane binding mismatch preserves the candidate
+ok - v2 cleanup requires and accepts the exact journal endpoint binding
+ok - current task metadata preserves the candidate
+ok - registered agent preserves the candidate
+ok - unknown agent preserves the candidate
+ok - multiple tabs preserves the candidate
+ok - multiple panes preserves the candidate
+ok - non-idle shell preserves the candidate
+ok - child process or shell job preserves the candidate
+ok - unreadable snapshot preserves the candidate
+ok - unreadable topology check preserves the candidate
+ok - revalidation race preserves the candidate
+ok - active target preserves the candidate
+ok - focus refusal preserves the candidate
+ok - an in-flight task's husk space whose record still exists survives cleanup silently
+ok - a live worker whose record names the pane preserves the candidate
+ok - a record naming another endpoint preserves the candidate
+ok - dry run reports close/keep with task and pane identity and mutates nothing
+ok - a v2 journal whose pane binding mismatches (locked run agrees with the preview and) preserves the candidate
+ok - a v2 journal whose workspace binding mismatches (locked run agrees with the preview and) preserves the candidate
+ok - a token that occurs twice in the snapshot (locked run agrees with the preview and) preserves the candidate
+ok - the active target tab (locked run agrees with the preview and) preserves the candidate
+ok - an unreadable snapshot (locked run agrees with the preview and) preserves the candidate
+ok - a second pane (locked run agrees with the preview and) preserves the candidate
+ok - a task whose record still exists (locked run agrees with the preview and) preserves the candidate
+ok - the preview and the locked run read one classifier and agree on every snapshot, binding, token, and focus boundary
+ok - standalone bootstrap cannot run lock-owned stale projection cleanup
+ok - session start runs cleanup only after acquiring its home lock
+ok - the watcher runs the locked projection cleanup once per slow-check interval for its exact home, logs its warnings, and never wakes
+all fm-herdr-session-cleanup tests passed
