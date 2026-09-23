@@ -1,0 +1,6 @@
+          ^
+
+Error: D: a subagent runner's fm_watch_arm_omp was not refused: watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+    at file:///Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M367HZP4F15KDS1DCV5RGXG5/[eval1]:37:11
+
+Node.js v24.11.1: expected exit 0, got 1

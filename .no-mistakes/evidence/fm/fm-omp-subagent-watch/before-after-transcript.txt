@@ -1,0 +1,22 @@
+=== base (e709adc): scenario subagent ===
+[main] session_start
+[task-subagent] session_start
+[task-subagent] fm_watch_arm_omp -> watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+[task-subagent] session_shutdown
+[main] fm_watch_arm_omp -> watcher: not armed - omp session is shutting down
+=== base (e709adc): scenario shutdown-then-switch ===
+[main] session_start
+[main] session_shutdown
+[main] session_switch
+[main] fm_watch_arm_omp -> watcher: not armed - omp session is shutting down
+=== fix (9d09eaf): scenario subagent ===
+[main] session_start
+[task-subagent] session_start
+[task-subagent] fm_watch_arm_omp -> watcher: not armed - this omp runner is not the supervising session (mode=print); only the tui or rpc primary arms the watcher, never a task subagent
+[task-subagent] session_shutdown
+[main] fm_watch_arm_omp -> watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+=== fix (9d09eaf): scenario shutdown-then-switch ===
+[main] session_start
+[main] session_shutdown
+[main] session_switch
+[main] fm_watch_arm_omp -> watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
