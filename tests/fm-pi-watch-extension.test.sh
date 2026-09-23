@@ -4135,6 +4135,16 @@ if (!existsSync(process.env.FM_GUARD_LOG)) {
   console.error("turn-end guard was suppressed by an external healthy watcher");
   process.exit(1);
 }
+// The arm plugin also prompts on its own: observeArmOutput settles readiness
+// to "external" on the "watcher: healthy" line from the fake arm, so the guard runs,
+// but classifyArmClose then treats that same healthy-then-exit close as a
+// failure and calls scheduleRetry. That path either calls surfaceFailure
+// immediately or, after the 250ms retry timer, calls it when the retried
+// ensureArm resolves "external". Either way it sends an unawaited "watcher"
+// promptAsync. On a slow runner that prompt could replace the guard prompt when the
+// harness kept only the last prompt (the PR 7 serial-4 failure), so every
+// prompt is kept and only the turn-end-guard envelope from the guard is asserted.
+// That second prompt is the intended plugin reaction to an external watcher.
 const guardPrompts = prompts.filter((text) => text.startsWith("\u2063FIRSTMATE_OP: v1 turn-end-guard: "));
 if (guardPrompts.length !== 1 || !guardPrompts[0].includes("TURN WOULD END BLIND")) {
   console.error(`expected one blind-turn guard prompt, got ${JSON.stringify(prompts)}`);
