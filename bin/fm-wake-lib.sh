@@ -173,6 +173,27 @@ fm_watcher_healthy() {
   return 0
 }
 
+# fm_watcher_stale_beacon_reason <state> <watch-path> [grace] [home]
+# Distinguishes fm_watcher_healthy's beacon-only failure from a genuinely
+# missing, dead, or foreign-owned watcher lock. True only when the lock pid is
+# alive and identity-matched to this home's watcher (the same checks
+# fm_watcher_healthy runs), but its beacon has simply gone stale past
+# <grace> - the shape a macOS sleep or suspend leaves behind, since the
+# watcher resumes ticking once the system wakes rather than needing repair.
+# On a true verdict, echoes a diagnostic line naming the pid and beacon age; a
+# dead pid, a foreign/absent lock, or a still-fresh beacon return 1 with no
+# output, so callers fall back to the ordinary "no live watcher" message.
+fm_watcher_stale_beacon_reason() {
+  local state=$1 watch_path=$2 grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-$FM_HOME} lockdir pid age
+  lockdir="$state/.watch.lock"
+  pid=$(cat "$lockdir/pid" 2>/dev/null || true)
+  fm_pid_alive "$pid" || return 1
+  fm_watcher_lock_matches_pid "$state" "$watch_path" "$pid" "$home" || return 1
+  age=$(fm_path_age "$state/.last-watcher-beat")
+  [ "$age" -lt "$grace" ] && return 1
+  printf 'watcher pid %s alive, beacon stale %ss - possible system sleep; recheck after one poll\n' "$pid" "$age"
+}
+
 # fm_watcher_healthy above is the PID-STRICT primitive: true only when a live,
 # identity-matched watcher PROCESS holds this home's lock with a fresh beacon. The
 # arm layer (bin/fm-watch-arm.sh, bin/fm-claude-stop-autoarm.sh) needs exactly

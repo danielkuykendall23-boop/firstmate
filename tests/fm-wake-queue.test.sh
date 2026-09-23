@@ -1566,6 +1566,49 @@ test_interruption_before_and_after_raw_commit() {
   pass "interruptions preserve durable rows until post-handling acknowledgement"
 }
 
+# Finding #15 (data/env-bug-audit/report.md): a drain killed while it is
+# preparing the UNREAD STATUS/OPEN DECISIONS presentation left its
+# .status-presentation.prepared.* scratch file behind. print_status_sections
+# only ever runs inside the (print_status_presentation) subshell its one
+# caller wraps it in, and bash resets every inherited EXIT/INT/TERM trap on
+# entering a subshell, so the outer drain script's own cleanup() trap can
+# never reach a file created in there - signaling only the outer drain pid
+# proves nothing, because bash also defers that signal until the subshell
+# child it is waiting on exits on its own. print_status_sections now arms its
+# own EXIT/INT/TERM trap immediately after creating the scratch file, scoped
+# to that subshell process, so a kill delivered to the subshell itself still
+# removes it.
+test_interrupted_status_presentation_leaves_no_prepared_temp_file() {
+  local dir state status out pid child i glob_count
+  dir=$(make_case interrupted-status-presentation)
+  state="$dir/state"
+  status="$state/task1.status"
+  out="$dir/drain.out"
+  printf 'note: captain said use REST not RPC\n' > "$status"
+
+  FM_STATE_OVERRIDE="$state" FM_WAKE_DRAIN_TEST_DELAY_STATUS_PRESENT=3 "$DRAIN" > "$out" 2>"$dir/drain.err" &
+  pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && ! ls "$state"/.status-presentation.prepared.* >/dev/null 2>&1; do
+    sleep 0.02
+    i=$((i + 1))
+  done
+  ls "$state"/.status-presentation.prepared.* >/dev/null 2>&1 \
+    || { kill "$pid" 2>/dev/null || true; fail "drain never created its status-presentation scratch file"; }
+  child=$(pgrep -P "$pid" 2>/dev/null | head -n1)
+  [ -n "$child" ] || { kill "$pid" 2>/dev/null || true; fail "could not find the status-presentation subshell child"; }
+  kill -TERM "$child" 2>/dev/null || fail "could not interrupt the status-presentation subshell"
+  wait "$pid" 2>/dev/null || true
+  glob_count=0
+  for f in "$state"/.status-presentation.prepared.*; do
+    [ -e "$f" ] || continue
+    glob_count=$((glob_count + 1))
+  done
+  [ "$glob_count" -eq 0 ] \
+    || fail "interrupted drain leaked its status-presentation scratch file: $(ls "$state"/.status-presentation.prepared.* 2>/dev/null)"
+  pass "an interrupted drain leaves no status-presentation.prepared.* residue behind"
+}
+
 # The guarded self-announced status append (fm_wake_status_append_self_announced)
 # and the seen-signature gate it shares with the watcher's signal scan. Both
 # directions of the dedup contract are pinned through the real library
@@ -2051,3 +2094,4 @@ test_stale_ack_that_consumes_nothing_names_the_current_wake
 test_branch_stale_ack_that_consumes_nothing_names_its_granted_wake
 test_recovery_ack_failure_is_reported
 test_interruption_before_and_after_raw_commit
+test_interrupted_status_presentation_leaves_no_prepared_temp_file

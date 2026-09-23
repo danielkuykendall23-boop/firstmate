@@ -428,7 +428,10 @@ test_hook_blocks_with_live_lock_and_stale_beacon() {
   wait "$pid" 2>/dev/null || true
   expect_code 2 "$status" "hook must block when a live watcher lock has an ancient beacon"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
-  pass "fm-turnend-guard: blocks on a live watcher lock with an ancient beacon"
+  assert_contains "$out" "watcher pid $pid alive, beacon stale" "block banner must credit the live watcher pid instead of denying it exists"
+  assert_contains "$out" "possible system sleep; recheck after one poll" "block banner must diagnose a stale-but-alive lock as a recheckable sleep gap"
+  assert_not_contains "$out" "no live watcher holds this home lock" "block banner must not claim no watcher holds the lock when the lock pid is alive"
+  pass "fm-turnend-guard: blocks on a live watcher lock with an ancient beacon and reports the alive-but-stale reason distinctly"
 }
 
 test_hook_blocks_when_unhealthy_in_primary() {
@@ -439,6 +442,7 @@ test_hook_blocks_when_unhealthy_in_primary() {
   expect_code 2 "$status" "hook must block (exit 2) when in-flight work has no live watcher"
   assert_contains "$out" "$REQUIRED_REASON" "block reason must contain the exact required instruction"
   assert_contains "$out" "TURN WOULD END BLIND" "block banner must read as an alarm"
+  assert_contains "$out" "no live watcher holds this home lock" "a genuinely missing watcher lock must keep its original diagnostic"
   pass "fm-turnend-guard: blocks with the exact required reason in the primary when unhealthy"
 }
 
