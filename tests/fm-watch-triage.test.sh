@@ -2779,15 +2779,13 @@ test_wedge_threshold_recheck_names_the_captain_for_a_held_lane() {
   ack_stopped_cycle "$state" || fail "could not acknowledge the captain-held recheck"
 
   # The quiet direction is unchanged from a declared pause: inside the cadence the
-  # hold is absorbed whole, with no escalation counted. The cadence is set far
-  # beyond any runner's wall-clock for these rounds, so a slow host cannot age
-  # the fresh declaration into a legitimate recheck.
+  # hold is absorbed whole, with no escalation counted.
   dir=$(wedge_threshold_fixture captain-held-quiet \
     'captain-held: which retention window wins' 0)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   n=1
   while [ "$n" -le 3 ]; do
-    FM_TEST_PAUSE_RESURFACE=86400 wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
+    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
       || fail "a captain-held lane wedge-escalated at threshold $n under a working verdict: $(cat "$out")"
     n=$((n + 1))
   done
