@@ -1,0 +1,18 @@
+=== BEFORE (bc93010): harness=omp, confirmed record present, running: fm-afk-launch.sh start-native
+exit=0
+state/.afk exists: yes; .afk-daemon-terminal exists: yes; .afk-contract kept: yes
+=== BEFORE (bc93010): harness=omp, running: fm-afk-launch.sh stop
+fm-afk-launch: away-posture record archived at /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.MSI2SXhCLw/state/afk-contracts/1790143439.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+exit=0
+.afk-contract after stop: archived; archive: 1790143439.afk-contract
+
+=== AFTER (67d87e4): harness=omp, confirmed record present, running: fm-afk-launch.sh start-native
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+exit=1
+state/.afk exists: no; .afk-daemon-terminal exists: no; .afk-contract kept: yes
+=== AFTER (67d87e4): harness=omp, running: fm-afk-launch.sh stop
+fm-afk-launch: away-posture record archived at /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.OTzdTgQBnc/state/afk-contracts/1790143515.afk-contract
+fm-afk-launch: away mode stopped; daemon terminal torn down, .afk cleared, and the posture record archived
+exit=0
+.afk-contract after stop: archived; archive: 1790143515.afk-contract

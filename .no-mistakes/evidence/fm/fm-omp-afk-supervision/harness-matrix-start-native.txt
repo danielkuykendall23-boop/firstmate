@@ -1,0 +1,7 @@
+=== harness=codex: fm-afk-launch.sh start-native
+exit=0 .afk=present daemon-terminal=none	-	native
+=== harness=claude: fm-afk-launch.sh start-native
+exit=0 .afk=present daemon-terminal=none	-	native
+=== harness=omp: fm-afk-launch.sh start-native
+fm-afk-launch: the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)
+exit=1 .afk=absent daemon-terminal=none-recorded
