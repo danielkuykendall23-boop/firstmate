@@ -549,7 +549,7 @@ EOF
 }
 
 print_status_sections() {
-  local snapshot=${1:-} fully_presented=${2:-} acknowledged prepared _fm_wake_delay_ticks
+  local snapshot=${1:-} fully_presented=${2:-} acknowledged prepared
   if [ -z "$snapshot" ]; then snapshot=$(status_presentation_snapshot "$STATE") || return 1; fi
   [ -n "$snapshot" ] || return 0
   acknowledged=$(status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented") || return 1
@@ -566,22 +566,6 @@ print_status_sections() {
   trap "rm -f -- '$prepared' 2>/dev/null" EXIT
   trap 'exit 143' TERM
   trap 'exit 130' INT
-  case "${FM_WAKE_DRAIN_TEST_DELAY_STATUS_PRESENT:-0}" in
-    0) ;;
-    ''|*[!0-9]*) ;;
-    *)
-      # A single blocking `sleep N` defers a pending trapped signal (TERM)
-      # until sleep itself returns, on both bash/macOS and bash/Linux, which
-      # would make an interruption test wait out the whole delay instead of
-      # landing inside this window. A loop of short sleeps gives the shell a
-      # command boundary roughly every 0.1s to notice and act on the signal.
-      _fm_wake_delay_ticks=$((FM_WAKE_DRAIN_TEST_DELAY_STATUS_PRESENT * 10))
-      while [ "$_fm_wake_delay_ticks" -gt 0 ]; do
-        sleep 0.1
-        _fm_wake_delay_ticks=$((_fm_wake_delay_ticks - 1))
-      done
-      ;;
-  esac
   if ! {
     print_unread_status_section "$snapshot" \
       && print_status_outcome_backstop_section "$snapshot" \

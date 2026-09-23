@@ -4103,11 +4103,11 @@ import { pathToFileURL } from "node:url";
 
 const armMod = await import(pathToFileURL(process.env.ARM_PLUGIN).href);
 const guardMod = await import(pathToFileURL(process.env.GUARD_PLUGIN).href);
-const prompts = [];
+let promptBody = "";
 const client = {
   session: {
     promptAsync: async (request) => {
-      prompts.push(request.body.parts[0].text);
+      promptBody = request.body.parts[0].text;
     },
   },
 };
@@ -4123,6 +4123,9 @@ const guardHooks = await guardMod.FmPrimaryTurnendGuard({
 });
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 await guardHooks.event({ event: { type: "session.idle", properties: { sessionID: "session-test" } } });
+for (let i = 0; i < 250 && !existsSync(process.env.FM_GUARD_LOG); i += 1) {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
 if (!existsSync(process.env.FM_ARM_LOG)) {
   console.error("watch arm did not run");
   process.exit(1);
@@ -4135,25 +4138,13 @@ if (!existsSync(process.env.FM_GUARD_LOG)) {
   console.error("turn-end guard was suppressed by an external healthy watcher");
   process.exit(1);
 }
-// The arm plugin also prompts on its own: observeArmOutput settles readiness
-// to "external" on the "watcher: healthy" line from the fake arm, so the guard runs,
-// but classifyArmClose then treats that same healthy-then-exit close as a
-// failure and calls scheduleRetry. That path either calls surfaceFailure
-// immediately or, after the 250ms retry timer, calls it when the retried
-// ensureArm resolves "external". Either way it sends an unawaited "watcher"
-// promptAsync. On a slow runner that prompt could replace the guard prompt when the
-// harness kept only the last prompt (the PR 7 serial-4 failure), so every
-// prompt is kept and only the turn-end-guard envelope from the guard is asserted.
-// That second prompt is the intended plugin reaction to an external watcher.
-const guardPrompts = prompts.filter((text) => text.startsWith("\u2063FIRSTMATE_OP: v1 turn-end-guard: "));
-if (guardPrompts.length !== 1 || !guardPrompts[0].includes("TURN WOULD END BLIND")) {
-  console.error(`expected one blind-turn guard prompt, got ${JSON.stringify(prompts)}`);
+if (!promptBody.includes("TURN WOULD END BLIND")) {
+  console.error(`missing blind-turn prompt: ${promptBody}`);
   process.exit(1);
 }
 EOF
 )
   status=$?
-  [ "$status" -eq 0 ] || printf 'OpenCode external-healthy test diagnostic (node stderr):\n%s\n' "$out" >&2
   expect_code 0 "$status" "OpenCode watch plugin must not treat external healthy output as an owned arm"
   [ -z "$out" ] || fail "OpenCode external-healthy test printed output: $out"
   pass "OpenCode healthy arm output does not suppress the turn-end guard"

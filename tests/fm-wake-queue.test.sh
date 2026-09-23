@@ -1569,36 +1569,31 @@ test_interruption_before_and_after_raw_commit() {
 # Finding #15 (data/env-bug-audit/report.md): a drain killed while it is
 # preparing the UNREAD STATUS/OPEN DECISIONS presentation left its
 # .status-presentation.prepared.* scratch file behind. print_status_sections
-# only ever runs inside the (print_status_presentation) subshell its one
-# caller wraps it in, and bash resets every inherited EXIT/INT/TERM trap on
-# entering a subshell, so the outer drain script's own cleanup() trap can
-# never reach a file created in there - signaling only the outer drain pid
-# proves nothing, because bash also defers that signal until the subshell
-# child it is waiting on exits on its own. print_status_sections now arms its
-# own EXIT/INT/TERM trap immediately after creating the scratch file, scoped
-# to that subshell process, so a kill delivered to the subshell itself still
-# removes it.
+# runs inside the (print_status_presentation) subshell, whose inherited traps
+# bash resets, so the outer drain's cleanup() trap never reaches that file. A
+# PATH-stubbed cat TERMs its parent - that subshell - when asked to present
+# the prepared file, landing the interruption while the scratch file exists.
 test_interrupted_status_presentation_leaves_no_prepared_temp_file() {
-  local dir state status out pid child i glob_count
+  local dir state status fakebin real_cat f glob_count
   dir=$(make_case interrupted-status-presentation)
   state="$dir/state"
   status="$state/task1.status"
-  out="$dir/drain.out"
+  fakebin="$dir/fakebin"
+  real_cat=$(command -v cat)
+  mkdir -p "$fakebin"
+  # shellcheck disable=SC2016 # The stub expands $*, $PPID and $@ itself.
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'case "$*" in\n'
+    printf '  *.status-presentation.prepared.*) : > %q; kill -TERM "$PPID" ;;\n' "$dir/interrupted"
+    printf 'esac\n'
+    printf 'exec %q "$@"\n' "$real_cat"
+  } > "$fakebin/cat"
+  chmod +x "$fakebin/cat"
   printf 'note: captain said use REST not RPC\n' > "$status"
 
-  FM_STATE_OVERRIDE="$state" FM_WAKE_DRAIN_TEST_DELAY_STATUS_PRESENT=3 "$DRAIN" > "$out" 2>"$dir/drain.err" &
-  pid=$!
-  i=0
-  while [ "$i" -lt 100 ] && ! ls "$state"/.status-presentation.prepared.* >/dev/null 2>&1; do
-    sleep 0.02
-    i=$((i + 1))
-  done
-  ls "$state"/.status-presentation.prepared.* >/dev/null 2>&1 \
-    || { kill "$pid" 2>/dev/null || true; fail "drain never created its status-presentation scratch file"; }
-  child=$(pgrep -P "$pid" 2>/dev/null | head -n1)
-  [ -n "$child" ] || { kill "$pid" 2>/dev/null || true; fail "could not find the status-presentation subshell child"; }
-  kill -TERM "$child" 2>/dev/null || fail "could not interrupt the status-presentation subshell"
-  wait "$pid" 2>/dev/null || true
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2>"$dir/drain.err" || true
+  [ -e "$dir/interrupted" ] || fail "drain never presented its status-presentation scratch file"
   glob_count=0
   for f in "$state"/.status-presentation.prepared.*; do
     [ -e "$f" ] || continue
