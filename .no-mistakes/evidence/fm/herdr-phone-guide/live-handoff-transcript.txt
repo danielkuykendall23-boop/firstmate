@@ -1,0 +1,103 @@
+## default session before
+{"default":true,"name":"default","running":true,"session_dir":"/Users/danielkuykendall/.config/herdr","socket_path":"/Users/danielkuykendall/.config/herdr/herdr.sock"}
+## name ho -> fm-lab-ho-44384-5309 (len 20)
+## provision
+exit 0
+## status
+{"client":{"version":"0.9.0-preview.2026-09-09-5a244caa60b0","channel":"preview","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"binary":"/Users/danielkuykendall/.local/bin/herdr","session":"fm-lab-ho-44384-5309"},"server":{"status":"running","running":true,"version":"0.9.0-preview.2026-09-09-5a244caa60b0","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"pane_input_stream":true,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-44384-5309/herdr.sock","session":"fm-lab-ho-44384-5309","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+
+exit 0
+## tripwire perms
+-rw-------  1 danielkuykendall  staff  114 Sep 23 23:22 /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-herdr-lab-501/fm-lab-ho-44384-5309.fleet-state.json
+## pane setup: start marker fixture
+unknown option: --json
+pane=
+{"error":{"code":"pane_not_found","message":"pane  not found"},"id":"cli:request"}
+{"error":{"code":"pane_not_found","message":"pane  not found"},"id":"cli:request"}
+## process-info before
+{"error":{"code":"pane_not_found","message":"pane not found"},"id":"cli:pane:process_info"}
+
+## ADV1 wrong digest
+fm-herdr-lab: refusing handoff: staged executable SHA256 does not match
+exit 1
+## ADV2 client itself as staged exe
+fm-herdr-lab: refusing handoff: staged executable must differ from the selected Herdr client
+exit 1
+## ADV3 symlinked staged exe
+fm-herdr-lab: refusing handoff: /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fmho.sqvr/link: requires an owned, single-link regular file without group/world write access
+exit 1
+## ADV4 group-writable staged exe
+fm-herdr-lab: refusing handoff: /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fmho.sqvr/gw: requires an owned, single-link regular file without group/world write access
+exit 1
+## ADV5 hardlinked staged exe
+fm-herdr-lab: refusing handoff: /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fmho.sqvr/hl: requires an owned, single-link regular file without group/world write access
+exit 1
+## ADV6 default session
+fm-herdr-lab: refusing session name 'default'
+exit 1
+## ADV7 relative path
+fm-herdr-lab: refusing handoff: staged executable must have an absolute single-line path
+exit 1
+## ADV8 unowned lab (no tripwire)
+fm-herdr-lab: refusing handoff: [Errno 2] No such file or directory: '/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-herdr-lab-501/fm-lab-calm-omp-evidence.fleet-state.json'
+exit 1
+## ADV9 bad protocol
+fm-herdr-lab: handoff requires a SHA256, explicit version and positive protocol number
+exit 1
+## ADV10 run still forbids server live-handoff
+fm-herdr-lab: run forbids server operations; use provision for the named lab server
+exit 1
+## ADV11 wrong expected version (real Herdr refusal)
+{"error":{"code":"handoff_failed","message":"handoff stream closed while reading line"},"id":"cli:server:live-handoff"}
+exit 1
+## HAPPY handoff sha=5a4629256918cabaab98e604af5d1205b20e7d42af2a37c62a3fa49c0ab9bd2b
+live handoff complete; server log: /Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-44384-5309/herdr-server.log
+exit 0
+## status after
+{"running":true,"version":"0.9.0-preview.2026-09-09-5a244caa60b0","protocol":22}
+## process-info after
+{"error":{"code":"pane_not_found","message":"pane not found"},"id":"cli:pane:process_info"}
+{"error":{"code":"pane_not_found","message":"pane  not found"},"id":"cli:request"}
+{"error":{"code":"pane_not_found","message":"pane  not found"},"id":"cli:request"}
+## pane read after
+{"error":{"code":"pane_not_found","message":"pane  not found"},"id":"cli:pane:read"}
+## default session after
+{"default":true,"name":"default","running":true,"session_dir":"/Users/danielkuykendall/.config/herdr","socket_path":"/Users/danielkuykendall/.config/herdr/herdr.sock"}
+
+## ===== second handoff with process-continuity fixture (pane w1:p1) =====
+## process-info before
+{"process_info":{"foreground_process_group_id":48455,"foreground_processes":[{"argv":["-zsh"],"argv0":"zsh","cmdline":"-zsh","cwd":"/Users/danielkuykendall","name":"zsh","pid":48455}],"pane_id":"w1:p1","shell_pid":48455},"type":"pane_process_info"}
+## read before
+danielkuykendall@Daniels-MacBook-Air-4 ~ % sleep 900 & echo CHILD=$! SHELL=$$; echo BEFORE_HANDOFF
+[1] 54022
+CHILD=54022 SHELL=48455
+BEFORE_HANDOFF
+danielkuykendall@Daniels-MacBook-Air-4 ~ %
+## HAPPY handoff #2
+live handoff complete; server log: /Users/danielkuykendall/.config/herdr/sessions/fm-lab-ho-44384-5309/herdr-server.log
+exit 0
+## process-info after
+{"process_info":{"foreground_process_group_id":48455,"foreground_processes":[{"argv":["-zsh"],"argv0":"zsh","cmdline":"-zsh","cwd":"/Users/danielkuykendall","name":"zsh","pid":48455}],"pane_id":"w1:p1","shell_pid":48455},"type":"pane_process_info"}
+## read after
+BEFORE_HANDOFF
+danielkuykendall@Daniels-MacBook-Air-4 ~ % echo AFTER_HANDOFF; ps -p $CHILD_PID >/dev/null; jobs
+AFTER_HANDOFF
+ps: option requires an argument -- p
+usage: ps [-AaCcEefhjlMmrSTvwXx] [-O fmt | -o fmt] [-G gid[,gid...]]
+          [-g grp[,grp...]] [-u [uid,uid...]]
+          [-p pid[,pid...]] [-t tty[,tty...]] [-U user[,user...]]
+       ps [-L]
+[1]  + running    sleep 900
+danielkuykendall@Daniels-MacBook-Air-4 ~ %
+## default session after
+{"default":true,"name":"default","running":true,"session_dir":"/Users/danielkuykendall/.config/herdr","socket_path":"/Users/danielkuykendall/.config/herdr/herdr.sock"}
+
+## teardown
+exit 0
+## handoff after teardown (must refuse)
+fm-herdr-lab: refusing handoff: [Errno 2] No such file or directory: '/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//fm-herdr-lab-501/fm-lab-ho-44384-5309.fleet-state.json'
+exit 1
+## sessions after
+{"name":"default","default":true,"running":true}
+{"name":"fm-lab-calm-omp-evidence","default":false,"running":false}
+{"name":"fm-remote","default":false,"running":false}
