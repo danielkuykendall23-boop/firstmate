@@ -168,6 +168,13 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try primary-index touch "$git_dir/index"
   try other-worktree touch "$git_dir/worktrees/other-wt/HEAD"
   try packed-refs git -C "$PROBE_WT" pack-refs --all
+  wt_git_dir=$(git -C "$PROBE_WT" rev-parse --absolute-git-dir)
+  try wt-gitlink sh -c 'echo "gitdir: /tmp/fm-$1/evil" > "$0"' "$PROBE_WT/.git" "$id"
+  try wt-commondir sh -c 'echo /tmp > "$0"' "$wt_git_dir/commondir"
+  try wt-gitdir sh -c 'echo /tmp/.git > "$0"' "$wt_git_dir/gitdir"
+  try wt-config-worktree sh -c 'printf "[core]\n\tfsmonitor = touch /tmp/pwned\n" > "$0"' "$wt_git_dir/config.worktree"
+  try wt-move mv "$PROBE_WT" "/tmp/fm-$id/moved-wt"
+  try wt-admin-move mv "$wt_git_dir" "/tmp/fm-$id/moved-admin"
   try omp-rules touch "$omp/agent/RULES.md"
   try omp-rule-dir touch "$omp/agent/rules/planted.md"
   try omp-extension touch "$omp/agent/extensions/planted.ts"
@@ -230,11 +237,14 @@ test_on_fences_the_spawned_worker() {
     done
     for label in other-meta home-state other-status other-data primary-checkout git-hooks git-config \
       other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir \
+      wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move \
       omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config \
       gate-move home; do
       assert_grep "denied $label" "$result" "$kind worker write '$label' must be denied"$'\n'"$(cat "$result")"
     done
     assert_absent "$PROJ_DIR/planted.txt" "the $kind worker planted a file in the primary checkout"
+    [ "$(git -C "$WT_DIR" rev-parse --git-common-dir)" = "$(git -C "$PROJ_DIR" rev-parse --absolute-git-dir)" ] ||
+      fail "the $kind worker repointed its worktree away from the repository"
     [ "$(git -C "$PROJ_DIR" symbolic-ref HEAD)" = refs/heads/main ] || fail "the $kind worker moved the primary checkout's HEAD"
     git -C "$user_home/.no-mistakes/repos/gate.git" rev-parse --verify -q "refs/heads/fm/$id" >/dev/null ||
       fail "the $kind worker's push never reached the no-mistakes gate"

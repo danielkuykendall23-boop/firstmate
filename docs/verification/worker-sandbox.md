@@ -38,6 +38,21 @@ Each created and committed on `fm/<id>` through its bash tool and edited a file 
 The only other refusals omp met were a write probe of `~/.omp/natives/18.2.10`, `~/Library/HTTPStorages/omp/`, and a mode change under `~/Library/Application Support/Microsoft/DeveloperTools/.onnxruntime`; none stopped the session, and none was writable under the original profile either.
 `tests/fm-worker-sandbox.test.sh` pins each of these allowances and denials for a fenced ship and scout launch.
 
+## Gitlink and worktree admin files (2026-09-28)
+
+The task worktree's `.git` gitlink and its admin directory's `commondir`, `gitdir`, and `config.worktree` are denied, and neither the worktree nor its admin directory is itself writable (only their contents), so a rename cannot carry those files out from under their rule.
+Otherwise a worker could repoint its checkout at a repository it controls, or set `core.hooksPath` or `core.fsmonitor`, and the primary's own unfenced git commands in the worktree would run the worker's choice.
+
+Under that profile omp 18.2.10 ran a ship-shaped `-p` session (`git checkout -b fm/<id>`, `git fetch`, `git rebase origin/main`, a commit, and an edit-tool change) and a scout-shaped interactive TUI session (read a file, append its status line, edit a file); all succeeded.
+The TUI's deliberate `echo pwned > .git` was refused, and the only other refusal was omp's usual write probe of `~/.omp/natives/18.2.10`.
+
+Known residuals of the fence as a whole:
+
+- a worker can create or move a tag or remote-tracking ref, briefly hold `packed-refs.lock`, and write the shared no-mistakes `state.sqlite`;
+- deleting a packed ref fails, because `packed-refs` is denied;
+- the worktree's files stay worker-written, so anything the primary runs beyond git in a worker's worktree (its scripts, tests, or project-local tool configuration) runs worker-chosen code outside the fence;
+- only omp is supported; other harnesses refuse to spawn while the setting is on.
+
 ## Live proof (original writable set)
 
 A throwaway Firstmate home held `config/worker-sandbox` set to `on` and a two-file project.

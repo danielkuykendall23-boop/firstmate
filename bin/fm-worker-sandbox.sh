@@ -47,9 +47,13 @@
 # matches resolved paths, e.g. /tmp is /private/tmp). No writable entry is an
 # ancestor of a denied path, because a rename of that ancestor into another
 # writable path would carry the denied path out of reach of its rule:
-#   - the task worktree and, in the repository's shared git dir, only objects/,
-#     logs/, the task's own linked-worktree admin dir worktrees/<name>/ (its
-#     HEAD, index, FETCH_HEAD, ORIG_HEAD and rebase state), its own branch
+#   - the contents of the task worktree except its .git gitlink, and, in the
+#     repository's shared git dir, only objects/, logs/, the contents of the
+#     task's own linked-worktree admin dir worktrees/<name>/ (its HEAD, index,
+#     FETCH_HEAD, ORIG_HEAD and rebase state) except its commondir, gitdir and
+#     config.worktree, so a worker cannot repoint its checkout at a repository
+#     it controls or set a hook or fsmonitor command that the unfenced primary
+#     would run when it inspects the worktree with git; its own branch
 #     refs/heads/fm/<id> and that ref's lock, and the shared refs/remotes/ and
 #     refs/tags/ a fetch and push update, plus packed-refs.lock, which git
 #     2.50 takes on every ref update and reports as an error when refused.
@@ -60,7 +64,10 @@
 #     still create or move a tag or remote-tracking ref and briefly hold the
 #     packed-refs lock, and deleting a packed ref (e.g. fetch --prune of a
 #     packed remote-tracking ref) fails because packed-refs is denied. The
-#     task worktree must be a linked worktree, never the primary checkout.
+#     worktree's files are still worker-written, so anything the primary does
+#     beyond git in it (running its scripts, tests or project-local tool
+#     configuration) runs worker-chosen code outside the fence. The task
+#     worktree must be a linked worktree, never the primary checkout.
 #   - the task temp root (/tmp/fm-<id>)
 #   - Firstmate task files: state/<id>.status, .turn-ended, .progress,
 #     .busy-state and its .busy-state.* lock and temp siblings, the steering
@@ -248,8 +255,9 @@ cmd_profile() {
   home=$(real_path "$HOME") && [ -d "$home" ] || die "HOME cannot be resolved"
   uid=$(id -u)
 
-  paths+=("subpath|$wt" "subpath|$tmp")
-  paths+=("subpath|$common/objects" "subpath|$common/logs" "subpath|$gitdir")
+  paths+=("regex|^$(regex_quote "$wt")/" "subpath|$tmp")
+  paths+=("subpath|$common/objects" "subpath|$common/logs" "regex|^$(regex_quote "$gitdir")/")
+  denies+=("literal|$wt/.git" "literal|$gitdir/commondir" "literal|$gitdir/gitdir" "literal|$gitdir/config.worktree")
   paths+=("literal|$common/refs/heads/fm/$id" "literal|$common/refs/heads/fm/$id.lock")
   paths+=("subpath|$common/refs/remotes" "subpath|$common/refs/tags" "literal|$common/packed-refs.lock")
   paths+=("literal|$st/$id.status" "literal|$st/$id.turn-ended" "literal|$st/$id.progress")
