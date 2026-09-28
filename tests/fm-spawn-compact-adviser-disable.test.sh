@@ -176,7 +176,10 @@ test_launch_drops_an_ambient_jev_key() {
     out=$(run_case_spawn "ship-jevkey-$setting-a1" "$PROJ_DIR" --mode no-mistakes --yolo off)
     status=$?
     expect_code 0 "$status" "allowlist=$setting spawn should succeed: $out"
-    printf '#!/bin/sh\nprintf "%%s\\n" "${TYPESAFE_API_KEY-unset}"\n' > "$FAKEBIN_DIR/codex"
+    cat > "$FAKEBIN_DIR/codex" <<'SH'
+#!/bin/sh
+printf '%s\n' "${TYPESAFE_API_KEY-unset}"
+SH
     chmod +x "$FAKEBIN_DIR/codex"
     seen=$(env -i HOME="$TMP_ROOT/pane-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
       TMUX=synthetic-pane TYPESAFE_API_KEY=ambient-jev-key \
