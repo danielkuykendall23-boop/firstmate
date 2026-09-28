@@ -82,7 +82,7 @@ The ship's final status line:
 done [at=1790602828]: ready in branch fm/sbx-live-ship (05ab06d, subtract added); inbox 001.msg read+acked to handled/; neighbor/precious.txt write REFUSED: 'Operation not permitted (os error 1)'; toyproj/HACK.txt create REFUSED: 'touch: cannot touch ...: Permission denied'; git push to ~/.no-mistakes/repos/fm-sandbox-probe.git SUCCEEDED ('* [new branch] HEAD -> probe', exit 0) - fence gap; Jev skipped per spec
 ```
 
-The push target was a throwaway bare repository under `~/.no-mistakes/repos/`, where a no-mistakes remote lives, so that write is allowed by design.
+The push target was a throwaway bare repository under `~/.no-mistakes/repos/`, where a no-mistakes remote lives, which the original writable set allowed by design; the narrowed set above allows a gate push only to the task's own `fm/<id>` branch, so this `probe` push falls outside the current fence.
 No pipeline run was started, because the throwaway project had no forge remote for the pipeline's push and pull-request steps; the fenced scout confirmed `no-mistakes doctor` exits 0.
 
 Every write the kernel refused during both complete sessions, read with `log show --predicate 'eventMessage CONTAINS "deny" AND eventMessage CONTAINS "file-write"'`:
