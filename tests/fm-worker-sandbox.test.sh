@@ -156,6 +156,7 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try omp-session touch "$omp/agent/sessions/session.jsonl"
   try nm-cli-log sh -c 'echo line >> "$0"' "$nm/logs/cli.log"
   try gate-push git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/$PROBE_ID"
+  try gate-notify-log sh -c 'echo pushed >> "$0"' "$nm/repos/gate.git/notify-push.log"
   try other-meta sh -c 'echo harness=evil >> "$0"' "$st/other-task.meta"
   try home-state touch "$st/.wake-queue"
   try other-status sh -c 'echo x >> "$0"' "$st/other-task.status"
@@ -186,6 +187,13 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-hooks touch "$nm/repos/gate.git/hooks/pre-receive"
   try gate-config sh -c 'echo "[core]" >> "$0"' "$nm/repos/gate.git/config"
   try gate-move mv "$nm/repos/gate.git" "$nm/repos/moved.git"
+  try gate-config-worktree git config --file "$nm/repos/gate.git/config.worktree" core.hooksPath "/tmp/fm-$id"
+  try gate-run-admin sh -c 'echo 0000000000000000000000000000000000000000 > "$0"' "$nm/repos/gate.git/worktrees/run/HEAD"
+  try gate-run-config sh -c 'printf "[core]\n\tfsmonitor = touch /tmp/pwned\n" > "$0"' "$nm/repos/gate.git/worktrees/run/config.worktree"
+  try gate-nm-config sh -c 'echo x >> "$0"' "$nm/repos/gate.git/no-mistakes-gate-config"
+  try gate-info touch "$nm/repos/gate.git/info/exclude"
+  try gate-other-ref git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/main"
+  try gate-fm-move mv "$nm/repos/gate.git/refs/heads/fm" "/tmp/fm-$id/gate-fm"
   try home touch "$HOME/planted"
 } > "$PROBE_OUT"
 SH
@@ -193,7 +201,7 @@ SH
 }
 
 test_on_fences_the_spawned_worker() {
-  local kind id out status launch result label user_home
+  local kind id out status launch result label user_home gate
   if [ "$(uname -s)" != Darwin ] || [ ! -x /usr/bin/sandbox-exec ]; then
     printf '# skip - the worker sandbox uses macOS Seatbelt (/usr/bin/sandbox-exec)\n'
     return 0
@@ -220,7 +228,14 @@ test_on_fences_the_spawned_worker() {
       "$user_home/.no-mistakes/logs" "$user_home/.no-mistakes/bin" "$user_home/.no-mistakes/worktrees/repo/run"
     : > "$user_home/.omp/agent/config.yml"
     : > "$user_home/.no-mistakes/config.yaml"
-    git init --quiet --bare "$user_home/.no-mistakes/repos/gate.git"
+    gate="$user_home/.no-mistakes/repos/gate.git"
+    git init --quiet --bare "$gate"
+    git -C "$PROJ_DIR" push --quiet "$gate" main
+    git -C "$gate" config extensions.worktreeConfig true
+    git -C "$gate" config --worktree core.hooksPath "$gate/hooks"
+    git -C "$gate" worktree add --quiet --detach "$user_home/.no-mistakes/worktrees/repo/run" main
+    mkdir -p "$gate/info"
+    : > "$gate/no-mistakes-gate-config"
     printf 'steer\n' > "$HOME_DIR/state/$id.inbox/001.msg"
     # The stand-in reports through the task temp root, one of the few paths the
     # fence leaves writable.
@@ -232,21 +247,25 @@ test_on_fences_the_spawned_worker() {
       PROBE_STATE="$(cd "$HOME_DIR/state" && pwd -P)" PROBE_DATA="$(cd "$HOME_DIR/data" && pwd -P)" \
       PROBE_WT="$WT_DIR" PROBE_PROJ="$PROJ_DIR" bash -c "$launch" >"$CASE_DIR/launch.out" 2>&1
     [ -s "$result" ] || fail "the $kind launch never ran the worker"$'\n'"$(cat "$CASE_DIR/launch.out")"
-    for label in commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push; do
+    for label in commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push \
+      gate-notify-log; do
       assert_grep "allowed $label" "$result" "$kind worker write '$label' must be allowed"$'\n'"$(cat "$result")"
     done
     for label in other-meta home-state other-status other-data primary-checkout git-hooks git-config \
       other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir \
       wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move \
       omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config \
-      gate-move home; do
+      gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info \
+      gate-other-ref gate-fm-move home; do
       assert_grep "denied $label" "$result" "$kind worker write '$label' must be denied"$'\n'"$(cat "$result")"
     done
     assert_absent "$PROJ_DIR/planted.txt" "the $kind worker planted a file in the primary checkout"
     [ "$(git -C "$WT_DIR" rev-parse --git-common-dir)" = "$(git -C "$PROJ_DIR" rev-parse --absolute-git-dir)" ] ||
       fail "the $kind worker repointed its worktree away from the repository"
     [ "$(git -C "$PROJ_DIR" symbolic-ref HEAD)" = refs/heads/main ] || fail "the $kind worker moved the primary checkout's HEAD"
-    git -C "$user_home/.no-mistakes/repos/gate.git" rev-parse --verify -q "refs/heads/fm/$id" >/dev/null ||
+    [ "$(git -C "$gate" config --worktree core.hooksPath)" = "$gate/hooks" ] ||
+      fail "the $kind worker changed the gate's hooks path"
+    git -C "$gate" rev-parse --verify -q "refs/heads/fm/$id" >/dev/null ||
       fail "the $kind worker's push never reached the no-mistakes gate"
     assert_present "$HOME_DIR/state/$id.inbox/handled/001.msg" "the $kind worker could not acknowledge its inbox"
     rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*

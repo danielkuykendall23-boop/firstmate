@@ -78,10 +78,15 @@
 #     files or any home-wide state
 #   - no-mistakes (~/.no-mistakes): only what the worker-side CLI writes
 #     (logs/cli.log, state.sqlite and its journal files, update-check.json,
-#     telemetry-gate.json) and the contents of each gate repository under
-#     repos/<gate>/ that a push writes, except that gate's hooks/ and config.
-#     config.yaml, bin/, the daemon's files, pipeline worktrees/ and the gate
-#     directories themselves stay denied.
+#     telemetry-gate.json) and, in each gate repository repos/<gate>/, only
+#     what a push of the task branch writes: objects/, logs/, the ref
+#     refs/heads/fm/<id> and its lock, creating (never renaming) the
+#     refs/heads/fm directory, packed-refs.lock, and the notify-push.log the
+#     gate's hooks append to. Each gate's hooks/, config, config.worktree
+#     (where a real gate sets core.hooksPath), info/, no-mistakes-gate-config,
+#     other branch refs, and worktrees/<run>/ pipeline admin dirs stay
+#     denied, as do config.yaml, bin/, the daemon's files, pipeline
+#     worktrees/ and the gate directories themselves.
 #   - the per-user macOS temp and cache dirs, ~/Library/Caches, ~/.cache and
 #     the npm, bun, Go module and Cargo download caches, so builds and test
 #     runs keep working; the tmux socket dir /private/tmp/tmux-<uid>
@@ -235,7 +240,7 @@ cmd_profile() {
     die "the worker sandbox is verified only for: $SUPPORTED_HARNESSES (got $harness)"
   sandbox_exec_usable
 
-  local wt common gitdir tmp st dt home nm omp uid paths=() p denies=() modes=()
+  local wt common gitdir tmp st dt home nm gate omp uid paths=() p denies=() modes=() creates=()
   wt=$(real_path "$worktree") && [ -d "$wt" ] || die "worktree $worktree cannot be resolved"
   common=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     die "worktree $wt has no resolvable git common dir"
@@ -268,8 +273,10 @@ cmd_profile() {
   nm="$home/.no-mistakes"
   paths+=("prefix|$nm/logs/cli.log" "prefix|$nm/state.sqlite")
   paths+=("prefix|$nm/update-check.json" "prefix|$nm/telemetry-gate.json")
-  paths+=("regex|^$(regex_quote "$nm/repos/")[^/]+/.")
-  denies+=("regex|^$(regex_quote "$nm/repos/")[^/]+/(hooks|config)(/|\$)")
+  gate="^$(regex_quote "$nm/repos/")[^/]+/"
+  paths+=("regex|${gate}objects/" "regex|${gate}logs/" "regex|${gate}packed-refs\.lock\$")
+  paths+=("regex|${gate}refs/heads/fm/$(regex_quote "$id")(\.lock)?\$" "regex|${gate}notify-push\.log\$")
+  creates+=("regex|${gate}refs/heads/fm\$")
   for p in DARWIN_USER_TEMP_DIR DARWIN_USER_CACHE_DIR; do
     p=$(getconf "$p" 2>/dev/null) && [ -n "$p" ] && p=$(real_path "${p%/}") && paths+=("subpath|$p")
   done
@@ -303,6 +310,8 @@ cmd_profile() {
     sbpl_rules "${paths[@]}"
     printf ')\n(deny file-write*'
     sbpl_rules "${denies[@]}"
+    printf ')\n(allow file-write-create'
+    sbpl_rules "${creates[@]}"
     printf ')\n'
     if [ "${#modes[@]}" -gt 0 ]; then
       printf '(allow file-write-mode'
