@@ -171,7 +171,8 @@ test_on_fences_the_spawned_worker() {
     return 0
   fi
   for kind in ship scout; do
-    id="sandbox-live-$kind"
+    # Task ids may contain dots (bin/fm-pr-lib.sh fm_task_id_path_safe).
+    id="sandbox.live-$kind"
     make_case "live-$kind" omp "$id"
     write_worker_omp "$FAKEBIN"
     printf 'on\n' > "$HOME_DIR/config/worker-sandbox"

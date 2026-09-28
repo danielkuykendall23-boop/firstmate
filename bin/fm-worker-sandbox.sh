@@ -180,8 +180,9 @@ cmd_profile() {
   done
   [ -n "$id" ] && [ -n "$harness" ] && [ -n "$worktree" ] && [ -n "$task_tmp" ] &&
     [ -n "$state" ] && [ -n "$data" ] && [ -n "$output" ] || usage
+  # The same charset bin/fm-pr-lib.sh's fm_task_id_path_safe admits for ids.
   case "$id" in
-  *[!A-Za-z0-9_-]* | '' | -*) die "task id '$id' is not a bare slug" ;;
+  '' | .* | *[!A-Za-z0-9._-]*) die "task id '$id' is not path-safe" ;;
   esac
   harness_supported "$harness" ||
     die "the worker sandbox is verified only for: $SUPPORTED_HARNESSES (got $harness)"
@@ -200,8 +201,10 @@ cmd_profile() {
 
   paths+=("subpath|$wt" "subpath|$common" "subpath|$tmp")
   paths+=("literal|$st/$id.status" "literal|$st/$id.turn-ended" "literal|$st/$id.progress")
-  paths+=("literal|$st/$id.busy-state" "prefix|$st/$id.busy-state." "subpath|$st/$id.inbox")
-  paths+=("subpath|$dt/$id" "literal|$st/$id.meta" "prefix|$st/.meta-$id.lock")
+  paths+=("literal|$st/$id.busy-state" "literal|$st/$id.busy-state.lock" "prefix|$st/$id.busy-state.tmp.")
+  paths+=("subpath|$st/$id.inbox" "subpath|$dt/$id" "literal|$st/$id.meta")
+  paths+=("literal|$st/.meta-$id.lock" "prefix|$st/.meta-$id.lock.owner.")
+  paths+=("literal|$st/.meta-$id.lock.steal" "prefix|$st/.meta-$id.lock.steal.owner.")
   paths+=("subpath|$home/.no-mistakes")
   for p in DARWIN_USER_TEMP_DIR DARWIN_USER_CACHE_DIR; do
     p=$(getconf "$p" 2>/dev/null) && [ -n "$p" ] && p=$(real_path "${p%/}") && paths+=("subpath|$p")
