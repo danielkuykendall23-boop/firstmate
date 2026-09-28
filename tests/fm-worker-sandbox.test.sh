@@ -194,6 +194,8 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-info touch "$nm/repos/gate.git/info/exclude"
   try gate-other-ref git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/main"
   try gate-fm-move mv "$nm/repos/gate.git/refs/heads/fm" "/tmp/fm-$id/gate-fm"
+  try gate-fm-symlink ln -s "/tmp/fm-$id" "$nm/repos/fresh.git/refs/heads/fm"
+  try gate-fm-file touch "$nm/repos/fresh.git/refs/heads/fm"
   try home touch "$HOME/planted"
 } > "$PROBE_OUT"
 SH
@@ -230,6 +232,7 @@ test_on_fences_the_spawned_worker() {
     : > "$user_home/.no-mistakes/config.yaml"
     gate="$user_home/.no-mistakes/repos/gate.git"
     git init --quiet --bare "$gate"
+    git init --quiet --bare "$user_home/.no-mistakes/repos/fresh.git"
     git -C "$PROJ_DIR" push --quiet "$gate" main
     git -C "$gate" config extensions.worktreeConfig true
     git -C "$gate" config --worktree core.hooksPath "$gate/hooks"
@@ -256,7 +259,7 @@ test_on_fences_the_spawned_worker() {
       wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move \
       omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config \
       gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info \
-      gate-other-ref gate-fm-move home; do
+      gate-other-ref gate-fm-move gate-fm-symlink gate-fm-file home; do
       assert_grep "denied $label" "$result" "$kind worker write '$label' must be denied"$'\n'"$(cat "$result")"
     done
     assert_absent "$PROJ_DIR/planted.txt" "the $kind worker planted a file in the primary checkout"

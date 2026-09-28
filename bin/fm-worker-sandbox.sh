@@ -80,8 +80,8 @@
 #     (logs/cli.log, state.sqlite and its journal files, update-check.json,
 #     telemetry-gate.json) and, in each gate repository repos/<gate>/, only
 #     what a push of the task branch writes: objects/, logs/, the ref
-#     refs/heads/fm/<id> and its lock, creating (never renaming) the
-#     refs/heads/fm directory, packed-refs.lock, and the notify-push.log the
+#     refs/heads/fm/<id> and its lock, creating (never renaming, and never as
+#     a symlink or file) the refs/heads/fm directory, packed-refs.lock, and the notify-push.log the
 #     gate's hooks append to. Each gate's hooks/, config, config.worktree
 #     (where a real gate sets core.hooksPath), info/, no-mistakes-gate-config,
 #     other branch refs, and worktrees/<run>/ pipeline admin dirs stay
@@ -310,9 +310,9 @@ cmd_profile() {
     sbpl_rules "${paths[@]}"
     printf ')\n(deny file-write*'
     sbpl_rules "${denies[@]}"
-    printf ')\n(allow file-write-create'
+    printf ')\n(allow file-write-create (require-all (vnode-type DIRECTORY) (require-any'
     sbpl_rules "${creates[@]}"
-    printf ')\n'
+    printf ')))\n'
     if [ "${#modes[@]}" -gt 0 ]; then
       printf '(allow file-write-mode'
       sbpl_rules ${modes[@]+"${modes[@]}"}
