@@ -1,0 +1,26 @@
+## omp 18.2.10 -p --auto-approve under sandbox-exec with generated profile; omp stdout:
+allowed commit
+denied gate-fm-symlink
+denied gate-fm-file
+allowed gate-first-push
+denied gate-other-ref
+denied gate-fm-move
+denied gate-config
+denied gate-hooks
+denied primary-checkout
+denied wt-gitlink
+denied other-branch
+denied omp-rules
+## post-run on-disk state
+total 0
+drwxr-xr-x  3 danielkuykendall  wheel   96 Sep 28 11:03 .
+drwxr-xr-x  4 danielkuykendall  wheel  128 Sep 28 10:49 ..
+drwxr-xr-x  3 danielkuykendall  wheel   96 Sep 28 11:03 fm
+total 8
+drwxr-xr-x  3 danielkuykendall  wheel  96 Sep 28 11:03 .
+drwxr-xr-x  3 danielkuykendall  wheel  96 Sep 28 11:03 ..
+-rw-r--r--  1 danielkuykendall  wheel  41 Sep 28 11:03 live.t
+be7ba87058f96314c58d6622f747c657644a7403 commit	refs/heads/fm/live.t
+wt .git: gitdir: /private/tmp/fm-live-sbx.ahCw/proj/.git/worktrees/wt
+a.txt
+--private-tmp-fm-live-sbx.ahCw-wt--
