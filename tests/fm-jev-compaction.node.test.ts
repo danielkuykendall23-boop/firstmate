@@ -483,7 +483,7 @@ test("compactOmpRegion runs the real vendored compact() end to end against a fak
   assert.equal(result.audit.candidateCalls, 2);
   assert.equal(result.audit.kept, 1);
   assert.deepEqual(result.audit.dropped, ["drop1"], "the dropped id is omp's toolCall id, resolvable against the journal");
-  assert.equal(result.audit.keepThreshold, 0.5, "the audit records the vendored library's own resolved default threshold");
+  assert.equal(result.audit.keepThreshold, 0.5, "without an explicit threshold the audit records the vendored library's own resolved default");
   assert.match(result.text, /important content Jev should keep/);
   assert.doesNotMatch(result.text, /drwxr-xr-x/, "dropped tool output must not appear in the rendered summary");
 });
@@ -698,6 +698,26 @@ test("the handler gives a split turn two separate Jev passes and merges them und
   assert.match(result.compaction.summary, /history content to keep[\s\S]*\*\*Turn Context \(split turn\):\*\*[\s\S]*prefix content to keep/);
   assert.doesNotMatch(result.compaction.summary, /hhhh|pppp/, "each region's dropped listing is gone");
   assert.deepEqual(result.compaction.preserveData.jevCompaction.dropped, ["h-drop", "p-drop"]);
+});
+
+// Live Jev keep answers for edits and test runs sit around 0.3-0.5, not near 1.
+test("the handler keeps a call Jev rates moderately relevant as a truncated record and asks with the session's latest prompt as the goal", async () => {
+  const region: OmpMessage[] = [userText("add include support"), assistantToolCall("edit1", "edit", { path: "config.py" }), toolResult("edit1", "e".repeat(3000)),
+    assistantToolCall("read1", "read", { path: "paths.py" }), toolResult("read1", "r".repeat(3000))];
+  const goals: string[] = [];
+  const fetchImpl: typeof fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    goals.push(body.state.goal);
+    const answers = Object.fromEntries(Object.keys(body.questions).map((name) => [name, { type: "noul", noul: name === "call_t1" ? 0.4 : 0.15 }]));
+    return new Response(JSON.stringify({ model: "jev-latest", answers }), { status: 200 });
+  };
+  const { result, notes } = await runHandler(compactEvent(region, { recentMessages: [userText("the include-cycle test still fails"), assistantText("fixing it")] }), { fetch: fetchImpl });
+  assert.deepEqual(notes, []);
+  assert.match(goals[0], /the include-cycle test still fails/, "the goal reflects the current work, which lives in the recent messages outside the region");
+  const record = result?.compaction.preserveData.jevCompaction;
+  assert.equal(record?.truncated, 1, "a moderately relevant edit keeps its call and a result head");
+  assert.deepEqual(record?.dropped, ["read1"]);
+  assert.match(result?.compaction.summary ?? "", /config\.py/);
 });
 
 test("a split turn whose two regions' verbatim text already caps the combined reduction under 25% is declined before either region is uploaded", async () => {

@@ -10,6 +10,7 @@ Provide `TYPESAFE_API_KEY` in the launching process environment or the owning Fi
 A resolved key automatically enables compaction and `jev_review`; without a key both factories register nothing, including no compaction hook, so native speculative compaction remains available.
 `FM_JEV_COMPACTION=0` in the launching environment disables only Jev compaction.
 No key is included in generated worker commands, task metadata, or logs, and the extension reader never exports a file credential into `process.env`.
+Every worker launch unsets an inherited `TYPESAFE_API_KEY`, and a terminal server or session Firstmate starts drops it, so a key the primary holds ambiently never reaches worker panes; workers reach Jev only through the home `.env` via `FM_HOME`.
 The shared extension reader is `.omp/extensions/lib/fm-jev-key.ts`: a nonempty inherited value wins; otherwise the home is `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the repository containing the extension.
 Its one-key file parsing follows `bin/fm-env-lib.sh`: the last assignment wins, leading whitespace and `export` are tolerated, and surrounding quotes are stripped.
 The desktop wrapper uses that existing shell accessor and gives the credential only to the Node child's environment.
@@ -40,7 +41,7 @@ When native protection is off, these extensions do not promise secret detection 
 Permission to send relevant code is not permission to send credentials.
 
 Compaction failures visibly report native fallback through OMP UI status/notification and stderr without changing native method order.
-Review input, network or response failures return an explicit unavailable result, never invented scores; upstream validation errors and raw response bodies are not printed because they can echo input.
+Review input, network or response failures return an explicit unavailable result, never invented scores; its reason names the failing field paths and fixed validation codes, or the HTTP status, never upstream messages, input values or raw response bodies, because those can echo input.
 The worker's review loop records unavailable Jev once and continues ordinary review.
 A missing key makes the tool absent: OMP drops the unregistered name from the reviewer definition rather than failing the spawn, and the reviewer and worker instructions disclose the fallback.
 Desktop failures pause Jev-driven actions instead of silently choosing another operator.
@@ -55,6 +56,8 @@ Translation preserves custom messages, execution messages and branch summaries, 
 The upstream library decides keep/truncate/drop and preserves tool call/result pairing; split turns receive separate passes and a combined audit.
 An earlier Jev or text summary is prepended verbatim; file operations remain in the summary's bounded `<files>` block.
 `preserveData.jevCompaction` records decisions by original tool-call id and the installed replacement's budget and reduction measurements.
+Because the region excludes OMP's retained recent messages, the adapter passes the session's latest user prompts, recent ones included, as the library's goal.
+It keeps a call at a Jev answer of 0.3 rather than upstream's 0.5: live answers for edits and failing test runs fall below 0.5, which dropped nearly every call outright, while at 0.3 such calls keep their input and a truncated result head.
 
 Both acceptance checks cover the whole replacement, including carried history: at least 25% character reduction and a token estimate within the active model's retained-context budget.
 The budget uses OMP's 80%-of-trigger progress ceiling after counting response reserve, recent messages and system prompt, not the native summary-text cap.
@@ -75,7 +78,7 @@ Manual and automatic compaction use the same hook and privacy checks.
 
 `jev_review` is an in-process OMP tool backed by pinned [`jev-review`](https://github.com/NiazMorshed2007/jev-review) evaluation code.
 `.omp/vendor/jev-review/NOTICE.md` owns provenance and reproducible bundling; the shipped evaluator includes upstream Zod and needs no install or separate server at runtime.
-The tool takes `task`, `diff`, `files: [{path, content}]`, `repositoryContext`, and the previous complete result as `previousEvaluation`.
+The tool takes `task`, `diff`, `files: [{path, content}]`, `repositoryContext`, and the previous complete result as `previousEvaluation`; other fields OMP adds to a call, such as the intent `i`, are dropped before upstream's strict validation.
 At least one substantive task, diff or file is required.
 It returns the upstream evaluation JSON both as text and structured details: applicable dimensions with scores from 1 to 10, confidence, priorities, and local comparison deltas on a rescore.
 Jev scores inform diagnosis; the agent still inspects code, identifies evidence-backed weaknesses, verifies fixes and decides its verdict.

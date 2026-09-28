@@ -146,6 +146,7 @@ import {
   compact,
   decideCall,
   estimateTokens,
+  goalFromMessages,
   JevClient,
   messageChars,
   resolveOptions,
@@ -275,6 +276,11 @@ export type JevCompactionRecord = JevCompactionAudit & {
 const JEV_MODEL = "jev-latest";
 const MIN_REDUCTION_RATIO = 0.25;
 const FILES_TAG_LIMIT = 20;
+// Live jev-1.13.0 answers to "keep this call" sit below upstream's 0.5 default
+// even for edits and the latest failing test run, so 0.5 dropped nearly every
+// call outright (docs/verification/jev.md). At 0.3 those calls keep their input
+// and a truncated result head while incidental reads still drop.
+const KEEP_THRESHOLD = 0.3;
 
 const extensionFile = fileURLToPath(import.meta.url);
 
@@ -683,7 +689,10 @@ export default function (pi: ExtensionAPI): void {
       return fallback(ctx, `even if Jev dropped every candidate call, the carried summary and the verbatim text the library cannot prune are ~${floorTokens} tokens, over the ${budget.budgetTokens}-token retained-context budget for a ${contextWindow}-token model`);
     }
 
-    const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined };
+    // The region omits OMP's retained recent messages, so the library's own
+    // goal (the region's last user prompts) can predate the current work.
+    const goal = goalFromMessages(toLibraryMessages([...historyRegion, ...turnPrefixRegion, ...event.preparation.recentMessages]));
+    const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined, goal, keepThreshold: KEEP_THRESHOLD };
 
     let merged: JevRegionResult;
     try {

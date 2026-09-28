@@ -86,19 +86,29 @@ test("review refuses protected, unprovable and context-only submissions without 
   } finally { globalThis.fetch = saved; }
 }));
 
-test("tool exposes meaningful evaluation and sanitized errors, never fake success on bad responses", async () => environment(async () => {
+test("tool exposes meaningful evaluation and specific sanitized errors, never fake success on bad responses", async () => environment(async () => {
   const saved = globalThis.fetch;
   let broken = false;
-  globalThis.fetch = async (_url, init) => new Response(JSON.stringify(broken ? { secret: "NEVER_PRINT_ME" } : systemOneResponse(JSON.parse(String(init?.body)))), { status: 200 });
+  const states: unknown[] = [];
+  globalThis.fetch = async (_url, init) => {
+    const request = JSON.parse(String(init?.body));
+    states.push(request.state);
+    return new Response(JSON.stringify(broken ? { secret: "NEVER_PRINT_ME" } : systemOneResponse(request)), { status: 200 });
+  };
   try {
     const tool = load().tools[0];
-    const result = await tool.execute("good", { task: "Review scope" });
+    // OMP hands execute harness fields such as the intent `i`; they are dropped, not rejected or sent.
+    const result = await tool.execute("good", { i: "Scoring the change", task: "Review scope" } as never);
     assert.deepEqual(JSON.parse(result.content[0].text), result.details);
     assert.equal("metrics" in result.details && result.details.metrics.correctness.score, 4);
+    assert.deepEqual(states, [{ task: "Review scope" }]);
+    const stalePrior = await tool.execute("prior", { task: "Review scope", previousEvaluation: { metrics: { note: "NEVER_PRINT_ME" } } });
+    assert.match(stalePrior.content[0].text, /invalid review input \(previousEvaluation\.metrics\.\S+: invalid_type.*pass the prior jev_review result unchanged/);
+    assert.equal(states.length, 1);
     broken = true;
     const error = await tool.execute("bad", { task: "Review scope" });
     assert.equal(error.isError, true);
-    assert.match(error.content[0].text, /continue agent-led review without Jev/);
-    assert.doesNotMatch(error.content[0].text, /NEVER_PRINT_ME|fake-review-key/);
+    assert.match(error.content[0].text, /did not match the pinned evaluator's response schema; continue agent-led review without Jev/);
+    for (const text of [stalePrior.content[0].text, error.content[0].text]) assert.doesNotMatch(text, /NEVER_PRINT_ME|fake-review-key/);
   } finally { globalThis.fetch = saved; }
 }));
