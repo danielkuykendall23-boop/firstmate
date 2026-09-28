@@ -44,10 +44,23 @@
 # harness-state paths below and a live proof; an unlisted harness refuses.
 #
 # Writable set (every path resolved to its real location, because Seatbelt
-# matches resolved paths, e.g. /tmp is /private/tmp):
-#   - the task worktree and the repository's shared git dir, except that dir's
-#     hooks/ and config, which stay denied so one worker cannot plant code
-#     that runs in every other checkout of the repository
+# matches resolved paths, e.g. /tmp is /private/tmp). No writable entry is an
+# ancestor of a denied path, because a rename of that ancestor into another
+# writable path would carry the denied path out of reach of its rule:
+#   - the task worktree and, in the repository's shared git dir, only objects/,
+#     logs/, the task's own linked-worktree admin dir worktrees/<name>/ (its
+#     HEAD, index, FETCH_HEAD, ORIG_HEAD and rebase state), its own branch
+#     refs/heads/fm/<id> and that ref's lock, and the shared refs/remotes/ and
+#     refs/tags/ a fetch and push update, plus packed-refs.lock, which git
+#     2.50 takes on every ref update and reports as an error when refused.
+#     Every other branch ref, the primary checkout's HEAD and index, other
+#     worktrees' admin dirs, hooks/, config and packed-refs itself stay
+#     denied, so one worker cannot move another task's branch or checkout, or
+#     plant code that runs in every other checkout. Residual: a worker can
+#     still create or move a tag or remote-tracking ref and briefly hold the
+#     packed-refs lock, and deleting a packed ref (e.g. fetch --prune of a
+#     packed remote-tracking ref) fails because packed-refs is denied. The
+#     task worktree must be a linked worktree, never the primary checkout.
 #   - the task temp root (/tmp/fm-<id>)
 #   - Firstmate task files: state/<id>.status, .turn-ended, .progress,
 #     .busy-state and its .busy-state.* lock and temp siblings, the steering
@@ -56,11 +69,22 @@
 #     lock state/.meta-<id>.lock*, which the scout completion gate
 #     (bin/fm-captain-hold.sh complete) records into; never another task's
 #     files or any home-wide state
-#   - no-mistakes (~/.no-mistakes: CLI log, state, and the local push remote)
+#   - no-mistakes (~/.no-mistakes): only what the worker-side CLI writes
+#     (logs/cli.log, state.sqlite and its journal files, update-check.json,
+#     telemetry-gate.json) and the contents of each gate repository under
+#     repos/<gate>/ that a push writes, except that gate's hooks/ and config.
+#     config.yaml, bin/, the daemon's files, pipeline worktrees/ and the gate
+#     directories themselves stay denied.
 #   - the per-user macOS temp and cache dirs, ~/Library/Caches, ~/.cache and
 #     the npm, bun, Go module and Cargo download caches, so builds and test
 #     runs keep working; the tmux socket dir /private/tmp/tmux-<uid>
-#   - the harness's own state (omp: ~/.omp)
+#   - the harness's own session state. omp: agent/sessions, agent/blobs,
+#     agent/terminal-sessions, agent/cache, the agent, models and history
+#     databases, logs/, cache/, run/, webcache/, stats.db and gpu_cache.json
+#     under ~/.omp, plus a mode change on ~/.omp/agent itself, which omp makes
+#     at startup. Shared omp configuration - agent/RULES.md, agent/rules,
+#     agent/extensions, agent/config.yml, natives/ and everything else not
+#     listed - stays denied.
 #   - terminal and null devices
 set -u
 
@@ -102,6 +126,22 @@ sbpl_path_ok() {
   *'"'* | *\\* | *[[:cntrl:]]*) return 1 ;;
   esac
   return 0
+}
+
+# Quote a path for use inside an SBPL regex literal.
+regex_quote() {
+  printf '%s' "$1" | sed 's/[.*+?(){}|^$[]/\\&/g; s/]/\\]/g'
+}
+
+# Print one SBPL filter per "kind|path" argument.
+sbpl_rules() {
+  local p
+  for p in "$@"; do
+    case "${p%%|*}" in
+    regex) printf '\n  (regex #"%s")' "${p#*|}" ;;
+    *) printf '\n  (%s "%s")' "${p%%|*}" "${p#*|}" ;;
+    esac
+  done
 }
 
 harness_supported() {
@@ -188,24 +228,40 @@ cmd_profile() {
     die "the worker sandbox is verified only for: $SUPPORTED_HARNESSES (got $harness)"
   sandbox_exec_usable
 
-  local wt common tmp st dt home uid paths=() p denies=()
+  local wt common gitdir tmp st dt home nm omp uid paths=() p denies=() modes=()
   wt=$(real_path "$worktree") && [ -d "$wt" ] || die "worktree $worktree cannot be resolved"
   common=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) ||
     die "worktree $wt has no resolvable git common dir"
   common=$(real_path "$common") || die "git common dir $common cannot be resolved"
+  gitdir=$(git -C "$wt" rev-parse --absolute-git-dir 2>/dev/null) ||
+    die "worktree $wt has no resolvable git dir"
+  gitdir=$(real_path "$gitdir") || die "git dir $gitdir cannot be resolved"
+  case "$gitdir" in
+  "$common"/worktrees/?*) ;;
+  *) die "worktree $wt is not a linked worktree of $common; the worker sandbox fences only a task's own linked worktree" ;;
+  esac
+  mkdir -p "$common/refs/heads/fm" 2>/dev/null ||
+    die "could not create $common/refs/heads/fm for the task branch"
   tmp=$(real_path "$task_tmp") && [ -d "$tmp" ] || die "task temp root $task_tmp cannot be resolved"
   st=$(real_path "$state") && [ -d "$st" ] || die "state directory $state cannot be resolved"
   dt=$(real_path "$data") && [ -d "$dt" ] || die "data directory $data cannot be resolved"
   home=$(real_path "$HOME") && [ -d "$home" ] || die "HOME cannot be resolved"
   uid=$(id -u)
 
-  paths+=("subpath|$wt" "subpath|$common" "subpath|$tmp")
+  paths+=("subpath|$wt" "subpath|$tmp")
+  paths+=("subpath|$common/objects" "subpath|$common/logs" "subpath|$gitdir")
+  paths+=("literal|$common/refs/heads/fm/$id" "literal|$common/refs/heads/fm/$id.lock")
+  paths+=("subpath|$common/refs/remotes" "subpath|$common/refs/tags" "literal|$common/packed-refs.lock")
   paths+=("literal|$st/$id.status" "literal|$st/$id.turn-ended" "literal|$st/$id.progress")
   paths+=("literal|$st/$id.busy-state" "literal|$st/$id.busy-state.lock" "prefix|$st/$id.busy-state.tmp.")
   paths+=("subpath|$st/$id.inbox" "subpath|$dt/$id" "literal|$st/$id.meta")
   paths+=("literal|$st/.meta-$id.lock" "prefix|$st/.meta-$id.lock.owner.")
   paths+=("literal|$st/.meta-$id.lock.steal" "prefix|$st/.meta-$id.lock.steal.owner.")
-  paths+=("subpath|$home/.no-mistakes")
+  nm="$home/.no-mistakes"
+  paths+=("prefix|$nm/logs/cli.log" "prefix|$nm/state.sqlite")
+  paths+=("prefix|$nm/update-check.json" "prefix|$nm/telemetry-gate.json")
+  paths+=("regex|^$(regex_quote "$nm/repos/")[^/]+/.")
+  denies+=("regex|^$(regex_quote "$nm/repos/")[^/]+/(hooks|config)(/|\$)")
   for p in DARWIN_USER_TEMP_DIR DARWIN_USER_CACHE_DIR; do
     p=$(getconf "$p" 2>/dev/null) && [ -n "$p" ] && p=$(real_path "${p%/}") && paths+=("subpath|$p")
   done
@@ -214,12 +270,19 @@ cmd_profile() {
   paths+=("subpath|$home/.cargo/registry" "subpath|$home/.cargo/git")
   paths+=("subpath|/private/tmp/tmux-$uid")
   case "$harness" in
-  omp) paths+=("subpath|$home/.omp") ;;
+  omp)
+    omp="$home/.omp"
+    paths+=("subpath|$omp/agent/sessions" "subpath|$omp/agent/blobs")
+    paths+=("subpath|$omp/agent/terminal-sessions" "subpath|$omp/agent/cache")
+    paths+=("prefix|$omp/agent/agent.db" "prefix|$omp/agent/models.db" "prefix|$omp/agent/history.db")
+    paths+=("subpath|$omp/logs" "subpath|$omp/cache" "subpath|$omp/run" "subpath|$omp/webcache")
+    paths+=("prefix|$omp/stats.db" "literal|$omp/gpu_cache.json")
+    modes+=("literal|$omp/agent")
+    ;;
   esac
-  denies+=("subpath|$common/hooks" "literal|$common/config")
 
-  local kind path
-  for p in "${paths[@]}" "${denies[@]}"; do
+  for p in "${paths[@]}" "${denies[@]}" ${modes[@]+"${modes[@]}"}; do
+    [ "${p%%|*}" = regex ] && continue
     sbpl_path_ok "${p#*|}" || die "path '${p#*|}' cannot be expressed safely in a sandbox profile"
   done
 
@@ -229,18 +292,15 @@ cmd_profile() {
     printf '(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write*\n'
     printf '  (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx")\n'
     printf '  (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/")'
-    for p in "${paths[@]}"; do
-      kind=${p%%|*}
-      path=${p#*|}
-      printf '\n  (%s "%s")' "$kind" "$path"
-    done
+    sbpl_rules "${paths[@]}"
     printf ')\n(deny file-write*'
-    for p in "${denies[@]}"; do
-      kind=${p%%|*}
-      path=${p#*|}
-      printf '\n  (%s "%s")' "$kind" "$path"
-    done
+    sbpl_rules "${denies[@]}"
     printf ')\n'
+    if [ "${#modes[@]}" -gt 0 ]; then
+      printf '(allow file-write-mode'
+      sbpl_rules ${modes[@]+"${modes[@]}"}
+      printf ')\n'
+    fi
   } >"$stage"; then
     rm -f "$stage"
     die "could not write sandbox profile $output"

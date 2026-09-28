@@ -140,10 +140,12 @@ try() {  # <label> <command...>
   shift
   if "$@" 2>/dev/null; then printf 'allowed %s\n' "$label"; else printf 'denied %s\n' "$label"; fi
 }
-st=$PROBE_STATE; id=$PROBE_ID
+st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOME/.no-mistakes
 {
-  try commit sh -c 'cd "$PROBE_WT" && echo change > change.txt && git add change.txt &&
-    git -c user.name=w -c user.email=w@example.invalid commit -qm change'
+  try commit sh -c 'cd "$PROBE_WT" && git checkout -q -b "fm/$PROBE_ID" && echo change > change.txt &&
+    git add change.txt && git -c user.name=w -c user.email=w@example.invalid commit -qm change 2>&1 |
+    { ! grep .; }'
+  try fetch git -C "$PROBE_WT" fetch -q origin
   try status sh -c 'echo "working [at=1]: probe" >> "$0"' "$st/$id.status"
   try busy sh -c 'mkdir "$0.lock" && echo r > "$0.tmp.1" && mv -f "$0.tmp.1" "$0" && rmdir "$0.lock"' "$st/$id.busy-state"
   try turnend touch "$st/$id.turn-ended"
@@ -151,13 +153,32 @@ st=$PROBE_STATE; id=$PROBE_ID
   try report sh -c 'echo findings > "$0"' "$PROBE_DATA/$id/report.md"
   try tasktmp touch "/tmp/fm-$id/scratch"
   try meta sh -c 'mkdir "$0" && echo decisions_reviewed=1 >> "$1" && rmdir "$0"' "$st/.meta-$id.lock" "$st/$id.meta"
+  try omp-session touch "$omp/agent/sessions/session.jsonl"
+  try nm-cli-log sh -c 'echo line >> "$0"' "$nm/logs/cli.log"
+  try gate-push git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/$PROBE_ID"
   try other-meta sh -c 'echo harness=evil >> "$0"' "$st/other-task.meta"
   try home-state touch "$st/.wake-queue"
   try other-status sh -c 'echo x >> "$0"' "$st/other-task.status"
   try other-data touch "$PROBE_DATA/other-task/report.md"
   try primary-checkout touch "$PROBE_PROJ/planted.txt"
-  try git-hooks touch "$PROBE_PROJ/.git/hooks/post-commit"
+  try git-hooks touch "$git_dir/hooks/post-commit"
   try git-config git -C "$PROBE_WT" config probe.key value
+  try other-branch git -C "$PROBE_WT" update-ref refs/heads/main HEAD
+  try primary-head git -C "$PROBE_PROJ" symbolic-ref HEAD refs/heads/planted
+  try primary-index touch "$git_dir/index"
+  try other-worktree touch "$git_dir/worktrees/other-wt/HEAD"
+  try packed-refs git -C "$PROBE_WT" pack-refs --all
+  try omp-rules touch "$omp/agent/RULES.md"
+  try omp-rule-dir touch "$omp/agent/rules/planted.md"
+  try omp-extension touch "$omp/agent/extensions/planted.ts"
+  try omp-config sh -c 'echo planted: 1 >> "$0"' "$omp/agent/config.yml"
+  try omp-agent-move mv "$omp/agent" "$omp/cache/agent"
+  try nm-config sh -c 'echo planted: 1 >> "$0"' "$nm/config.yaml"
+  try nm-bin touch "$nm/bin/planted"
+  try nm-worktrees touch "$nm/worktrees/repo/run/planted.txt"
+  try gate-hooks touch "$nm/repos/gate.git/hooks/pre-receive"
+  try gate-config sh -c 'echo "[core]" >> "$0"' "$nm/repos/gate.git/config"
+  try gate-move mv "$nm/repos/gate.git" "$nm/repos/moved.git"
   try home touch "$HOME/planted"
 } > "$PROBE_OUT"
 SH
@@ -165,7 +186,7 @@ SH
 }
 
 test_on_fences_the_spawned_worker() {
-  local kind id out status launch result label
+  local kind id out status launch result label user_home
   if [ "$(uname -s)" != Darwin ] || [ ! -x /usr/bin/sandbox-exec ]; then
     printf '# skip - the worker sandbox uses macOS Seatbelt (/usr/bin/sandbox-exec)\n'
     return 0
@@ -185,6 +206,14 @@ test_on_fences_the_spawned_worker() {
     launch=$(cat "$LAUNCH_LOG")
     assert_contains "$launch" "sandbox-exec' -f " "the $kind launch must run under sandbox-exec"
     mkdir -p "$HOME_DIR/state/$id.inbox/handled" "$HOME_DIR/data/other-task"
+    git -C "$PROJ_DIR" worktree add --quiet -b "other-$kind" "$CASE_DIR/other-wt"
+    user_home="$HOME_DIR/user-home"
+    mkdir -p "$user_home/.omp/agent/sessions" "$user_home/.omp/agent/rules" \
+      "$user_home/.omp/agent/extensions" "$user_home/.omp/cache" \
+      "$user_home/.no-mistakes/logs" "$user_home/.no-mistakes/bin" "$user_home/.no-mistakes/worktrees/repo/run"
+    : > "$user_home/.omp/agent/config.yml"
+    : > "$user_home/.no-mistakes/config.yaml"
+    git init --quiet --bare "$user_home/.no-mistakes/repos/gate.git"
     printf 'steer\n' > "$HOME_DIR/state/$id.inbox/001.msg"
     # The stand-in reports through the task temp root, one of the few paths the
     # fence leaves writable.
@@ -192,21 +221,27 @@ test_on_fences_the_spawned_worker() {
     rm -f "$result"
     # Execute the staged launch exactly as the pane would, with the stand-in
     # omp first on PATH and the spawn's own throwaway HOME.
-    HOME="$HOME_DIR/user-home" PATH="$FAKEBIN:$PATH" PROBE_OUT="$result" PROBE_ID="$id" \
+    HOME="$user_home" PATH="$FAKEBIN:$PATH" PROBE_OUT="$result" PROBE_ID="$id" \
       PROBE_STATE="$(cd "$HOME_DIR/state" && pwd -P)" PROBE_DATA="$(cd "$HOME_DIR/data" && pwd -P)" \
       PROBE_WT="$WT_DIR" PROBE_PROJ="$PROJ_DIR" bash -c "$launch" >"$CASE_DIR/launch.out" 2>&1
     [ -s "$result" ] || fail "the $kind launch never ran the worker"$'\n'"$(cat "$CASE_DIR/launch.out")"
-    for label in commit status busy turnend inbox report tasktmp meta; do
+    for label in commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push; do
       assert_grep "allowed $label" "$result" "$kind worker write '$label' must be allowed"$'\n'"$(cat "$result")"
     done
-    for label in other-meta home-state other-status other-data primary-checkout git-hooks git-config home; do
+    for label in other-meta home-state other-status other-data primary-checkout git-hooks git-config \
+      other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir \
+      omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config \
+      gate-move home; do
       assert_grep "denied $label" "$result" "$kind worker write '$label' must be denied"$'\n'"$(cat "$result")"
     done
     assert_absent "$PROJ_DIR/planted.txt" "the $kind worker planted a file in the primary checkout"
+    [ "$(git -C "$PROJ_DIR" symbolic-ref HEAD)" = refs/heads/main ] || fail "the $kind worker moved the primary checkout's HEAD"
+    git -C "$user_home/.no-mistakes/repos/gate.git" rev-parse --verify -q "refs/heads/fm/$id" >/dev/null ||
+      fail "the $kind worker's push never reached the no-mistakes gate"
     assert_present "$HOME_DIR/state/$id.inbox/handled/001.msg" "the $kind worker could not acknowledge its inbox"
     rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
   done
-  pass "a sandboxed worker writes its task files and nothing else"
+  pass "a sandboxed worker writes its task files, own branch, omp session and gate push, and nothing shared"
 }
 
 test_setting_tokens
