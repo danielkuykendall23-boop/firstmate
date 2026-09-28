@@ -1,0 +1,12 @@
+{
+  "case": "compact-target",
+  "approxTokens": 225135,
+  "compact": true,
+  "endpointHits": 1,
+  "goalsSent": [
+    "Investigate the failing build across the repository. the important invariant the run must keep.\nNow summarize what we learned so far."
+  ],
+  "jevStatus": [
+    "Jev compaction: kept 0, truncated 9, dropped 27 of 37 calls (97% reduction of the whole context, ~10306 of 113078 budget tokens)"
+  ]
+}
