@@ -1,0 +1,52 @@
+{
+  "case": "mid-session-off",
+  "kind": "tools",
+  "sessionChars": 300896,
+  "approxTokens": 75224,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "shortSummary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "details"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction skipped (this home's config/jev-compaction turns Jev compaction off) - using native compaction",
+    "Jev compaction skipped (this home's config/jev-compaction turns Jev compaction off) - using native compaction"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] falling back to native omp compaction: this home's config/jev-compaction turns Jev compaction off",
+    "[fm-jev-compaction] falling back to native omp compaction: this home's config/jev-compaction turns Jev compaction off"
+  ],
+  "endpoint": {
+    "hits": 0,
+    "markerLeaked": false,
+    "questions": 0,
+    "states": [],
+    "modelRequests": []
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-mid-session-off.jsonl",
+      "fromExtension": false,
+      "method": "snapcompact",
+      "summaryChars": 1033,
+      "summaryHasKept": false,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": false,
+      "droppedToolAbsent": true,
+      "jev": null
+    }
+  ],
+  "durationMs": 2184,
+  "midOffWrittenAfterReady": true
+}

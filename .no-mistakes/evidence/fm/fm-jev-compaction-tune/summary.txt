@@ -1,0 +1,16 @@
+# Live omp 18.2.10 runs (RPC compact on a resumed synthetic session, fake local Jev endpoint)
+
+## Calibration: same 33-call region, same Jev answers (keep-call 0.12-0.35, keep-result 0.13)
+target 88125ea: Jev compaction: kept 0, truncated 16, dropped 16 of 33 calls (95% reduction of the whole context, ~6688 of 111946 budget tokens)  threshold=0.24
+base   122ed99: Jev compaction: kept 0, truncated 8, dropped 24 of 33 calls (96% reduction of the whole context, ~5393 of 111946 budget tokens)  threshold=0.3
+
+## Off switch (FM_HOME/config/jev-compaction)
+config-off: {"hooksRegistered":0,"compactionRequestsToJev":0,"hitsTotal":2,"compactSuccess":true,"entry":[{"fromExtension":false,"method":"snapcompact"}],"status":[],"stderr":null}
+config-on: {"hooksRegistered":1,"compactionRequestsToJev":1,"hitsTotal":3,"compactSuccess":true,"entry":[{"fromExtension":true,"method":null}],"status":["Jev compaction: kept 0, truncated 0, dropped 17 of 18 calls (94% reduction of the whole context, ~4921 of 110030 budget tokens)"],"stderr":"[fm-jev-compaction] Jev compaction: kept 0, truncated 0, dropped 17 of 18 calls (94% reduction of the whole context, ~4921 of 110030 budget tokens)"}
+config-garbage: {"hooksRegistered":0,"compactionRequestsToJev":0,"hitsTotal":2,"compactSuccess":true,"entry":[{"fromExtension":false,"method":"snapcompact"}],"status":[],"stderr":"[fm-jev-compaction] /tmp/fm-jev-tune-lab.Rgwi/config-garbage/fleet/config/jev-compaction is neither on nor off; treating Jev compaction as off"}
+mid-session-off: {"hooksRegistered":null,"compactionRequestsToJev":0,"hitsTotal":0,"compactSuccess":true,"entry":[{"fromExtension":false,"method":"snapcompact"}],"status":["Jev compaction skipped (this home's config/jev-compaction turns Jev compaction off) - using native compaction","Jev compaction skipped (this home's config/jev-compaction turns Jev compaction off) - using native compaction"],"stderr":"[fm-jev-compaction] falling back to native omp compaction: this home's config/jev-compaction turns Jev compaction off"}
+inherited-worker: {"hooksRegistered":null,"compactionRequestsToJev":0,"hitsTotal":0,"compactSuccess":true,"entry":[{"fromExtension":false,"method":"snapcompact"}],"status":[],"stderr":null}
+
+## Secondmate inheritance (propagate_secondmate_inheritance)
+jev-compaction	pushed	
+jev-compaction	pushed	mirrored primary absence

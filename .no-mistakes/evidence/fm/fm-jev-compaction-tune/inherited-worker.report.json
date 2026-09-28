@@ -1,0 +1,45 @@
+{
+  "case": "inherited-worker",
+  "kind": "tools",
+  "sessionChars": 300896,
+  "approxTokens": 75224,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "shortSummary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "details"
+    ]
+  },
+  "jevStatus": [],
+  "jevStderr": [],
+  "endpoint": {
+    "hits": 0,
+    "markerLeaked": false,
+    "questions": 0,
+    "states": [],
+    "modelRequests": []
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-inherited-worker.jsonl",
+      "fromExtension": false,
+      "method": "snapcompact",
+      "summaryChars": 1033,
+      "summaryHasKept": false,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": false,
+      "droppedToolAbsent": true,
+      "jev": null
+    }
+  ],
+  "durationMs": 2300
+}

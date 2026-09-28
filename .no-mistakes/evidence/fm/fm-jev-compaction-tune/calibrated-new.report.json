@@ -1,0 +1,115 @@
+{
+  "case": "calibrated-new",
+  "kind": "tools",
+  "sessionChars": 401160,
+  "approxTokens": 100290,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "preserveData"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction: kept 0, truncated 16, dropped 16 of 33 calls (95% reduction of the whole context, ~6688 of 111946 budget tokens)"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] Jev compaction: kept 0, truncated 16, dropped 16 of 33 calls (95% reduction of the whole context, ~6688 of 111946 budget tokens)"
+  ],
+  "endpoint": {
+    "hits": 1,
+    "markerLeaked": false,
+    "questions": 64,
+    "callAnswers": [
+      0.26,
+      0.33,
+      0.16,
+      0.23,
+      0.3,
+      0.13,
+      0.2,
+      0.27,
+      0.34,
+      0.17,
+      0.24,
+      0.31,
+      0.14,
+      0.21,
+      0.28,
+      0.35,
+      0.18,
+      0.25,
+      0.32,
+      0.15,
+      0.22,
+      0.29,
+      0.12,
+      0.19,
+      0.26,
+      0.33,
+      0.16,
+      0.23,
+      0.3,
+      0.13,
+      0.2,
+      0.27
+    ]
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-calibrated-new.jsonl",
+      "fromExtension": true,
+      "method": null,
+      "summaryChars": 18506,
+      "summaryHasKept": true,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": true,
+      "droppedToolAbsent": true,
+      "jev": {
+        "keepThreshold": 0.24,
+        "truncated": 16,
+        "droppedIds": [
+          "call-3",
+          "call-4",
+          "call-6",
+          "call-7",
+          "call-10",
+          "call-13",
+          "call-14",
+          "call-17",
+          "call-20",
+          "call-21",
+          "call-23",
+          "call-24",
+          "call-27",
+          "call-28",
+          "call-30",
+          "call-31"
+        ],
+        "kept": 0,
+        "dropped": 16,
+        "candidateCalls": 33,
+        "reductionRatio": 0.9477749305229726,
+        "summaryTokens": 6688,
+        "budget": {
+          "contextWindow": 272000,
+          "trigger": 231200,
+          "progressCeiling": 184960,
+          "reserve": 40800,
+          "recentTokens": 27071,
+          "systemPromptTokens": 5143,
+          "budgetTokens": 111946
+        }
+      }
+    }
+  ],
+  "durationMs": 2549
+}

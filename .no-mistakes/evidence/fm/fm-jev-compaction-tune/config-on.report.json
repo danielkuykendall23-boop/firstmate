@@ -1,0 +1,1018 @@
+{
+  "case": "config-on",
+  "kind": "tools",
+  "sessionChars": 300896,
+  "approxTokens": 75224,
+  "model": {
+    "id": "gpt-5.1-codex-max",
+    "contextWindow": 272000
+  },
+  "compact": {
+    "success": true,
+    "error": null,
+    "dataKeys": [
+      "summary",
+      "firstKeptEntryId",
+      "tokensBefore",
+      "preserveData"
+    ]
+  },
+  "jevStatus": [
+    "Jev compaction: kept 0, truncated 0, dropped 17 of 18 calls (94% reduction of the whole context, ~4921 of 110030 budget tokens)"
+  ],
+  "jevStderr": [
+    "[fm-jev-compaction] Jev compaction: kept 0, truncated 0, dropped 17 of 18 calls (94% reduction of the whole context, ~4921 of 110030 budget tokens)"
+  ],
+  "endpoint": {
+    "hits": 3,
+    "markerLeaked": false,
+    "questions": 148,
+    "states": [
+      {
+        "task": "Preserve exact key gating for Firstmate Jev integration",
+        "diff": "+ if (!apiKey) return;"
+      },
+      {
+        "task": "Preserve exact key gating for Firstmate Jev integration RESCORE",
+        "diff": "+ if (!apiKey) return;"
+      },
+      {
+        "context": "A coding assistant conversation is being compacted to free context. `history` is the whole conversation so far, oldest first; tool outputs are replaced by a short `result` note and long texts may be abridged. Each question asks whether one tool call, or the full output of that call, still needs to stay in the history verbatim. Whatever is not kept is deleted permanently, but the assistant can always re-run a tool or re-read a file.",
+        "goal": "Investigate the failing build across the repository. the important invariant the run must keep.\nNow summarize what we learned so far.",
+        "history": [
+          {
+            "i": 0,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t1",
+                "tool": "bash",
+                "input": "{\"command\":\"keep important tool output\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 2,
+            "role": "assistant",
+            "text": "Listing 0 noted."
+          },
+          {
+            "i": 3,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t2",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir1\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 5,
+            "role": "assistant",
+            "text": "Listing 1 noted."
+          },
+          {
+            "i": 6,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t3",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir2\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 8,
+            "role": "assistant",
+            "text": "Listing 2 noted."
+          },
+          {
+            "i": 9,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t4",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir3\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 11,
+            "role": "assistant",
+            "text": "Listing 3 noted."
+          },
+          {
+            "i": 12,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t5",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir4\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 14,
+            "role": "assistant",
+            "text": "Listing 4 noted."
+          },
+          {
+            "i": 15,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t6",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir5\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 17,
+            "role": "assistant",
+            "text": "Listing 5 noted."
+          },
+          {
+            "i": 18,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t7",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir6\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 20,
+            "role": "assistant",
+            "text": "Listing 6 noted."
+          },
+          {
+            "i": 21,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t8",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir7\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 23,
+            "role": "assistant",
+            "text": "Listing 7 noted."
+          },
+          {
+            "i": 24,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t9",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir8\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 26,
+            "role": "assistant",
+            "text": "Listing 8 noted."
+          },
+          {
+            "i": 27,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t10",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir9\"}",
+                "result": "ok, 12528 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 29,
+            "role": "assistant",
+            "text": "Listing 9 noted."
+          },
+          {
+            "i": 30,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t11",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir10\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 32,
+            "role": "assistant",
+            "text": "Listing 10 noted."
+          },
+          {
+            "i": 33,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t12",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir11\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 35,
+            "role": "assistant",
+            "text": "Listing 11 noted."
+          },
+          {
+            "i": 36,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t13",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir12\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 38,
+            "role": "assistant",
+            "text": "Listing 12 noted."
+          },
+          {
+            "i": 39,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t14",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir13\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 41,
+            "role": "assistant",
+            "text": "Listing 13 noted."
+          },
+          {
+            "i": 42,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t15",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir14\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 44,
+            "role": "assistant",
+            "text": "Listing 14 noted."
+          },
+          {
+            "i": 45,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t16",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir15\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 47,
+            "role": "assistant",
+            "text": "Listing 15 noted."
+          },
+          {
+            "i": 48,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t17",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir16\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          },
+          {
+            "i": 50,
+            "role": "assistant",
+            "text": "Listing 16 noted."
+          },
+          {
+            "i": 51,
+            "role": "assistant",
+            "text": "",
+            "tool_calls": [
+              {
+                "id": "t18",
+                "tool": "bash",
+                "input": "{\"command\":\"ls -la dir17\"}",
+                "result": "ok, 12544 chars (omitted)"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "modelRequests": []
+  },
+  "reviewEvidence": {},
+  "compactionEntries": [
+    {
+      "file": "synthetic-config-on.jsonl",
+      "fromExtension": true,
+      "method": null,
+      "summaryChars": 13232,
+      "summaryHasKept": true,
+      "summaryHasMarker": false,
+      "keptToolVerbatim": true,
+      "droppedToolAbsent": true,
+      "jev": {
+        "keepThreshold": 0.1,
+        "truncated": 0,
+        "droppedIds": [
+          "call-1",
+          "call-2",
+          "call-3",
+          "call-4",
+          "call-5",
+          "call-6",
+          "call-7",
+          "call-8",
+          "call-9",
+          "call-10",
+          "call-11",
+          "call-12",
+          "call-13",
+          "call-14",
+          "call-15",
+          "call-16",
+          "call-17"
+        ],
+        "kept": 0,
+        "dropped": 17,
+        "candidateCalls": 18,
+        "reductionRatio": 0.9428556289987151,
+        "summaryTokens": 4921,
+        "budget": {
+          "contextWindow": 272000,
+          "trigger": 231200,
+          "progressCeiling": 184960,
+          "reserve": 40800,
+          "recentTokens": 28987,
+          "systemPromptTokens": 5143,
+          "budgetTokens": 110030
+        }
+      }
+    }
+  ],
+  "durationMs": 2835,
+  "proof": {
+    "errors": [],
+    "tools": [
+      "jev_review"
+    ],
+    "hooks": 1,
+    "parentTools": [
+      "read",
+      "bash",
+      "edit",
+      "ast_edit",
+      "debug",
+      "eval",
+      "glob",
+      "grep",
+      "lsp",
+      "task",
+      "hub",
+      "todo",
+      "web_search",
+      "write",
+      "goal",
+      "jev_review",
+      "init_experiment",
+      "run_experiment",
+      "log_experiment",
+      "update_notes"
+    ],
+    "keyExported": false,
+    "baseline": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"metrics\":{\"correctness\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Correctness and requirement fit is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Requested behavior appears missing or incomplete.\",\"suggestion\":\"Address the concrete requirement, edge-case, invariant, or regression risk before polishing structure.\"}]},\"cognitiveComplexity\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Cognitive complexity is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Control flow is harder to follow than the problem requires.\",\"suggestion\":\"Simplify the hardest control or data flow while preserving a cohesive implementation.\"}]},\"readability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Readability and intent is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Names do not communicate intent precisely enough.\",\"suggestion\":\"Make intent explicit through clearer naming, flow, or responsibility boundaries.\"}]},\"modularity\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Modularity and cohesion is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Unrelated responsibilities are coupled in the same module or boundary.\",\"suggestion\":\"Regroup responsibilities around cohesive domain behavior without creating gratuitous layers.\"}]},\"coupling\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Coupling and dependency quality is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"A dependency is broader or less necessary than the behavior requires.\",\"suggestion\":\"Remove or invert the dependency that most strongly leaks details or makes change unsafe.\"}]},\"changeability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Changeability and change amplification is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"A domain rule or decision is scattered across multiple locations.\",\"suggestion\":\"Centralize the relevant knowledge or boundary so the next conceptual change has a small, predictable edit surface.\"}]},\"abstractionQuality\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Abstraction and API design is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"A wrapper or layer adds surface without hiding meaningful complexity.\",\"suggestion\":\"Deepen, remove, or reshape the abstraction that currently adds more surface than value.\"}]},\"projectStructure\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Project and file structure is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Code is located where future maintainers are unlikely to look for it.\",\"suggestion\":\"Move the affected code toward a predictable, cohesive location without splitting it mechanically.\"}]},\"duplication\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Duplication and reuse is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"The same rule or source of truth appears in multiple places.\",\"suggestion\":\"Unify duplicated knowledge only where the copies represent the same rule and should change together.\"}]},\"maintainability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Maintainability is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"The implementation has a high recurring cost to understand.\",\"suggestion\":\"Reduce the highest recurring cost of understanding, changing, debugging, or testing this code.\"}]},\"testQuality\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Testability and test quality is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Important changed behavior lacks meaningful regression coverage.\",\"suggestion\":\"Add or improve the smallest behavior-focused test that protects the important risk without overspecifying implementation.\"}]},\"reliability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Reliability and error handling is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Errors are swallowed, distorted, or propagated without useful boundaries.\",\"suggestion\":\"Handle the most credible failure path deliberately, including cleanup and propagation where relevant.\"}]},\"security\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Security is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"Untrusted input crosses a boundary without sufficient validation or safe handling.\",\"suggestion\":\"Mitigate the concrete trust-boundary, validation, secret-handling, or privilege risk without expanding scope speculatively.\"}]},\"consistency\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Consistency and conventions is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"The change diverges from an established repository pattern without clear benefit.\",\"suggestion\":\"Align the change with the repository's established pattern unless a documented constraint justifies the difference.\"}]},\"documentation\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Documentation and explainability is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"A public or changed contract is not documented clearly enough.\",\"suggestion\":\"Document the non-obvious contract, constraint, configuration, or rationale at the narrowest useful location.\"}]},\"performance\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Performance and resource efficiency is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"The relevant path has avoidable algorithmic cost.\",\"suggestion\":\"Optimize only the evidenced hot path or waste, keeping the design proportionate.\"}]},\"scalability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Scalability and flexibility is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"An evidenced growth dimension reaches a clear implementation bottleneck.\",\"suggestion\":\"Address the evidenced growth constraint with the simplest design that fits expected demand.\"}]},\"compatibility\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Compatibility and API stability is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"The change appears to break an existing public or integration contract.\",\"suggestion\":\"Preserve the affected contract or provide an explicit, tested migration path.\"}]},\"observability\":{\"applicable\":true,\"score\":4,\"confidence\":0.91,\"summary\":\"Observability and operability is meaningfully weak based on the supplied change context.\",\"issues\":[{\"severity\":\"medium\",\"description\":\"A credible production failure would not be visible or diagnosable.\",\"suggestion\":\"Expose the smallest useful diagnostic signal for the credible production failure mode.\"}]}},\"priorities\":[{\"metric\":\"correctness\",\"severity\":\"medium\",\"reason\":\"Requested behavior appears missing or incomplete.\"},{\"metric\":\"changeability\",\"severity\":\"medium\",\"reason\":\"A domain rule or decision is scattered across multiple locations.\"},{\"metric\":\"security\",\"severity\":\"medium\",\"reason\":\"Untrusted input crosses a boundary without sufficient validation or safe handling.\"},{\"metric\":\"cognitiveComplexity\",\"severity\":\"medium\",\"reason\":\"Control flow is harder to follow than the problem requires.\"},{\"metric\":\"modularity\",\"severity\":\"medium\",\"reason\":\"Unrelated responsibilities are coupled in the same module or boundary.\"}]}"
+        }
+      ],
+      "details": {
+        "metrics": {
+          "correctness": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Correctness and requirement fit is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Requested behavior appears missing or incomplete.",
+                "suggestion": "Address the concrete requirement, edge-case, invariant, or regression risk before polishing structure."
+              }
+            ]
+          },
+          "cognitiveComplexity": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Cognitive complexity is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Control flow is harder to follow than the problem requires.",
+                "suggestion": "Simplify the hardest control or data flow while preserving a cohesive implementation."
+              }
+            ]
+          },
+          "readability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Readability and intent is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Names do not communicate intent precisely enough.",
+                "suggestion": "Make intent explicit through clearer naming, flow, or responsibility boundaries."
+              }
+            ]
+          },
+          "modularity": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Modularity and cohesion is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Unrelated responsibilities are coupled in the same module or boundary.",
+                "suggestion": "Regroup responsibilities around cohesive domain behavior without creating gratuitous layers."
+              }
+            ]
+          },
+          "coupling": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Coupling and dependency quality is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "A dependency is broader or less necessary than the behavior requires.",
+                "suggestion": "Remove or invert the dependency that most strongly leaks details or makes change unsafe."
+              }
+            ]
+          },
+          "changeability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Changeability and change amplification is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "A domain rule or decision is scattered across multiple locations.",
+                "suggestion": "Centralize the relevant knowledge or boundary so the next conceptual change has a small, predictable edit surface."
+              }
+            ]
+          },
+          "abstractionQuality": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Abstraction and API design is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "A wrapper or layer adds surface without hiding meaningful complexity.",
+                "suggestion": "Deepen, remove, or reshape the abstraction that currently adds more surface than value."
+              }
+            ]
+          },
+          "projectStructure": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Project and file structure is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Code is located where future maintainers are unlikely to look for it.",
+                "suggestion": "Move the affected code toward a predictable, cohesive location without splitting it mechanically."
+              }
+            ]
+          },
+          "duplication": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Duplication and reuse is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "The same rule or source of truth appears in multiple places.",
+                "suggestion": "Unify duplicated knowledge only where the copies represent the same rule and should change together."
+              }
+            ]
+          },
+          "maintainability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Maintainability is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "The implementation has a high recurring cost to understand.",
+                "suggestion": "Reduce the highest recurring cost of understanding, changing, debugging, or testing this code."
+              }
+            ]
+          },
+          "testQuality": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Testability and test quality is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Important changed behavior lacks meaningful regression coverage.",
+                "suggestion": "Add or improve the smallest behavior-focused test that protects the important risk without overspecifying implementation."
+              }
+            ]
+          },
+          "reliability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Reliability and error handling is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Errors are swallowed, distorted, or propagated without useful boundaries.",
+                "suggestion": "Handle the most credible failure path deliberately, including cleanup and propagation where relevant."
+              }
+            ]
+          },
+          "security": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Security is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "Untrusted input crosses a boundary without sufficient validation or safe handling.",
+                "suggestion": "Mitigate the concrete trust-boundary, validation, secret-handling, or privilege risk without expanding scope speculatively."
+              }
+            ]
+          },
+          "consistency": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Consistency and conventions is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "The change diverges from an established repository pattern without clear benefit.",
+                "suggestion": "Align the change with the repository's established pattern unless a documented constraint justifies the difference."
+              }
+            ]
+          },
+          "documentation": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Documentation and explainability is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "A public or changed contract is not documented clearly enough.",
+                "suggestion": "Document the non-obvious contract, constraint, configuration, or rationale at the narrowest useful location."
+              }
+            ]
+          },
+          "performance": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Performance and resource efficiency is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "The relevant path has avoidable algorithmic cost.",
+                "suggestion": "Optimize only the evidenced hot path or waste, keeping the design proportionate."
+              }
+            ]
+          },
+          "scalability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Scalability and flexibility is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "An evidenced growth dimension reaches a clear implementation bottleneck.",
+                "suggestion": "Address the evidenced growth constraint with the simplest design that fits expected demand."
+              }
+            ]
+          },
+          "compatibility": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Compatibility and API stability is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "The change appears to break an existing public or integration contract.",
+                "suggestion": "Preserve the affected contract or provide an explicit, tested migration path."
+              }
+            ]
+          },
+          "observability": {
+            "applicable": true,
+            "score": 4,
+            "confidence": 0.91,
+            "summary": "Observability and operability is meaningfully weak based on the supplied change context.",
+            "issues": [
+              {
+                "severity": "medium",
+                "description": "A credible production failure would not be visible or diagnosable.",
+                "suggestion": "Expose the smallest useful diagnostic signal for the credible production failure mode."
+              }
+            ]
+          }
+        },
+        "priorities": [
+          {
+            "metric": "correctness",
+            "severity": "medium",
+            "reason": "Requested behavior appears missing or incomplete."
+          },
+          {
+            "metric": "changeability",
+            "severity": "medium",
+            "reason": "A domain rule or decision is scattered across multiple locations."
+          },
+          {
+            "metric": "security",
+            "severity": "medium",
+            "reason": "Untrusted input crosses a boundary without sufficient validation or safe handling."
+          },
+          {
+            "metric": "cognitiveComplexity",
+            "severity": "medium",
+            "reason": "Control flow is harder to follow than the problem requires."
+          },
+          {
+            "metric": "modularity",
+            "severity": "medium",
+            "reason": "Unrelated responsibilities are coupled in the same module or boundary."
+          }
+        ]
+      }
+    },
+    "rescore": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"metrics\":{\"correctness\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Correctness and requirement fit is strong based on the supplied change context.\"},\"cognitiveComplexity\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Cognitive complexity is strong based on the supplied change context.\"},\"readability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Readability and intent is strong based on the supplied change context.\"},\"modularity\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Modularity and cohesion is strong based on the supplied change context.\"},\"coupling\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Coupling and dependency quality is strong based on the supplied change context.\"},\"changeability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Changeability and change amplification is strong based on the supplied change context.\"},\"abstractionQuality\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Abstraction and API design is strong based on the supplied change context.\"},\"projectStructure\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Project and file structure is strong based on the supplied change context.\"},\"duplication\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Duplication and reuse is strong based on the supplied change context.\"},\"maintainability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Maintainability is strong based on the supplied change context.\"},\"testQuality\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Testability and test quality is strong based on the supplied change context.\"},\"reliability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Reliability and error handling is strong based on the supplied change context.\"},\"security\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Security is strong based on the supplied change context.\"},\"consistency\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Consistency and conventions is strong based on the supplied change context.\"},\"documentation\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Documentation and explainability is strong based on the supplied change context.\"},\"performance\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Performance and resource efficiency is strong based on the supplied change context.\"},\"scalability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Scalability and flexibility is strong based on the supplied change context.\"},\"compatibility\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Compatibility and API stability is strong based on the supplied change context.\"},\"observability\":{\"applicable\":true,\"score\":9,\"confidence\":0.91,\"summary\":\"Observability and operability is strong based on the supplied change context.\"}},\"priorities\":[],\"improvements\":[\"Correctness and requirement fit: 4 → 9\",\"Cognitive complexity: 4 → 9\",\"Readability and intent: 4 → 9\",\"Modularity and cohesion: 4 → 9\",\"Coupling and dependency quality: 4 → 9\",\"Changeability and change amplification: 4 → 9\",\"Abstraction and API design: 4 → 9\",\"Project and file structure: 4 → 9\",\"Duplication and reuse: 4 → 9\",\"Maintainability: 4 → 9\",\"Testability and test quality: 4 → 9\",\"Reliability and error handling: 4 → 9\",\"Security: 4 → 9\",\"Consistency and conventions: 4 → 9\",\"Documentation and explainability: 4 → 9\",\"Performance and resource efficiency: 4 → 9\",\"Scalability and flexibility: 4 → 9\",\"Compatibility and API stability: 4 → 9\",\"Observability and operability: 4 → 9\"],\"regressions\":[],\"comparison\":[{\"metric\":\"correctness\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"cognitiveComplexity\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"readability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"modularity\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"coupling\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"changeability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"abstractionQuality\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"projectStructure\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"duplication\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"maintainability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"testQuality\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"reliability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"security\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"consistency\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"documentation\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"performance\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"scalability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"compatibility\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"},{\"metric\":\"observability\",\"previousScore\":4,\"currentScore\":9,\"delta\":5,\"direction\":\"improved\"}]}"
+        }
+      ],
+      "details": {
+        "metrics": {
+          "correctness": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Correctness and requirement fit is strong based on the supplied change context."
+          },
+          "cognitiveComplexity": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Cognitive complexity is strong based on the supplied change context."
+          },
+          "readability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Readability and intent is strong based on the supplied change context."
+          },
+          "modularity": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Modularity and cohesion is strong based on the supplied change context."
+          },
+          "coupling": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Coupling and dependency quality is strong based on the supplied change context."
+          },
+          "changeability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Changeability and change amplification is strong based on the supplied change context."
+          },
+          "abstractionQuality": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Abstraction and API design is strong based on the supplied change context."
+          },
+          "projectStructure": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Project and file structure is strong based on the supplied change context."
+          },
+          "duplication": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Duplication and reuse is strong based on the supplied change context."
+          },
+          "maintainability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Maintainability is strong based on the supplied change context."
+          },
+          "testQuality": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Testability and test quality is strong based on the supplied change context."
+          },
+          "reliability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Reliability and error handling is strong based on the supplied change context."
+          },
+          "security": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Security is strong based on the supplied change context."
+          },
+          "consistency": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Consistency and conventions is strong based on the supplied change context."
+          },
+          "documentation": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Documentation and explainability is strong based on the supplied change context."
+          },
+          "performance": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Performance and resource efficiency is strong based on the supplied change context."
+          },
+          "scalability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Scalability and flexibility is strong based on the supplied change context."
+          },
+          "compatibility": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Compatibility and API stability is strong based on the supplied change context."
+          },
+          "observability": {
+            "applicable": true,
+            "score": 9,
+            "confidence": 0.91,
+            "summary": "Observability and operability is strong based on the supplied change context."
+          }
+        },
+        "priorities": [],
+        "improvements": [
+          "Correctness and requirement fit: 4 → 9",
+          "Cognitive complexity: 4 → 9",
+          "Readability and intent: 4 → 9",
+          "Modularity and cohesion: 4 → 9",
+          "Coupling and dependency quality: 4 → 9",
+          "Changeability and change amplification: 4 → 9",
+          "Abstraction and API design: 4 → 9",
+          "Project and file structure: 4 → 9",
+          "Duplication and reuse: 4 → 9",
+          "Maintainability: 4 → 9",
+          "Testability and test quality: 4 → 9",
+          "Reliability and error handling: 4 → 9",
+          "Security: 4 → 9",
+          "Consistency and conventions: 4 → 9",
+          "Documentation and explainability: 4 → 9",
+          "Performance and resource efficiency: 4 → 9",
+          "Scalability and flexibility: 4 → 9",
+          "Compatibility and API stability: 4 → 9",
+          "Observability and operability: 4 → 9"
+        ],
+        "regressions": [],
+        "comparison": [
+          {
+            "metric": "correctness",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "cognitiveComplexity",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "readability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "modularity",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "coupling",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "changeability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "abstractionQuality",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "projectStructure",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "duplication",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "maintainability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "testQuality",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "reliability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "security",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "consistency",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "documentation",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "performance",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "scalability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "compatibility",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          },
+          {
+            "metric": "observability",
+            "previousScore": 4,
+            "currentScore": 9,
+            "delta": 5,
+            "direction": "improved"
+          }
+        ]
+      }
+    }
+  }
+}
