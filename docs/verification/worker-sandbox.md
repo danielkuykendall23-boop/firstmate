@@ -42,6 +42,7 @@ done [at=1790602838]: calc.py provides add(a,b) only; README.md does not documen
 
 Its completion gate, `bin/fm-captain-hold.sh complete <id> --none`, ran fenced and recorded `decisions_reviewed=1` in the task's own record.
 Before the fence opened the task's own `state/<id>.meta` and `state/.meta-<id>.lock*`, that step never finished: the denied lock create was treated as a stale holder and retried as an ever-longer `.meta-<id>.lock.steal.steal...` path.
+`bin/fm-wake-lib.sh` now reports a lock whose create is refused as uncreatable and stops the wait with a clear error instead of stealing, and `tests/fm-watcher-lock.test.sh` pins that; a worker-side script that needs a lock outside the fence therefore fails visibly rather than hanging.
 
 The ship's final status line:
 

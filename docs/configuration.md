@@ -392,7 +392,7 @@ The fence is verified only for omp workers, the harness in [`docs/verification/w
 Any other token, or an unreadable file, refuses every spawn from that home the same way; Firstmate never falls back to an unfenced worker while the setting is on.
 Persistent secondmates are never fenced, because each runs a whole Firstmate home of its own.
 The fence applies at launch, so a native resume typed into a worker's pane instead of a control-plane relaunch runs outside it.
-Registering a crew-hosted Lavish board writes home-wide process-event state outside the fence, so a scout that must host a board needs the setting off for its launch.
+A fenced scout cannot arm a crew-hosted Lavish board, because arming it writes home-wide process-event state outside the fence; launch a scout that must host a board with the setting off.
 `bin/fm-spawn.sh` reads the file on every spawn and relaunch, so a change takes effect at the next launch without a restart.
 The file is local to one home and is not inherited into secondmate homes, because a secondmate home may run on a machine without Seatbelt, where an inherited `on` would refuse every worker there.
 
