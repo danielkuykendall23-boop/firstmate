@@ -290,6 +290,10 @@
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
 #   See docs/configuration.md for provider/Git setup and supported limits.
+# TYPESAFE_API_KEY: every launch, with or without the allowlist, unsets it in
+#   the pane shell and agent, so a key the launcher or terminal server holds
+#   ambiently never reaches a worker. Firstmate's Jev tools read it from
+#   $FM_HOME/.env instead (docs/jev.md).
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -4760,7 +4764,9 @@ fi
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
-LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+# Unset beside it: the Jev key reaches Firstmate's tools only through
+# $FM_HOME/.env, never a worker's inherited environment (header above).
+LAUNCH="unset TYPESAFE_API_KEY; export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
 if [ -z "$SPAWN_TRACEPARENT" ] && [ "$RELAUNCH" -eq 1 ]; then
   LAUNCH="unset TRACEPARENT; $LAUNCH"
 fi

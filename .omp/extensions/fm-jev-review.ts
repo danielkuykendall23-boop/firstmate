@@ -32,6 +32,44 @@ type ExtensionAPI = {
   }): void;
 };
 const extensionFile = fileURLToPath(import.meta.url);
+const inputFields: Record<string, true> = { task: true, diff: true, files: true, repositoryContext: true, previousEvaluation: true };
+
+function issuePath(issue: unknown): unknown[] {
+  return issue && typeof issue === "object" && "path" in issue && Array.isArray(issue.path) ? issue.path : [];
+}
+
+// Validation issue paths name schema fields only (neither upstream schema has
+// caller-keyed records), and codes are fixed; messages and unrecognized key
+// names are never used because they can carry caller text.
+function issuesReason(issues: unknown[]): string {
+  const described = issues.slice(0, 3).map((issue) => {
+    const path = issuePath(issue);
+    const where = path.length
+      ? path.map((part) => typeof part === "number" ? `[${part}]` : `.${String(part)}`).join("").replace(/^\./, "")
+      : "input";
+    const code = issue && typeof issue === "object" && "code" in issue && typeof issue.code === "string" ? issue.code : "invalid";
+    return `${where}: ${code}`;
+  }).join("; ") + (issues.length > 3 ? `; ${issues.length - 3} more` : "");
+  const first = issuePath(issues[0]);
+  if (first.length && !(typeof first[0] === "string" && inputFields[first[0]])) return `Jev evaluation failed the pinned evaluator's result schema (${described})`;
+  const prior = first[0] === "previousEvaluation" ? "; pass the prior jev_review result unchanged" : "";
+  return `invalid review input (${described})${prior}`;
+}
+
+function failureReason(error: unknown): string {
+  if (error instanceof JevApiError) {
+    // The pinned client's messages are fixed text; map them without echoing bodies.
+    if (error.status === 400 && error.message.startsWith("Jev's input limit")) return "Jev HTTP 400: input limit exceeded; send a smaller focused diff or split the review";
+    if (error.status === 401) return "Jev HTTP 401: TYPESAFE_API_KEY rejected";
+    if (error.status) return `Jev HTTP ${error.status}`;
+    if (error.message.startsWith("Jev returned a response")) return "Jev response did not match the pinned evaluator's response schema";
+    if (error.message.startsWith("Jev did not respond")) return "Jev did not respond within the evaluator's 30 s timeout; send a smaller focused diff";
+    return "could not reach Jev";
+  }
+  if (error instanceof JevEvaluationError) return error.message.replace(/\.$/, "");
+  if (error instanceof Error && "issues" in error && Array.isArray(error.issues)) return issuesReason(error.issues);
+  return `unexpected evaluator failure (${error instanceof Error ? error.name : typeof error})`;
+}
 
 function unavailable(reason: string, ctx?: Context): Result {
   const text = `Jev review unavailable: ${reason}; continue agent-led review without Jev.`;
@@ -73,16 +111,14 @@ export default function (pi: ExtensionAPI): void {
           signal: signal ? AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) : init?.signal,
         }),
       });
+      // Upstream's input schema is strict, while OMP can hand execute harness
+      // fields such as the intent `i` (the eval tool bridge always does).
+      const { task, diff, files, repositoryContext, previousEvaluation } = input;
       try {
-        const evaluation = await reviewWithJev(input, { client });
+        const evaluation = await reviewWithJev({ task, diff, files, repositoryContext, previousEvaluation }, { client });
         return { content: [{ type: "text", text: JSON.stringify(evaluation) }], details: evaluation };
       } catch (error) {
-        // Validation errors may echo input; never emit their messages or raw bodies.
-        const reason = signal?.aborted ? "cancelled"
-          : error instanceof JevApiError ? (error.status ? `Jev HTTP ${error.status}` : "Jev network or response failure")
-          : error instanceof JevEvaluationError ? "Jev omitted a required evaluation answer"
-          : "invalid review input or evaluation result";
-        return unavailable(reason, ctx);
+        return unavailable(signal?.aborted ? "cancelled" : failureReason(error), ctx);
       }
     },
   });
