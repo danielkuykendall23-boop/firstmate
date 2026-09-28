@@ -379,6 +379,25 @@ Any other value, or an unreadable file, refuses every spawn from that home, whic
 The file is a captain-wide safety preference, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract; a secondmate's own Claude crewmates then launch on the same posture.
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the verified shape of both launches and which once-per-machine dialog each one can meet.
 
+## Worker sandbox (config/worker-sandbox)
+
+The optional local, gitignored `config/worker-sandbox` holds one token that decides whether ship and scout workers run inside an operating-system write fence.
+The token is the file's whitespace-trimmed content.
+`off` keeps today's unfenced launch and is also the default when the file is absent, so an unconfigured home launches byte-for-byte as before.
+`on` launches every new ship and scout worker, and every control-plane relaunch of one, under the macOS Seatbelt sandbox, so the whole worker process and everything it starts can write only its own task worktree, the parts of the repository's shared git data its own branch needs (objects, reflogs, its worktree admin directory, its `fm/<id>` branch, and the shared remote-tracking and tag refs a fetch or push updates), its task temp directory, its own Firstmate task files (status, turn-end, busy-state, steering inbox, task record, and `data/<id>/`), the files the no-mistakes client writes and, in a no-mistakes gate repository, only the objects, reflogs, lock files, push log, and `fm/<id>` branch a push of its task branch writes (never a gate's hooks, configuration, other branches, or pipeline worktree admin directories), per-user temporary and package-cache directories, and its harness's session state.
+Reads and network access stay open; the fence exists so one worker cannot move another worker's branch or checkout, change another task's records or the primary checkout, or plant shared configuration or code (git hooks and config, omp rules, extensions and settings, no-mistakes configuration) that every other session loads.
+The worktree's `.git` gitlink and its admin directory's `commondir`, `gitdir`, and `config.worktree` stay denied, so a worker cannot redirect its checkout or plant a git hook for the primary's own git commands there.
+It does not stop a worker from creating or moving a tag or remote-tracking ref, or from writing the shared no-mistakes state database, and the worktree's files remain worker-written, so running anything other than git in a worker's worktree outside the fence runs worker-chosen code.
+[`bin/fm-worker-sandbox.sh`](../bin/fm-worker-sandbox.sh)'s header owns the exact writable set and why each entry is there.
+
+The fence is verified only for omp workers, the harness in [`docs/verification/worker-sandbox.md`](verification/worker-sandbox.md); with the setting on, a spawn of any other harness, a raw launch command, or a spawn on a machine where `/usr/bin/sandbox-exec` is missing or does not enforce a probe fence refuses before any endpoint, worktree, or task record exists and names the reason.
+Any other token, or an unreadable file, refuses every spawn from that home the same way; Firstmate never falls back to an unfenced worker while the setting is on.
+Persistent secondmates are never fenced, because each runs a whole Firstmate home of its own.
+The fence applies at launch, so a native resume typed into a worker's pane instead of a control-plane relaunch runs outside it.
+A fenced scout cannot arm a crew-hosted Lavish board, because arming it writes home-wide process-event state outside the fence; launch a scout that must host a board with the setting off.
+`bin/fm-spawn.sh` reads the file on every spawn and relaunch, so a change takes effect at the next launch without a restart.
+The file is local to one home and is not inherited into secondmate homes, because a secondmate home may run on a machine without Seatbelt, where an inherited `on` would refuse every worker there.
+
 ## Lavish server address (config/lavish-axi-host)
 
 The optional local, gitignored `config/lavish-axi-host` contains one non-empty address without whitespace for the per-machine Lavish server.

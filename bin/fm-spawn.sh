@@ -516,6 +516,11 @@ case "$CLAUDE_PERMISSION_MODE" in
 auto) CLAUDE_PERM_FLAG='--permission-mode auto' ;;
 *) CLAUDE_PERM_FLAG='--dangerously-skip-permissions' ;;
 esac
+# config/worker-sandbox (bin/fm-worker-sandbox.sh header owns the contract):
+# resolved once per spawn or relaunch, before any mutation, so a malformed
+# setting refuses instead of launching a worker outside the fence the captain
+# chose. Only ship and scout workers are fenced; a secondmate runs its own home.
+WORKER_SANDBOX=$("$SCRIPT_DIR/fm-worker-sandbox.sh" setting "$CONFIG") || exit 1
 # config/lavish-axi-host is the primary-owned per-machine address for the
 # shared Lavish server. Read it once per launch and refuse malformed values so
 # every worker reaches the same server instead of starting a second one.
@@ -2243,6 +2248,18 @@ agy)
   }
   ;;
 esac
+
+# Worker sandbox preflight: refuse before any endpoint, worktree, or metadata
+# exists when a fenced launch is impossible, so the setting can never degrade
+# into an unsandboxed worker. A raw launch command names no verified harness,
+# so no profile can be proven for it.
+if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
+  if [ "$RAW_LAUNCH" -eq 1 ]; then
+    echo "error: config/worker-sandbox is on, but a raw launch command has no verified sandbox profile; refusing to launch the worker unsandboxed - choose a supported harness or turn the setting off" >&2
+    exit 1
+  fi
+  "$SCRIPT_DIR/fm-worker-sandbox.sh" preflight "$HARNESS" || exit 1
+fi
 
 # config/secondmate-harness may carry optional model/effort tokens alongside the
 # harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
@@ -4906,6 +4923,18 @@ LAUNCH_STAGE="$LAUNCH_DIR/.launch.$SPAWN_GEN.tmp"
 if [ -e "$LAUNCH_FILE" ] || [ -L "$LAUNCH_FILE" ]; then
   echo "error: task launch file $LAUNCH_FILE already exists; refusing to replace it" >&2
   exit 1
+fi
+# Worker sandbox (bin/fm-worker-sandbox.sh header): the profile is staged in
+# this private launch directory, outside every path the worker may write, and
+# the whole launch - environment prefix included - runs under it. A profile
+# that cannot be generated or loaded refuses the launch rather than dropping
+# the fence.
+if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
+  SANDBOX_PROFILE="$LAUNCH_DIR/sandbox.$SPAWN_GEN.sb"
+  SANDBOX_EXEC_BIN=$("$SCRIPT_DIR/fm-worker-sandbox.sh" profile --id "$ID" --harness "$HARNESS" \
+    --worktree "$WT" --task-tmp "$TASK_TMP" --state "$STATE_REAL" --data "$DATA" \
+    --output "$SANDBOX_PROFILE") || exit 1
+  LAUNCH="$(shell_quote "$SANDBOX_EXEC_BIN") -f $(shell_quote "$SANDBOX_PROFILE") /bin/sh -c $(shell_quote "$LAUNCH")"
 fi
 if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   chmod 0600 "$LAUNCH_STAGE" && mv -f "$LAUNCH_STAGE" "$LAUNCH_FILE"); then
