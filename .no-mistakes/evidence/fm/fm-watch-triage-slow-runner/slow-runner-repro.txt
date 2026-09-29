@@ -1,0 +1,4 @@
+declaration_age=0     resurface=default absorb_round=absorbed stale_wakes=0 escalations=0 watcher_output=
+declaration_age=0     resurface=86400   absorb_round=absorbed stale_wakes=0 escalations=0 watcher_output=
+declaration_age=1500  resurface=default absorb_round=EXITED stale_wakes=1 escalations=0 watcher_output=stale: test:fm-wedge (idle 3s, waiting 1505s - captain-held, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the 
+declaration_age=1500  resurface=86400   absorb_round=absorbed stale_wakes=0 escalations=0 watcher_output=
