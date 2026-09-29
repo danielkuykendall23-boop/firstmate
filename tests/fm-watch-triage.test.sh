@@ -2679,9 +2679,12 @@ test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict() {
     'paused: final validation at step 6/6 - clean whole-assembly baseline (~20 min)' 0)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   window="test:fm-wedge"; key=$(printf '%s' "$window" | tr ':/.' '___')
+  # The declaration is written fresh and ages in real time across the rounds, so
+  # the cadence is pinned far past any runner's wall-clock for them: a slow host
+  # must not age it into the legitimate recheck the next case asserts.
   n=1
   while [ "$n" -le 3 ]; do
-    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
+    FM_TEST_PAUSE_RESURFACE=86400 wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
       || fail "a declared wait wedge-escalated at threshold $n under a working verdict: $(cat "$out")"
     n=$((n + 1))
   done
@@ -2779,13 +2782,14 @@ test_wedge_threshold_recheck_names_the_captain_for_a_held_lane() {
   ack_stopped_cycle "$state" || fail "could not acknowledge the captain-held recheck"
 
   # The quiet direction is unchanged from a declared pause: inside the cadence the
-  # hold is absorbed whole, with no escalation counted.
+  # hold is absorbed whole, with no escalation counted, under the same pinned
+  # cadence so a slow host cannot age the fresh hold into a recheck.
   dir=$(wedge_threshold_fixture captain-held-quiet \
     'captain-held: which retention window wins' 0)
   state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; capture="$dir/pane.txt"
   n=1
   while [ "$n" -le 3 ]; do
-    wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
+    FM_TEST_PAUSE_RESURFACE=86400 wedge_threshold_round "$state" "$fakebin" "$out" "$capture" "$window" "$working" absorb \
       || fail "a captain-held lane wedge-escalated at threshold $n under a working verdict: $(cat "$out")"
     n=$((n + 1))
   done
