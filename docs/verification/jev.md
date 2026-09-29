@@ -100,7 +100,30 @@ A direct adapter run with the intent field present also scored a 53,019-characte
 
 Compaction was checked by driving the registered `session_before_compact` handler directly (not `/compact` in a session) with a synthetic 9-call worker region.
 Before the change, the vendored library at its 0.5 default dropped all 10 calls of a matching probe, including both edits and the latest failing test run; live keep-call answers were 0.18-0.51 and keep-result answers 0.10-0.21.
-With the session goal and the 0.3 threshold the handler reported `kept 0, truncated 7, dropped 2 of 9 calls (74% reduction ...)`, dropping only a grep and `git status`, and the summary retained the latest failing test's head.
+With the session goal and a fixed 0.3 threshold the handler reported `kept 0, truncated 7, dropped 2 of 9 calls (74% reduction ...)`, dropping only a grep and `git status`, and the summary retained the latest failing test's head.
+
+### Compaction calibration on saved worker sessions
+
+Measured on 2026-09-28 with OMP 18.2.10, Node 24.11.1 and live `jev-1.13.0`, using the home key, Hide Secrets off, and read-only copies of five saved OMP worker sessions in the owning home, each holding one live Jev compaction whose region had already been sent to Jev at the time.
+Each region was rebuilt from its session journal as the entries before the compaction's `firstKeptEntryId`, with the later entries as the recent messages that supply the goal; every rebuilt region produced the same candidate-call count the live audit recorded.
+`compactOmpRegion` then ran against live Jev with the session goal, recording every answer; the whole measurement made 84 requests totalling about 2.35 million input tokens, about $0.10 at the published $0.042 per million input tokens.
+
+Across the five regions, median keep-call answers were 0.25-0.31 (10th to 90th percentile 0.18-0.42) and median keep-result answers 0.13-0.15.
+Candidate calls kept whole or truncated, of the total:
+
+| Session region | Live compaction as recorded | Fixed 0.3 | Calibrated (threshold) |
+| --- | --- | --- | --- |
+| Worker A, 154 calls | 2 (0.5, no goal) | 45 (29%) | 84 (55%, 0.25) |
+| Worker B, 251 calls | 17 (0.5, no goal) | 149 (59%) | 144 (57%, 0.30) |
+| Worker C, 276 calls | 2 (0.5, no goal) | 77 (28%) | 139 (50%, 0.27) |
+| Worker D, 360 calls | 2 (0.5, no goal) | 111 (31%) | 186 (52%, 0.27) |
+| Worker E, 313 calls | 163 (0.3, goal) | 165 (53%) | 166 (53%, 0.30) |
+
+Calibrated region character reductions were 59-69%, and at most three results per region were kept whole.
+Offline replay of the recorded answers through the calibrated rule kept 83-91% of edit calls per region and 79-100% of edited file paths, beside the summary's own `<files>` block; the dropped edits were mostly failed edits, cosmetic touch-ups and throwaway scripts outside the project.
+The latest failing and latest passing test runs stayed in every region that had them, except Worker C's latest passing run, rated 0.26 against its 0.27 threshold.
+A goal extended with an explicit sentence about edits, test runs and file paths raised answers across the board on two regions without improving edit retention under the calibrated rule, so the adapter keeps the plain session goal.
+Repeat runs of the same region moved its middle-rank answer by at most 0.01 and its retained count by at most 23 of 360 calls.
 
 Desktop: `bin/fm-jev-desktop.sh act --access-approved --ui-approved --app Finder "select the file calc.py"`, without `--execute`, on a Finder window showing only the synthetic project returned `ok: true`, `decision: act`, target confidence 0.98 and `executed: null`.
 The same resolve on a Finder window of `/Applications` returned `typesafe 503 Service Unavailable` on four attempts over about two minutes while small review requests succeeded.

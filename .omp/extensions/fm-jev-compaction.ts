@@ -1,6 +1,6 @@
-// Key-gated Jev-guided compaction for OMP. A missing key or
-// FM_JEV_COMPACTION=0 registers no hook, preserving native speculative
-// compaction. Neither activation nor fallback changes saved settings.
+// Key-gated Jev-guided compaction for OMP. A missing key, FM_JEV_COMPACTION=0,
+// or a home config/jev-compaction of "off" registers no hook, preserving native
+// speculative compaction. Neither activation nor fallback changes saved settings.
 //
 // This is an OMP adapter around the real, pinned upstream decision
 // algorithm - not a reimplementation of it. `./vendor/fast-jev-compaction/`
@@ -11,9 +11,11 @@
 // loader - the same loader omp's native .ts extension discovery uses -
 // resolves the vendored files' internal `./x.js` imports; verified:
 // unpatched, `node --input-type=module -e "import '...compact.ts'"` fails
-// with ERR_MODULE_NOT_FOUND for request.js). Every actual decision - state
-// fitting, batching, the keep/drop rule, applyDecisions' verbatim rendering
-// and pairing guarantee - runs as the real vendored `compact()`, not a port.
+// with ERR_MODULE_NOT_FOUND for request.js). State fitting, batching, the Jev
+// questions and applyDecisions' verbatim rendering and pairing guarantee run as
+// the real vendored library, not a port. Only the keep/truncate/drop threshold
+// is Firstmate's: it is calibrated per compaction from Jev's own answers (see
+// KEEP_CALL_CAP below) instead of upstream's fixed decideCall threshold.
 //
 // What upstream's own project cannot supply is reusable: its hooks/ plugin
 // is built on Claude Code's early-access hooks.json/SessionMessage function-
@@ -136,8 +138,10 @@
 // FM_JEV_ENDPOINT replaces the upstream System One URL so the repository's
 // live omp test can point a real session at a local fake endpoint; it is
 // not a tuning knob and is unset in every real launch.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveTypesafeKey } from "./lib/fm-jev-key.ts";
+import { jevHome, resolveTypesafeKey } from "./lib/fm-jev-key.ts";
 import { hideSecretsState } from "./lib/fm-jev-privacy.ts";
 import { registrations } from "./lib/fm-jev-registration.ts";
 import {
@@ -150,9 +154,12 @@ import {
   JevClient,
   messageChars,
   resolveOptions,
+  type CallAnswer,
+  type CallDecision,
   type CompactOptions,
   type CompactResult,
   type Message as LibMessage,
+  type ToolCall as LibToolCall,
   type ToolResult as LibToolResult,
   type ToolUse as LibToolUse,
 } from "./vendor/fast-jev-compaction/src/index.ts";
@@ -276,16 +283,44 @@ export type JevCompactionRecord = JevCompactionAudit & {
 const JEV_MODEL = "jev-latest";
 const MIN_REDUCTION_RATIO = 0.25;
 const FILES_TAG_LIMIT = 20;
-// Live jev-1.13.0 answers to "keep this call" sit below upstream's 0.5 default
-// even for edits and the latest failing test run, so 0.5 dropped nearly every
-// call outright (docs/verification/jev.md). At 0.3 those calls keep their input
-// and a truncated result head while incidental reads still drop.
-const KEEP_THRESHOLD = 0.3;
+// Live jev-1.13.0 keep-call answers on saved Firstmate worker sessions cluster
+// between about 0.2 and 0.4, and the cluster moves from session to session, so
+// no fixed threshold keeps a steady share: upstream's 0.5 dropped 94-100% of
+// older calls and a fixed 0.3 still dropped 41-72% (docs/verification/jev.md).
+// The keep-call threshold is therefore set per compaction from Jev's own
+// answers: the answer at the middle rank of the candidate calls, so about half
+// keep their input and a result head while the rest drop. It never exceeds
+// KEEP_CALL_CAP, so a call Jev rates at least that high always stays, and never
+// falls below KEEP_CALL_FLOOR, so calls Jev is sure are spent still drop.
+const KEEP_CALL_CAP = 0.3;
+const KEEP_CALL_FLOOR = 0.1;
+// Keep-result answers sit lower still (about 0.1-0.2), so a full result stays
+// verbatim only at this fixed gate; a rank rule would keep whole outputs.
+const KEEP_RESULT_THRESHOLD = 0.3;
 
 const extensionFile = fileURLToPath(import.meta.url);
 
-
-
+/**
+ * The home's config/jev-compaction setting (docs/configuration.md "Jev
+ * compaction"): "off" turns Jev compaction off for this home's primary and every
+ * worker it launches, so native compaction runs; absent or "on" keeps the
+ * key-gated default. Content that is neither, or a file that cannot be read,
+ * reads as off rather than guessing, and says so on stderr.
+ */
+export function jevCompactionHomeSetting(): "on" | "off" {
+  const path = resolve(process.env.FM_CONFIG_OVERRIDE || resolve(jevHome(extensionFile), "config"), "jev-compaction");
+  let value: string;
+  try {
+    value = readFileSync(path, "utf8").trim();
+  } catch (error) {
+    if ((error as { code?: unknown }).code === "ENOENT") return "on";
+    console.error(`[fm-jev-compaction] ${path} could not be read; treating Jev compaction as off`);
+    return "off";
+  }
+  if (value === "on" || value === "off") return value;
+  console.error(`[fm-jev-compaction] ${path} is neither on nor off; treating Jev compaction as off`);
+  return "off";
+}
 
 function contentBlocks(content: unknown): OmpContentBlock[] {
   if (typeof content === "string") return [{ type: "text", text: content }];
@@ -575,22 +610,78 @@ export function buildFilesTag(fileOps: OmpFileOps): string {
   return `<files>\n${lines.join("\n")}\n</files>`;
 }
 
-// ---- Top-level: run the real vendored compact() against one omp region. ----
+// ---- Top-level: run the real vendored compact() against one omp region,
+// then decide with the calibrated threshold. ----
 
-export type JevRegionOptions = CompactOptions & { apiKey: string; baseUrl?: string; fetchImpl?: typeof fetch };
+export type JevRegionOptions = Omit<CompactOptions, "keepThreshold" | "preserveRecentMessages"> & { apiKey: string; baseUrl?: string; fetchImpl?: typeof fetch };
 export type JevRegionResult = { text: string; audit: JevCompactionAudit };
+export type AskedRegion = { libMessages: LibMessage[]; answered: CompactResult; truncateHeadChars: number };
 
-export async function compactOmpRegion(messages: readonly OmpMessage[], options: JevRegionOptions): Promise<JevRegionResult> {
+/**
+ * The keep-call threshold for one compaction: the keep-call answer at the
+ * middle rank of the candidate (unpinned) calls, clamped to
+ * [KEEP_CALL_FLOOR, KEEP_CALL_CAP]. Ties at the threshold stay, so a region
+ * can keep slightly more than half.
+ */
+export function calibratedKeepThreshold(answers: readonly CallDecision[]): number {
+  const scores = answers.filter((answer) => answer.reason !== "pinned").map((answer) => answer.keepCall).sort((a, b) => b - a);
+  const middle = scores.length > 0 ? scores[Math.ceil(scores.length / 2) - 1] : KEEP_CALL_CAP;
+  return Math.min(KEEP_CALL_CAP, Math.max(KEEP_CALL_FLOOR, middle));
+}
+
+/** One call's action, in the vendored library's own decision shape: the full result at the fixed result gate, the call and a result head at the calibrated call gate. */
+export function decideCalibrated(call: Pick<LibToolCall, "id" | "tool" | "pinned">, answer: CallAnswer, keepCallThreshold: number): CallDecision {
+  const base = { id: call.id, tool: call.tool, keepCall: answer.keepCall, keepResult: answer.keepResult };
+  if (call.pinned) return { ...base, action: "keep", reason: "pinned" };
+  if (answer.keepResult >= KEEP_RESULT_THRESHOLD) return { ...base, action: "keep", reason: "kept" };
+  if (answer.keepCall >= keepCallThreshold) return { ...base, action: "drop_result", reason: "result_dropped" };
+  return { ...base, action: "drop_call", reason: "call_dropped" };
+}
+
+/**
+ * Runs the real vendored compact() against one region to fit its state, batch
+ * its questions and collect Jev's answers. The decisions it makes at the
+ * library's own threshold are superseded by decideOmpRegion.
+ */
+export async function askOmpRegion(messages: readonly OmpMessage[], options: JevRegionOptions): Promise<AskedRegion> {
   const asker = new JevClient({ apiKey: options.apiKey, model: JEV_MODEL, baseUrl: options.baseUrl, fetch: options.fetchImpl });
   const libMessages = toLibraryMessages(messages);
   // The region omp hands the hook is already scoped to "not recent"; a
   // second preserveRecentMessages layer inside it would wrongly re-protect
   // its own tail, so this always compacts the whole given region.
-  const result = await compact(libMessages, asker, { ...options, preserveRecentMessages: 0 });
-  return {
-    text: renderLibraryMessages(result.messages),
-    audit: auditFromResult(JEV_MODEL, resolveOptions(options).keepThreshold, result, toolCallIdsByLibraryId(libMessages)),
+  const answered = await compact(libMessages, asker, { ...options, preserveRecentMessages: 0 });
+  return { libMessages, answered, truncateHeadChars: resolveOptions(options).truncateHeadChars };
+}
+
+/** Decides every call of an asked region at the given keep-call threshold and renders the result through the vendored applyDecisions, which truncates dropped results and never orphans a call from its result. */
+export function decideOmpRegion(asked: AskedRegion, keepCallThreshold: number): JevRegionResult {
+  const { libMessages, answered } = asked;
+  const calls = collectToolCalls(libMessages, 0);
+  const answers = new Map(answered.decisions.map((decision) => [decision.id, decision]));
+  // compact() decided every call, pinned ones included, so each id has an answer.
+  const decisions = calls.map((call) => decideCalibrated(call, answers.get(call.id)!, keepCallThreshold));
+  const messages = applyDecisions(libMessages, decisions, calls, asked.truncateHeadChars);
+  const count = (reason: CallDecision["reason"]): number => decisions.filter((decision) => decision.reason === reason).length;
+  const result: CompactResult = {
+    messages,
+    decisions,
+    stats: {
+      ...answered.stats,
+      messagesAfter: messages.length,
+      charsAfter: messages.reduce((sum, message) => sum + messageChars(message), 0),
+      kept: count("kept"),
+      resultsDropped: count("result_dropped"),
+      callsDropped: count("call_dropped"),
+      pinned: count("pinned"),
+    },
   };
+  return { text: renderLibraryMessages(messages), audit: auditFromResult(JEV_MODEL, keepCallThreshold, result, toolCallIdsByLibraryId(libMessages)) };
+}
+
+/** One region asked and decided at its own calibrated threshold. */
+export async function compactOmpRegion(messages: readonly OmpMessage[], options: JevRegionOptions): Promise<JevRegionResult> {
+  const asked = await askOmpRegion(messages, options);
+  return decideOmpRegion(asked, calibratedKeepThreshold(asked.answered.decisions));
 }
 
 export type IrreducibleRegion = { text: string; charsBefore: number; charsAfter: number };
@@ -644,13 +735,17 @@ function fallback(ctx: HookContext, reason: string): undefined {
 }
 
 export default function (pi: ExtensionAPI): void {
-  if (process.env.FM_JEV_COMPACTION === "0" || !resolveTypesafeKey(extensionFile)) return;
+  if (process.env.FM_JEV_COMPACTION === "0" || jevCompactionHomeSetting() === "off" || !resolveTypesafeKey(extensionFile)) return;
   const loaded = registrations("fm-jev-compaction");
   if (loaded.has(pi.events)) return;
 
   pi.on("session_before_compact", async (rawEvent: unknown, ctx: HookContext) => {
     const event = rawEvent as SessionBeforeCompactEvent;
     const cwd = ctx.cwd ?? process.cwd();
+
+    // A session that started before the home turned Jev compaction off still
+    // has this hook; honor the setting on every compaction, not only at load.
+    if (jevCompactionHomeSetting() === "off") return fallback(ctx, "this home's config/jev-compaction turns Jev compaction off");
 
     const hideSecrets = hideSecretsState(cwd);
     if (hideSecrets.state === "on") return fallback(ctx, `omp Hide Secrets is on (${hideSecrets.source}) and the hook receives the un-redacted region`);
@@ -692,16 +787,20 @@ export default function (pi: ExtensionAPI): void {
     // The region omits OMP's retained recent messages, so the library's own
     // goal (the region's last user prompts) can predate the current work.
     const goal = goalFromMessages(toLibraryMessages([...historyRegion, ...turnPrefixRegion, ...event.preparation.recentMessages]));
-    const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined, goal, keepThreshold: KEEP_THRESHOLD };
+    const options: JevRegionOptions = { apiKey, baseUrl: process.env.FM_JEV_ENDPOINT || undefined, goal };
 
     let merged: JevRegionResult;
     try {
-      const historyResult = await compactOmpRegion(historyRegion, options);
+      const history = await askOmpRegion(historyRegion, options);
       // Split-turn mirrors omp's own two-summary native behavior
       // (compaction.md "Split-turn handling"): a separate Jev pass for the
       // turn prefix, merged with the same documented section header, never
-      // flattened into one region.
-      const turnPrefixResult = turnPrefixRegion.length > 0 ? await compactOmpRegion(turnPrefixRegion, options) : undefined;
+      // flattened into one region. One threshold covers both passes, so about
+      // half of everything omp hands over stays rather than half of each part.
+      const turnPrefix = turnPrefixRegion.length > 0 ? await askOmpRegion(turnPrefixRegion, options) : undefined;
+      const keepCallThreshold = calibratedKeepThreshold([...history.answered.decisions, ...(turnPrefix?.answered.decisions ?? [])]);
+      const historyResult = decideOmpRegion(history, keepCallThreshold);
+      const turnPrefixResult = turnPrefix ? decideOmpRegion(turnPrefix, keepCallThreshold) : undefined;
       merged = turnPrefixResult
         ? { text: mergeSplitTurnSummary(historyResult.text, turnPrefixResult.text), audit: mergeAudits(historyResult.audit, turnPrefixResult.audit) }
         : historyResult;

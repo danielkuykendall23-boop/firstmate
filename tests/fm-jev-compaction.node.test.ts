@@ -106,6 +106,10 @@ type Handler = (event: unknown, ctx: HookCtx) => Promise<{ compaction: OmpCompac
 
 const isolatedAgentDir = mkdtempSync(join(tmpdir(), "fm-jev-agent-"));
 const isolatedProject = mkdtempSync(join(tmpdir(), "fm-jev-project-"));
+// The suite never reads a real home's config/jev-compaction: a developer home
+// that turned Jev compaction off must not change what these tests observe.
+const isolatedConfig = mkdtempSync(join(tmpdir(), "fm-jev-config-"));
+process.env.FM_CONFIG_OVERRIDE = isolatedConfig;
 
 // The omp binary the handler runs `config get` through is process.execPath
 // (inside a real session that is omp itself). This stand-in answers from
@@ -483,7 +487,7 @@ test("compactOmpRegion runs the real vendored compact() end to end against a fak
   assert.equal(result.audit.candidateCalls, 2);
   assert.equal(result.audit.kept, 1);
   assert.deepEqual(result.audit.dropped, ["drop1"], "the dropped id is omp's toolCall id, resolvable against the journal");
-  assert.equal(result.audit.keepThreshold, 0.5, "without an explicit threshold the audit records the vendored library's own resolved default");
+  assert.equal(result.audit.keepThreshold, 0.3, "the calibrated threshold is capped at 0.3 when the middle-rank answer is higher");
   assert.match(result.text, /important content Jev should keep/);
   assert.doesNotMatch(result.text, /drwxr-xr-x/, "dropped tool output must not appear in the rendered summary");
 });
@@ -496,8 +500,9 @@ test("compactOmpRegion sends to the given endpoint when one is supplied, the hoo
 
 test("compactOmpRegion never orphans a tool call without its result or vice versa (the vendored library's own pairing guarantee)", async () => {
   const messages: OmpMessage[] = [userText("investigate"), assistantToolCall("c1", "read", { path: "a.ts" }), toolResult("c1", "content")];
+  // Rated below the 0.1 floor, so even this region's only call drops.
   const fakeFetch: typeof fetch = async () =>
-    new Response(JSON.stringify({ model: "jev-latest", answers: { call_t1: { type: "noul", noul: 0.1 }, result_t1: { type: "noul", noul: 0.1 } } }), { status: 200 });
+    new Response(JSON.stringify({ model: "jev-latest", answers: { call_t1: { type: "noul", noul: 0.05 }, result_t1: { type: "noul", noul: 0.05 } } }), { status: 200 });
   const result = await compactOmpRegion(messages, { apiKey: "k", fetchImpl: fakeFetch });
   assert.equal(result.audit.dropped.length, 1, "a fully-dropped call drops call and result together, never one alone");
   assert.doesNotMatch(result.text, /content/, "the dropped result text must not leak into the summary");
@@ -531,6 +536,34 @@ test("missing key and explicit disable leave native compaction untouched; enable
     registerJevCompaction({ ...api, events: {} });
     assert.equal(count, 2, "a child session must receive its own registration");
   });
+});
+
+function configWith(setting: string): string {
+  const config = mkdtempSync(join(tmpdir(), "fm-jev-config-"));
+  writeFileSync(join(config, "jev-compaction"), setting);
+  return config;
+}
+
+test("a home's config/jev-compaction of off registers no hook, including for a worker that reaches its home only through FM_HOME; on or absent keeps the key-gated hook, and any other content reads as off", async () => {
+  const home = homeWithEnvFile("TYPESAFE_API_KEY=file-key\n");
+  mkdirSync(join(home, "config"));
+  const setting = join(home, "config", "jev-compaction");
+  await withEnv({ FM_CONFIG_OVERRIDE: undefined, FM_ROOT_OVERRIDE: undefined, FM_HOME: home, TYPESAFE_API_KEY: undefined }, async () => {
+    assert.equal(registerWith(undefined).registrations, 1, "absent keeps today's default");
+    writeFileSync(setting, "off\n");
+    assert.equal(registerWith(undefined).registrations, 0, "off registers nothing, so native speculative compaction stays available");
+    writeFileSync(setting, "on\n");
+    assert.equal(registerWith(undefined).registrations, 1);
+    writeFileSync(setting, "disabled\n");
+    assert.equal(await quietStderr(async () => registerWith(undefined).registrations), 0, "an unrecognized value never silently keeps Jev on");
+  });
+});
+
+test("a session that loaded the hook before its home turned Jev compaction off falls back to native compaction on its next compaction without contacting Jev", async () => {
+  const { result, seen, notes } = await runHandler(compactEvent(droppableRegion()), { env: { FM_CONFIG_OVERRIDE: configWith("off\n") } });
+  assert.equal(result, undefined);
+  assert.equal(seen.urls.length, 0);
+  assert.match(notes[0], /config\/jev-compaction turns Jev compaction off/);
 });
 
 test("key precedence preserves home isolation without exporting file credentials", async () => {
@@ -718,6 +751,60 @@ test("the handler keeps a call Jev rates moderately relevant as a truncated reco
   assert.equal(record?.truncated, 1, "a moderately relevant edit keeps its call and a result head");
   assert.deepEqual(record?.dropped, ["read1"]);
   assert.match(result?.compaction.summary ?? "", /config\.py/);
+});
+
+// A region of file reads, one per rating; each result is long enough that
+// keeping, truncating or dropping it shows in the installed summary.
+function ratedRegion(prefix: string, ratings: readonly number[]): OmpMessage[] {
+  return [userText("keep going"), ...ratings.flatMap((_, i) => [assistantToolCall(`${prefix}${i}`, "read", { path: `${prefix}${i}.ts` }), toolResult(`${prefix}${i}`, `${prefix}${i} body `.repeat(300))])];
+}
+
+// Answers the n-th Jev request from passes[n]: call_tK gets the K-th rating and
+// every result question gets resultRating.
+function ratingFetch(passes: readonly (readonly number[])[], resultRating: number): typeof fetch {
+  let pass = 0;
+  return async (_url, init) => {
+    const ratings = passes[pass++];
+    const body = JSON.parse(String(init?.body));
+    const answers = Object.fromEntries(Object.keys(body.questions).map((name) => {
+      const [kind, id] = name.split("_");
+      return [name, { type: "noul", noul: kind === "call" ? ratings[Number(id.slice(1)) - 1] : resultRating }];
+    }));
+    return new Response(JSON.stringify({ model: "jev-latest", answers }), { status: 200 });
+  };
+}
+
+test("the handler keeps about half of a region's calls even when Jev rates every call below 0.3: calls at or above the middle-rank answer keep their input and a result head, and full results still need 0.3", async () => {
+  const ratings = [0.12, 0.19, 0.14, 0.17, 0.11, 0.2, 0.13, 0.16, 0.18, 0.15];
+  const { result, notes } = await runHandler(compactEvent(ratedRegion("c", ratings)), { fetch: ratingFetch([ratings], 0.2) });
+  assert.deepEqual(notes, []);
+  const record = result?.compaction.preserveData.jevCompaction;
+  assert.equal(record?.keepThreshold, 0.16, "the fifth-highest of ten answers");
+  assert.equal(record?.kept, 0, "a result rated 0.2 is truncated, never kept whole, though it clears the call threshold");
+  assert.equal(record?.truncated, 5);
+  assert.deepEqual(record?.dropped, ["c0", "c2", "c4", "c6", "c9"]);
+  assert.match(result?.compaction.summary ?? "", /c5\.ts/);
+  assert.doesNotMatch(result?.compaction.summary ?? "", /c0\.ts/);
+});
+
+test("the calibrated threshold never exceeds 0.3, so every call Jev rates that high stays, and never falls below 0.1, so calls Jev is sure are spent still drop", async () => {
+  const high = [0.6, 0.5, 0.45, 0.4, 0.35, 0.1];
+  const capped = (await runHandler(compactEvent(ratedRegion("c", high)), { fetch: ratingFetch([high], 0.12) })).result?.compaction.preserveData.jevCompaction;
+  assert.equal(capped?.keepThreshold, 0.3);
+  assert.deepEqual(capped?.dropped, ["c5"], "five of six calls stay because each is rated at least 0.3");
+  const spent = [0.05, 0.04, 0.03, 0.02];
+  const floored = await runHandler(compactEvent(ratedRegion("c", spent)), { fetch: ratingFetch([spent], 0.01) });
+  assert.equal(floored.result?.compaction.preserveData.jevCompaction.keepThreshold, 0.1);
+  assert.deepEqual(floored.result?.compaction.preserveData.jevCompaction.dropped, ["c0", "c1", "c2", "c3"]);
+});
+
+test("a split turn is calibrated once over both passes, so about half of everything omp hands over stays rather than half of each part", async () => {
+  const history = ratedRegion("h", [0.25, 0.25]);
+  const turnPrefix = ratedRegion("p", [0.15, 0.15]);
+  const { result } = await runHandler(compactEvent(history, { isSplitTurn: true, turnPrefixMessages: turnPrefix }), { fetch: ratingFetch([[0.25, 0.25], [0.15, 0.15]], 0.12) });
+  const record = result?.compaction.preserveData.jevCompaction;
+  assert.equal(record?.keepThreshold, 0.25);
+  assert.deepEqual(record?.dropped, ["p0", "p1"], "the prefix's calls rank below the history's and drop, though each half alone would have kept its own");
 });
 
 test("a split turn whose two regions' verbatim text already caps the combined reduction under 25% is declined before either region is uploaded", async () => {

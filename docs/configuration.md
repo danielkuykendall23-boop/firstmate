@@ -406,6 +406,16 @@ When the file is absent, worker launches do not add a board address and retain t
 Malformed or unreadable values refuse the launch before the worker starts, while the adapter refuses the same malformed value before polling.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
 
+## Jev compaction (config/jev-compaction)
+
+The optional local, gitignored `config/jev-compaction` turns [Jev-guided compaction](jev.md) off for this home's primary and every OMP worker launched from it, so OMP's native compaction runs instead.
+It holds one word: `off` disables it, while `on` or an absent file keeps the default, where a resolved `TYPESAFE_API_KEY` enables it.
+Any other content, or a file that cannot be read, reads as off and is named on the session's stderr, so a mistyped value never silently keeps Jev on.
+The compaction extension reads it under the effective Firstmate home, from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present; worker launches already carry `FM_HOME`.
+A session started with the setting off registers no compaction hook, and a session started before it was turned off falls back to native compaction at its next compaction.
+`FM_JEV_COMPACTION=0` in a launching environment still disables it independently; neither switch changes `jev_review` or dispatch routing.
+The file is inherited into secondmate homes through the primary-authoritative configuration contract, so their workers follow the same choice.
+
 ## Home brief include (config/brief-include.md)
 
 The optional local, gitignored `config/brief-include.md` carries standing worker instructions that one captain wants on every ship and scout brief, so private brief content needs no edit to a tracked file.
