@@ -1,0 +1,3 @@
+## 40 iterations each of test_opencode_healthy_arm_output_does_not_suppress_guard (in-tree plugins) with 10 busy-loop CPU hogs
+fixed (target 785fce7): pass=40 fail=0
+base guard plugin (0477c58, fix reverted in place): pass=40 fail=0
