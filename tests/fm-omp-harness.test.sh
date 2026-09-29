@@ -28,9 +28,9 @@
 #   6. The turn-end guard extension compels one continuation on exit 2 and
 #      stands down when the payload already carries stop_hook_active.
 #   7. The watch extension arms through fm_watch_arm_omp and delivers an
-#      actionable close as one follow-up; only the tui or rpc primary runner
-#      arms, an in-process print-mode subagent runner stays inert, and the
-#      primary re-arms after a shutdown it outlived.
+#      actionable close as one follow-up; only the primary runner (with or
+#      without a runner mode) arms, an in-process print-mode subagent runner
+#      stays inert, and the primary re-arms after a shutdown it outlived.
 #   8. The Calm extension touches nothing while off, persists /calm to the
 #      shared preference file and reloads it on session_start and session_switch, and reports
 #      only working, waiting-for-you, quiet-age, and idle from omp's events;
@@ -628,7 +628,8 @@ EOF
 # subagent in print mode. Scenarios: C the primary alone; D a subagent runner
 # binds and starts; A it also shuts down; B the primary shuts down and then
 # switches sessions with no session_start; R the primary shuts down and its own
-# fm_watch_arm_omp re-arms.
+# fm_watch_arm_omp re-arms; N a primary on an omp build whose contexts carry no
+# mode still arms.
 drive_watch_runner_scenario() {  # <home> <repo> <scenario>
   FM_HOME="$1" FM_ROOT_OVERRIDE="$2" SCENARIO="$3" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 \
     FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
@@ -638,7 +639,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const home = process.env.FM_HOME;
 const scenario = process.env.SCENARIO;
 writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
-const mainCtx = scenario === "C" ? { mode: "rpc", hasUI: true } : { mode: "tui", hasUI: true };
+const mainCtx = scenario === "C" ? { mode: "rpc", hasUI: true } : scenario === "N" ? { hasUI: true } : { mode: "tui", hasUI: true };
 const subCtx = { mode: "print", hasUI: false };
 function runner() {
   const handlers = new Map(); const sent = []; let tool = null;
@@ -701,7 +702,7 @@ printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
 exec sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  for scenario in C D A B R; do
+  for scenario in C D A B R N; do
     home="$TMP_ROOT/watch-runners/home-$scenario"
     mkdir -p "$home/state"
     out=$(drive_watch_runner_scenario "$home" "$repo" "$scenario")
@@ -709,7 +710,7 @@ SH
     expect_code 0 "$status" "omp watch runner scenario $scenario: $out"
     [ -z "$out" ] || fail "omp watch runner scenario $scenario printed output: $out"
   done
-  pass ".omp watch extension: only the tui or rpc primary arms; a print-mode subagent runner stays inert through start and shutdown, and the primary re-arms after a shutdown via session_switch or fm_watch_arm_omp"
+  pass ".omp watch extension: only the primary arms, even with no runner mode; a print-mode subagent runner stays inert through start and shutdown, and the primary re-arms after a shutdown via session_switch or fm_watch_arm_omp"
 }
 
 # The lock holder loads both primary extensions, then a nested omp-like process

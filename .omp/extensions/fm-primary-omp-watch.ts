@@ -24,12 +24,13 @@
 // A process can host several runners that each bind this extension: the
 // primary session and every in-process `task` subagent (omp gives a subagent its
 // own runner, auto-discovers this file for it, and runs it as the same OS
-// process that holds the session lock). Only the supervising runner - the one
-// omp initialized in the `tui` or `rpc` mode - may activate a generation, arm,
-// or deliver wakes; a subagent runner, which omp initializes in `print` mode
+// process that holds the session lock). Only the supervising runner may
+// activate a generation, arm, or deliver wakes; a subagent runner, which omp
+// initializes in `print` mode
 // (verified live on omp 18.2.10 with and without --no-session; its hasUI is
 // false, but an rpc primary reports hasUI true, so hasUI is not the signal),
-// stays inert, and its fm_watch_arm_omp refuses by naming the mode it saw.
+// stays inert, and its fm_watch_arm_omp refuses by naming the mode it saw. Any
+// other runner, including one whose context carries no mode, supervises.
 // omp emits session_shutdown when it disposes a runner and session_switch for
 // in-process /new, /resume, and /fork (18.2.10 emits only session_switch there).
 // This extension binds one generation per activation. Only the active live
@@ -153,10 +154,9 @@ const armReadyTimeoutMs = positiveInteger(
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
-// The runner modes omp initializes a long-lived primary session in; every other
-// mode (a task subagent's `print` above all) is inert. See the session-generation
-// ownership note in the header.
-const supervisingModes: Record<string, true> = { tui: true, rpc: true };
+// The runner mode omp initializes an in-process task subagent in; it is the only
+// inert mode. See the session-generation ownership note in the header.
+const subagentMode = "print";
 
 let nextGenerationId = 0;
 let nextHandoffId = 0;
@@ -519,21 +519,17 @@ const cleanupOnProcessExit = () => {
 process.once("exit", cleanupOnProcessExit);
 
 export default function (pi: ExtensionAPI) {
-  // A bind never activates: only an event or call proving this runner is the
-  // supervising session does, so an in-process subagent's bind stays inert.
+  // A bind never activates: only an event or call from a runner not identified
+  // as a subagent does, so an in-process subagent's bind stays inert.
   let generation = createGeneration();
-  let observedMode = "";
-  let supervisingRunner = false;
+  let subagentRunner = false;
 
   // Learns this runner's role from any context that carries omp's runner mode;
   // a context without one keeps the verdict already learned.
   function observeRunner(ctx: unknown): boolean {
     const mode = runnerMode(ctx);
-    if (mode) {
-      observedMode = mode;
-      supervisingRunner = supervisingModes[mode] === true;
-    }
-    return supervisingRunner;
+    if (mode) subagentRunner = mode === subagentMode;
+    return !subagentRunner;
   }
 
   function activateSupervisingGeneration(): void {
@@ -548,7 +544,7 @@ export default function (pi: ExtensionAPI) {
     if (!observeRunner(ctx)) {
       return {
         ok: false,
-        message: `watcher: not armed - this omp runner is not the supervising session (mode=${observedMode || "unknown"}); only the tui or rpc primary arms the watcher, never a task subagent`,
+        message: `watcher: not armed - this omp runner is not the supervising session (mode=${subagentMode}); only the primary arms the watcher, never a task subagent`,
       };
     }
     activateSupervisingGeneration();
@@ -1113,7 +1109,7 @@ export default function (pi: ExtensionAPI) {
     await activateOwningSession(ctx);
   });
   pi.on?.("session_shutdown", async () => {
-    if (!supervisingRunner) return;
+    if (subagentRunner) return;
     // omp carries no shutdown reason (verified: `reason` is undefined), so the
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.

@@ -57,7 +57,7 @@ A file named both by `-e` and by auto-discovery loads twice (two factory calls, 
 
 ### omp in-process subagent runners, 2026-09-23
 
-omp runs a `task` subagent as another runner of the primary's own process, auto-discovers `.omp/extensions/` for it, and calls the extension factory again against the same shared module, so `.omp/extensions/fm-primary-omp-watch.ts` arms only from the runner omp initialized in `tui` or `rpc` mode.
+omp runs a `task` subagent as another runner of the primary's own process, auto-discovers `.omp/extensions/` for it, and calls the extension factory again against the same shared module, so `.omp/extensions/fm-primary-omp-watch.ts` never arms from a runner omp initialized in `print` mode; any other runner, including one whose context carries no `mode`, supervises.
 A probe extension recording every runner's context on omp/18.2.10 (macOS arm64, `openai-codex/gpt-6-astra`) observed these values:
 
 | Runner | `ctx.mode` | `ctx.hasUI` | Subagent session file |
