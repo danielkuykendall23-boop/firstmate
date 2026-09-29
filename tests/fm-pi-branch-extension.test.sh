@@ -834,7 +834,7 @@ assertRenderedNote(sentToMain[0].message.content, "⛵");
 const captainRendered = entryRenderers.get("fm-branch-visible-outcome")(
   captainEntries[0],
   { expanded: false },
-  renderTheme,
+  { fg(_color, text) { return text; } },
 );
 if (captainRendered.text !== "⚓ [seq 3] task-9: PR https://example.com/pr/9 checks green, ready for review") {
   throw new Error(`captain renderer changed the exact visible outcome: ${captainRendered.text}`);
