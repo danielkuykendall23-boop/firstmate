@@ -1,0 +1,23 @@
+host mechanism: perl
+== /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.dXEgC5ljn4/base-lib.sh
+fm_run_timed 2 sh -c 'kill -SEGV $$' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'kill -TERM $$' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'kill -KILL $$' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'kill -ABRT $$' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'exit 0' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'exit 3' -> rc=3 (0s)
+fm_run_timed 2 sh -c 'exit 200' -> rc=200 (0s)
+fm_run_timed 2 sh -c 'sleep 30' -> rc=124 (2s)
+/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.dXEgC5ljn4/base-lib.sh: line 44:  1507 Segmentation fault: 11  "$@"
+bash fallback SEGV: 139
+== bin/fm-timeout-lib.sh
+fm_run_timed 2 sh -c 'kill -SEGV $$' -> rc=139 (0s)
+fm_run_timed 2 sh -c 'kill -TERM $$' -> rc=143 (0s)
+fm_run_timed 2 sh -c 'kill -KILL $$' -> rc=137 (0s)
+fm_run_timed 2 sh -c 'kill -ABRT $$' -> rc=134 (0s)
+fm_run_timed 2 sh -c 'exit 0' -> rc=0 (0s)
+fm_run_timed 2 sh -c 'exit 3' -> rc=3 (0s)
+fm_run_timed 2 sh -c 'exit 200' -> rc=200 (0s)
+fm_run_timed 2 sh -c 'sleep 30' -> rc=124 (3s)
+bin/fm-timeout-lib.sh: line 44:  2020 Segmentation fault: 11  "$@"
+bash fallback SEGV: 139

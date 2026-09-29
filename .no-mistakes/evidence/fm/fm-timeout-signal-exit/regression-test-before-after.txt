@@ -1,0 +1,8 @@
+== test_perl_timeout_reports_signal_death (from tests/fm-session-start.test.sh) against bin/fm-timeout-lib.sh @ 0477c58
+lib under test: <tmp>/0477c58/bin/fm-timeout-lib.sh
+not ok - perl timeout path command killed by SIGSEGV: expected exit 139, got 0
+exit=1
+== test_perl_timeout_reports_signal_death (from tests/fm-session-start.test.sh) against bin/fm-timeout-lib.sh @ 68e8065
+lib under test: <tmp>/68e8065/bin/fm-timeout-lib.sh
+ok - the perl timeout path reports a signal death as 128+signal
+exit=0

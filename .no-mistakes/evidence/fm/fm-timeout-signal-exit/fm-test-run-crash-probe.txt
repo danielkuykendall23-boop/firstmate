@@ -1,0 +1,32 @@
+===== commit 0477c58: bin/fm-test-run.sh --per-script-timeout-secs 10 tests/zz-crash-probe.test.sh
+FM_TEST_BEGIN 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh family=unclassified expected_gate_skip=none
+about to crash
+FM_TEST_END 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh exit=139 duration_ms=53 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=188
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=53 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/zz-crash-probe.test.sh duration_ms=53
+runner exit=1
+----- without per-script timeout (reference, no fm_run_timed):
+FM_TEST_BEGIN 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh family=unclassified expected_gate_skip=none
+about to crash
+FM_TEST_END 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh exit=139 duration_ms=43 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=175
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=43 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/zz-crash-probe.test.sh duration_ms=43
+runner exit=1
+===== commit 68e8065: bin/fm-test-run.sh --per-script-timeout-secs 10 tests/zz-crash-probe.test.sh
+FM_TEST_BEGIN 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh family=unclassified expected_gate_skip=none
+about to crash
+FM_TEST_END 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh exit=139 duration_ms=60 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=197
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=60 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/zz-crash-probe.test.sh duration_ms=60
+runner exit=1
+----- without per-script timeout (reference, no fm_run_timed):
+FM_TEST_BEGIN 2026-09-29T20:11:52Z tests/zz-crash-probe.test.sh family=unclassified expected_gate_skip=none
+about to crash
+FM_TEST_END 2026-09-29T20:11:53Z tests/zz-crash-probe.test.sh exit=139 duration_ms=44 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=169
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=44 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/zz-crash-probe.test.sh duration_ms=44
+runner exit=1
