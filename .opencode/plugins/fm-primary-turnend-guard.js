@@ -22,6 +22,9 @@ function runProcess(command, args, input = "") {
     });
     child.on("error", () => resolve({ code: 0, stdout: "", stderr: "" }));
     child.on("close", (code) => resolve({ code: code ?? 0, stdout, stderr }));
+    // The guard's exit status is its verdict; it may exit without reading the
+    // payload, and writing to its already-closed stdin must not crash the host.
+    child.stdin.on("error", () => {});
     child.stdin.end(input);
   });
 }
