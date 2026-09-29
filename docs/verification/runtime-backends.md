@@ -1928,6 +1928,26 @@ FM_TEST_END 2026-08-29T01:01:01Z tests/fm-pi-branch-live-e2e.test.sh exit=0 dura
 
 The focused extension suite also exercised the installed Pi 0.84.4 picker and outcome-renderer consumers; [`calm-mode-feasibility.md`](../calm-mode-feasibility.md#2026-08-28-pi-0844-outcome-renderer-compatibility-verification) owns the version-scoped renderer evidence.
 
+### 2026-09-29 Pi renderer and export compatibility
+
+On macOS arm64 with Node 24.11.1, the real stock-consumer scenario from `tests/fm-pi-branch-extension.test.sh` passed against independently installed Pi 0.87.1 and 0.99.1.
+It exercises collapsed and expanded output, Calm toggles, a row created while Calm is active, error colors, and HTML-renderer fallback.
+The outcomes renderer delegates to the installed stock component rather than copying its title or preview format.
+Real headless Chrome exports from both versions passed the browser-visibility assertions from `tests/fm-calm-pi-extension.test.sh`; making the hidden operational message visible deliberately failed that same assertion.
+The full two shell suites could not initialize in the worker sandbox because process-identity inspection was denied, so these are focused consumer and browser probes, not full-suite results.
+Refresh complete coverage with `bin/fm-test-run.sh tests/fm-pi-branch-extension.test.sh tests/fm-calm-pi-extension.test.sh` outside that restriction.
+
+Strict type compatibility was also checked with:
+
+```sh
+FM_PI_PACKAGE_DIR=<installed Pi package> npm exec --yes --package=typescript@5.9.3 -- bash tests/fm-pi-primary-types.test.sh
+```
+
+```text
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.84.4
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.1
+```
+
 ### 2026-08-29 deterministic captain-outcome delivery
 
 The credential-free live guard, focused extension suite, store suite, and strict typecheck were run against the locally installed `@earendil-works/pi-coding-agent` 0.84.3 package.

@@ -15,9 +15,7 @@ set -u
 TMP_ROOT=$(fm_test_tmproot fm-pi-branch-extension)
 EXT="$ROOT/.pi/extensions/fm-branch-supervision.ts"
 export NODE_NO_WARNINGS=1
-# The Pi release whose stock renderer stopped supplying an implicit reset at
-# multiline boundaries, which is the contract this file's renderer cases
-# compare against.
+# Oldest Pi release exercised by the installed-stock rendering guard.
 PI_STOCK_RENDER_FLOOR=0.84.4
 
 # Semantic-version floor for a version string this file already holds (Pi's
@@ -792,64 +790,8 @@ if (outcomeScript(["unread"]) !== "") throw new Error("merged outcomes were not 
 // renderer.
 const outcomesTool = mainTools.find((tool) => tool.name === "fm_branch_outcomes");
 if (!outcomesTool) throw new Error("fm_branch_outcomes was not registered on main");
-const renderTheme = {
-  fg(_color, text) { return text; },
-  bg(_color, text) { return text; },
-  bold(text) { return text; },
-};
-const renderContext = { state: {}, isError: false, isPartial: false };
-const stockResult = { content: [{ type: "text", text: "OUTCOME_DUMP" }] };
-const calmOffCall = outcomesTool.renderCall({}, renderTheme, renderContext);
-const calmOffResult = outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-if (calmOffCall.constructor.name !== "Box" || calmOffCall.paddingX !== 1 || calmOffCall.paddingY !== 1) {
-  throw new Error("fm_branch_outcomes changed its ordinary shell rendering");
-}
-if (calmOffResult.constructor.name !== "Container" || calmOffCall.children[0]?.text !== "fm_branch_outcomes" || calmOffCall.children[1]?.text !== "OUTCOME_DUMP") {
-  throw new Error("fm_branch_outcomes changed its ordinary call or result rendering");
-}
-const legacyStockResult = {
-  content: [{
-    type: "text",
-    text: Array.from({ length: 12 }, (_, index) => `LEGACY_OUTCOME_${String(index + 1).padStart(2, "0")}`).join("\n"),
-  }],
-};
-const legacyRenderContext = { state: {}, isError: false, isPartial: false };
-const legacyCall = outcomesTool.renderCall({}, renderTheme, legacyRenderContext);
-outcomesTool.renderResult(legacyStockResult, { expanded: false, isPartial: false }, renderTheme, legacyRenderContext);
-const collapsedLegacyText = legacyCall.children[1]?.text;
-if (!collapsedLegacyText?.includes("LEGACY_OUTCOME_12") || collapsedLegacyText.includes("more lines")) {
-  throw new Error("legacy all-line stock capability did not preserve collapsed Calm-off output");
-}
-outcomesTool.renderResult(legacyStockResult, { expanded: true, isPartial: false }, renderTheme, legacyRenderContext);
-if (legacyCall.children[1]?.text !== collapsedLegacyText) {
-  throw new Error("legacy all-line stock capability changed expanded Calm-off output");
-}
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: false });
-const calmOnCall = outcomesTool.renderCall({}, renderTheme, renderContext);
-const calmOnResult = outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-if (calmOnCall.constructor.name !== "Container" || calmOnCall.render(100).length !== 0 || calmOnResult.constructor.name !== "Container" || calmOnResult.render(100).length !== 0) {
-  throw new Error("fm_branch_outcomes remained visible while Calm was on");
-}
-pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
-if (outcomesTool.renderCall({}, renderTheme, renderContext).constructor.name !== "Box" || outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext).constructor.name !== "Container") {
-  throw new Error("fm_branch_outcomes did not restore ordinary rendering when Calm was turned off");
-}
-pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
-let exportCallFellBack = false;
-let exportResultFellBack = false;
-try {
-  outcomesTool.renderCall({}, renderTheme, renderContext);
-} catch {
-  exportCallFellBack = true;
-}
-try {
-  outcomesTool.renderResult(stockResult, { expanded: false, isPartial: false }, renderTheme, renderContext);
-} catch {
-  exportResultFellBack = true;
-}
-if (!exportCallFellBack || !exportResultFellBack) {
-  throw new Error("fm_branch_outcomes replaced Pi stock export rendering");
-}
+// Rendering parity, live Calm toggles, and export fallback are exercised against
+// the installed Pi consumer below, not the incidental shape of mock components.
 const listed = await outcomesTool.execute("call-4", { recent: 2 }, undefined, undefined, {});
 const listedText = listed.content[0].text;
 if (listedText.split("\n").length !== 2 || !listedText.includes("checks green")) {
@@ -4560,14 +4502,8 @@ test_outcomes_tool_uses_stock_execution_and_export_consumers() {
     echo "skip: installed @earendil-works/pi-coding-agent package not found"
     return
   fi
-  # This case compares the extension's own renderers against Pi's stock
-  # rendering, so its verdict is only meaningful against the vendor contract
-  # those renderers target: since Pi 0.84.4 the stock renderer no longer
-  # supplies an implicit reset at multiline boundaries, and the extension
-  # emits that reset itself. An older installed Pi still supplies it, so the
-  # two legitimately differ there and a comparison would report a defect that
-  # is really a version skew. Name the version and skip rather than degrade
-  # quietly; a package whose version cannot be read at all is still a failure.
+  # Compare against the installed vendor consumer, not copied renderer output.
+  # Keep the guard's established minimum version; unreadable versions fail.
   package_version=$(node -p 'require(process.argv[1]).version || ""' "$package_dir/package.json" 2>/dev/null || printf '')
   [ -n "$package_version" ] \
     || fail "installed @earendil-works/pi-coding-agent has no readable version at $package_dir"
@@ -4681,10 +4617,22 @@ actualRow.invalidate();
 if (actualRow.render(100).length !== 0) {
   throw new Error("Calm-on ToolExecutionComponent row remained visible");
 }
+const bornHidden = new ToolExecutionComponent("fm_branch_outcomes", "hidden", args, { showImages: false }, actualDefinition, ui, process.cwd());
+bornHidden.updateResult(result);
+bornHidden.setExpanded(true);
+if (bornHidden.render(100).length !== 0) throw new Error("new Calm-on row remained visible");
 pi.events.emit("firstmate:calm-presentation", { active: false, stockExportRendering: false });
 actualRow.invalidate();
 if (JSON.stringify(actualRow.render(100)) !== JSON.stringify(stockRow.render(100))) {
   throw new Error("ToolExecutionComponent rendering did not restore after live toggle");
+}
+bornHidden.invalidate();
+if (JSON.stringify(bornHidden.render(100)) !== JSON.stringify(stockRow.render(100))) {
+  throw new Error("row created while Calm was on did not restore stock output");
+}
+for (const row of [stockRow, actualRow]) row.updateResult({ ...result, isError: true });
+if (JSON.stringify(actualRow.render(100)) !== JSON.stringify(stockRow.render(100))) {
+  throw new Error("error result lost stock rendering");
 }
 
 pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
