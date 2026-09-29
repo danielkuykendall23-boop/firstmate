@@ -1,0 +1,4 @@
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.1
+exit=0
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.84.4
+exit=0
