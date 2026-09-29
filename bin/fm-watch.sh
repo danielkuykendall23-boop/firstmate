@@ -2291,6 +2291,28 @@ resurface_after_downtime() {
   wake "check: rearm-resurface"
 }
 
+# Bounded Herdr presentation housekeeping on the slow-check cadence.
+# bin/fm-herdr-session-cleanup.sh retires a projected space only under its own
+# per-candidate locks and proofs - only a projection whose task record is
+# gone - and preserves every task that still has a record. Running that
+# same locked entry point here, once per CHECK_INTERVAL inside the
+# lock-owning session, is what lets a space that becomes provably unused
+# mid-session disappear without a new session, a daemon, or a per-poll sweep.
+# It is silent housekeeping: its warnings go to the triage log and it never
+# wakes firstmate.
+herdr_projection_sweep() {
+  local out line
+  out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-herdr-session-cleanup.sh" 2>&1) || true
+  [ -n "$out" ] || return 0
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    triage_log "herdr projection sweep: $line"
+  done <<EOF
+$out
+EOF
+}
+
 while :; do
   # Self-eviction: if the singleton lock no longer names this process, a second
   # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
@@ -2367,6 +2389,7 @@ while :; do
   # never run until the fleet went quiet. Checks are due only every
   # CHECK_INTERVAL, so most cycles skip this block and fall straight through.
   if [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
+    herdr_projection_sweep
     rejected_checks=
     contribution_check_output=
     for c in "$STATE"/*.check.sh; do

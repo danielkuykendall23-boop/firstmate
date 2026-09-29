@@ -173,6 +173,27 @@ fm_watcher_healthy() {
   return 0
 }
 
+# fm_watcher_stale_beacon_reason <state> <watch-path> [grace] [home]
+# Distinguishes fm_watcher_healthy's beacon-only failure from a genuinely
+# missing, dead, or foreign-owned watcher lock. True only when the lock pid is
+# alive and identity-matched to this home's watcher (the same checks
+# fm_watcher_healthy runs), but its beacon has simply gone stale past
+# <grace> - the shape a macOS sleep or suspend leaves behind, since the
+# watcher resumes ticking once the system wakes rather than needing repair.
+# On a true verdict, echoes a diagnostic line naming the pid and beacon age; a
+# dead pid, a foreign/absent lock, or a still-fresh beacon return 1 with no
+# output, so callers fall back to the ordinary "no live watcher" message.
+fm_watcher_stale_beacon_reason() {
+  local state=$1 watch_path=$2 grace=${3:-${FM_GUARD_GRACE:-300}} home=${4:-$FM_HOME} lockdir pid age
+  lockdir="$state/.watch.lock"
+  pid=$(cat "$lockdir/pid" 2>/dev/null || true)
+  fm_pid_alive "$pid" || return 1
+  fm_watcher_lock_matches_pid "$state" "$watch_path" "$pid" "$home" || return 1
+  age=$(fm_path_age "$state/.last-watcher-beat")
+  [ "$age" -lt "$grace" ] && return 1
+  printf 'watcher pid %s alive, beacon stale %ss - possible system sleep; recheck after one poll\n' "$pid" "$age"
+}
+
 # fm_watcher_healthy above is the PID-STRICT primitive: true only when a live,
 # identity-matched watcher PROCESS holds this home's lock with a fresh beacon. The
 # arm layer (bin/fm-watch-arm.sh, bin/fm-claude-stop-autoarm.sh) needs exactly
@@ -533,10 +554,20 @@ fm_lock_claim() {
   return 0
 }
 
+# Returns 0 created, 1 not created (held, raced, or claim lost), and 2 when the
+# lock cannot be created at all: its private owner record, whose name is unique
+# and therefore independent of any holder, could not be made - a missing or
+# unwritable directory, or a write the operating system refuses. FM_LOCK_ERROR
+# names that cause; no amount of waiting or stealing can clear it.
+FM_LOCK_ERROR=
 fm_lock_try_create() {
   local lockdir=$1 allowed_steal_owner=${2:-} ownerdir
   FM_LOCK_OWNER_DIR=
-  ownerdir=$(fm_lock_owner_dir "$lockdir") || return 1
+  FM_LOCK_ERROR=
+  if ! ownerdir=$(fm_lock_owner_dir "$lockdir"); then
+    FM_LOCK_ERROR="cannot create lock $lockdir: its owner record could not be written in $(dirname "$lockdir") (missing directory, no permission, or a sandbox refusal)"
+    return 2
+  fi
   if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
     fm_lock_discard_owner "$ownerdir"
     return 1
@@ -912,15 +943,22 @@ fm_recovery_marker_reopen_announced() {
   fm_recovery_transition "$1" reopen-announced
 }
 
+# Returns 0 acquired, 1 held or contended (retry later), and 2 when the lock
+# cannot be created at all (fm_lock_try_create; FM_LOCK_ERROR names why). A
+# failed create is never read as a stale holder in that case: there is no
+# holder, so stealing would only recurse onto ever-longer .steal paths.
 fm_lock_try_acquire() {
   local lockdir=$1 pid steal cur rc steal_owner primary_owner current
   FM_LOCK_HELD_PID=
   FM_LOCK_OWNER_DIR=
   FM_LOCK_RECOVERED_PID=
 
-  if fm_lock_try_create "$lockdir"; then
-    return 0
-  fi
+  rc=0
+  fm_lock_try_create "$lockdir" || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    2) return 2 ;;
+  esac
 
   fm_current_pid current || return 1
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
@@ -934,9 +972,12 @@ fm_lock_try_acquire() {
     # - the hang reproduced by the self-held reclaim regression in
     # tests/fm-wake-queue.test.sh - so reclaim the abandoned hold instead.
     fm_lock_remove_path "$lockdir" || true
-    if fm_lock_try_create "$lockdir"; then
-      return 0
-    fi
+    rc=0
+    fm_lock_try_create "$lockdir" || rc=$?
+    case "$rc" in
+      0) return 0 ;;
+      2) return 2 ;;
+    esac
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     return 1
   fi
@@ -950,10 +991,12 @@ fm_lock_try_acquire() {
   fi
 
   steal="$lockdir.steal"
-  if ! fm_lock_try_acquire "$steal"; then
+  rc=0
+  fm_lock_try_acquire "$steal" || rc=$?
+  if [ "$rc" -ne 0 ]; then
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     FM_LOCK_OWNER_DIR=
-    return 1
+    return "$rc"
   fi
   steal_owner=${FM_LOCK_OWNER_DIR:-}
 
@@ -997,9 +1040,9 @@ fm_lock_try_acquire() {
     return 1
   fi
   fm_lock_remove_path "$lockdir" || true
-  rc=1
-  if fm_lock_try_create "$lockdir" "$steal_owner"; then
-    rc=0
+  rc=0
+  fm_lock_try_create "$lockdir" "$steal_owner" || rc=$?
+  if [ "$rc" -eq 0 ]; then
     # shellcheck disable=SC2034 # Read by sourcing callers after lock acquisition.
     FM_LOCK_RECOVERED_PID=$cur
   fi
@@ -1012,9 +1055,23 @@ fm_lock_try_acquire() {
   return "$rc"
 }
 
+# Wait until the lock is acquired. A lock that cannot be created at all
+# (fm_lock_try_acquire returning 2) is never retried: waiting cannot clear it,
+# so this prints FM_LOCK_ERROR and exits the calling process with status 1.
+# It exits rather than returning because many callers run their critical
+# section unconditionally after this call, and must never do so unlocked.
 fm_lock_acquire_wait() {
-  local lockdir=$1
-  while ! fm_lock_try_acquire "$lockdir"; do
+  local lockdir=$1 rc
+  while :; do
+    rc=0
+    fm_lock_try_acquire "$lockdir" || rc=$?
+    case "$rc" in
+      0) return 0 ;;
+      2)
+        echo "error: ${FM_LOCK_ERROR:-cannot create lock $lockdir}; refusing to wait for a lock that can never be created" >&2
+        exit 1
+        ;;
+    esac
     sleep 0.1
   done
 }

@@ -74,10 +74,15 @@ RC=$?
 
 REASON=$(cat "$ERR" 2>/dev/null || true)
 [ -n "$REASON" ] || REASON='tasks in flight, no live watcher - repair missing watcher supervision according to the session-start operating block before ending the turn'
+PREAMBLE='TURN WOULD END BLIND - supervision is off. Repair missing watcher supervision according to the session-start operating block before ending the turn.'
+case "$REASON" in
+  *'WATCHER BEACON STALE - RECHECK BEFORE REPAIRING'*)
+    PREAMBLE='WATCHER BEACON STALE - the watcher process is alive but its beacon is stale. Follow the recheck instruction below before ending the turn.' ;;
+esac
 # shellcheck source=bin/fm-operational-input.sh
 . "$ROOT/bin/fm-operational-input.sh"
 fm_operational_input_encode turn-end-guard \
-  "TURN WOULD END BLIND - supervision is off. Repair missing watcher supervision according to the session-start operating block before ending the turn.
+  "$PREAMBLE
 
 $REASON" \
   PROMPT || exit 0

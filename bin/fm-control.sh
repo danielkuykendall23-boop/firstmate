@@ -45,6 +45,21 @@
 #              endpoint, so this verb cannot tell a destroyed window from one on
 #              a tmux server it cannot address, and it will not claim a stop it
 #              cannot see.
+#              For a `kind=secondmate` target, a stop this verb actually
+#              confirms (`already-stopped`, `endpoint-gone`, or `stopped`)
+#              also records a durable `secondmate_stopped_by=control-exit` /
+#              `secondmate_stopped_at=<epoch>` pair in the task's meta, under
+#              its own meta lock (secondmate_stop_marker_set, below). The
+#              session-start liveness sweep in bin/fm-bootstrap.sh
+#              (secondmate_liveness_one) skips a marked record instead of
+#              relaunching it as a crash, so a deliberate stop stays stopped.
+#              `relaunch` (this plane) and `bin/fm-spawn.sh <id> --secondmate`
+#              both clear the marker when they publish the replacement
+#              record - see fm-spawn.sh's preserve_relaunch_meta owned-field
+#              list and the fresh `--secondmate` respawn's from-scratch
+#              record build - so either normal recovery path un-stops it.
+#              A marker write failure is reported on stderr but never
+#              reverses the exit that already happened.
 #   relaunch   Transactionally replace the running agent with a new one, in the
 #              SAME worktree - and the same endpoint whenever that endpoint
 #              still exists - on the same or a newly chosen
@@ -162,6 +177,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-backlog-transition-lib.sh
+. "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -949,6 +966,42 @@ do_relaunch() {
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
 
+# secondmate_stop_marker_set: record that this kind=secondmate task's agent
+# was stopped ON PURPOSE by this exact `exit` command (see the `exit` verb
+# doc at the top of this file for the field contract and the two paths that
+# clear it). Best-effort: a write failure is reported by the caller but never
+# reverses the exit that already happened.
+secondmate_stop_marker_set() {
+  local lock tmp epoch
+  lock=$(fm_meta_lock_path "$META") || return 1
+  fm_lock_acquire_wait "$lock"
+  if [ ! -f "$META" ]; then
+    fm_lock_release "$lock"
+    return 1
+  fi
+  tmp=$(mktemp "$STATE/.$ID.meta.stop-marker.XXXXXX" 2>/dev/null) || {
+    fm_lock_release "$lock"
+    return 1
+  }
+  epoch=$(date +%s)
+  if ! { grep -vE '^secondmate_stopped_by=|^secondmate_stopped_at=' "$META" || true; } > "$tmp"; then
+    rm -f "$tmp"
+    fm_lock_release "$lock"
+    return 1
+  fi
+  if ! printf 'secondmate_stopped_by=control-exit\nsecondmate_stopped_at=%s\n' "$epoch" >> "$tmp"; then
+    rm -f "$tmp"
+    fm_lock_release "$lock"
+    return 1
+  fi
+  if ! fm_backlog_atomic_transition publish "$tmp" "$META" "task record" "$STATE"; then
+    rm -f "$tmp"
+    fm_lock_release "$lock"
+    return 1
+  fi
+  fm_lock_release "$lock"
+}
+
 # --- verbs ------------------------------------------------------------------
 
 case "$VERB" in
@@ -970,6 +1023,10 @@ case "$VERB" in
     ;;
   exit)
     result=$(do_exit)
+    if [ "$KIND" = secondmate ]; then
+      secondmate_stop_marker_set \
+        || echo "warning: task $ID stopped, but its deliberate-stop marker could not be recorded; a future session-start liveness sweep may relaunch it" >&2
+    fi
     echo "$result $ID harness=$HARNESS backend=$BACKEND endpoint=$T worktree=$WT"
     ;;
   relaunch)

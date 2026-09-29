@@ -867,6 +867,42 @@ test_secondmate_control_command_carries_no_marker() {
   pass "fm-control: a lifecycle command to a secondmate is unmarked and opens no reply expectation"
 }
 
+# --- 7. secondmate deliberate-stop marker -----------------------------------
+
+test_exit_records_deliberate_stop_marker_for_secondmate() {
+  local dir out rc home
+  dir=$(new_case sm-stop-marker)
+  home="$dir/home"
+  add_task "$dir" domain claude secondmate
+  # A secondmate's worktree IS its home; give it the marker its records need.
+  printf '%s\n' domain > "$dir/wt-domain/.fm-secondmate-home"
+  alive_as "$dir" claude
+  out=$(run_control "$dir" domain exit); rc=$?
+  expect_code 0 "$rc" "exiting a secondmate's agent should succeed"$'\n'"$out"
+  assert_contains "$out" "stopped domain" "the exit outcome should report the confirmed stop"
+  [ "$(grep -c '^secondmate_stopped_by=control-exit$' "$home/state/domain.meta")" = 1 ] \
+    || fail "fm-control exit should record exactly one secondmate_stopped_by=control-exit line, got: $(cat "$home/state/domain.meta")"
+  case "$(grep '^secondmate_stopped_at=' "$home/state/domain.meta" | tail -1)" in
+    secondmate_stopped_at=''|*secondmate_stopped_at=*[!0-9=]*)
+      fail "secondmate_stopped_at should be a plain epoch, got: $(grep '^secondmate_stopped_at=' "$home/state/domain.meta")"
+      ;;
+  esac
+  pass "fm-control exit: a confirmed secondmate stop records a durable deliberate-stop marker"
+}
+
+test_exit_does_not_mark_non_secondmate_stopped() {
+  local dir out rc home
+  dir=$(new_case ship-stop-no-marker)
+  home="$dir/home"
+  add_task "$dir" t1 claude ship
+  alive_as "$dir" claude
+  out=$(run_control "$dir" t1 exit); rc=$?
+  expect_code 0 "$rc" "exiting a ship's agent should succeed"$'\n'"$out"
+  assert_not_contains "$(cat "$home/state/t1.meta")" "secondmate_stopped_by" \
+    "a non-secondmate exit must never record the secondmate deliberate-stop marker"
+  pass "fm-control exit: a non-secondmate stop never records the secondmate deliberate-stop marker"
+}
+
 test_fm_send_still_marks_the_same_secondmate_task() {
   local dir log out rc
   dir=$(new_case sm-send)
@@ -922,3 +958,5 @@ test_grok_interrupt_without_acknowledgement_reports_unconfirmed
 test_grok_idle_footer_does_not_confirm_cancellation
 test_secondmate_control_command_carries_no_marker
 test_fm_send_still_marks_the_same_secondmate_task
+test_exit_records_deliberate_stop_marker_for_secondmate
+test_exit_does_not_mark_non_secondmate_stopped

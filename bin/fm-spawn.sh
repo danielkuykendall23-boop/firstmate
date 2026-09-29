@@ -290,6 +290,10 @@
 #   This is an exec environment boundary, not a sandbox for the pane's startup
 #   shell, credential files, same-user processes, or later shell initialization.
 #   See docs/configuration.md for provider/Git setup and supported limits.
+# TYPESAFE_API_KEY: every launch, with or without the allowlist, unsets it in
+#   the pane shell and agent, so a key the launcher or terminal server holds
+#   ambiently never reaches a worker. Firstmate's Jev tools read it from
+#   $FM_HOME/.env instead (docs/jev.md).
 # Claude permission mode (config/claude-permission-mode):
 #   One token selecting the permission flag every claude launch (ship, scout,
 #   secondmate, and relaunch) carries. Absent or `bypass` keeps today's
@@ -512,6 +516,11 @@ case "$CLAUDE_PERMISSION_MODE" in
 auto) CLAUDE_PERM_FLAG='--permission-mode auto' ;;
 *) CLAUDE_PERM_FLAG='--dangerously-skip-permissions' ;;
 esac
+# config/worker-sandbox (bin/fm-worker-sandbox.sh header owns the contract):
+# resolved once per spawn or relaunch, before any mutation, so a malformed
+# setting refuses instead of launching a worker outside the fence the captain
+# chose. Only ship and scout workers are fenced; a secondmate runs its own home.
+WORKER_SANDBOX=$("$SCRIPT_DIR/fm-worker-sandbox.sh" setting "$CONFIG") || exit 1
 # config/lavish-axi-host is the primary-owned per-machine address for the
 # shared Lavish server. Read it once per launch and refuse malformed values so
 # every worker reaches the same server instead of starting a second one.
@@ -2239,6 +2248,18 @@ agy)
   }
   ;;
 esac
+
+# Worker sandbox preflight: refuse before any endpoint, worktree, or metadata
+# exists when a fenced launch is impossible, so the setting can never degrade
+# into an unsandboxed worker. A raw launch command names no verified harness,
+# so no profile can be proven for it.
+if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
+  if [ "$RAW_LAUNCH" -eq 1 ]; then
+    echo "error: config/worker-sandbox is on, but a raw launch command has no verified sandbox profile; refusing to launch the worker unsandboxed - choose a supported harness or turn the setting off" >&2
+    exit 1
+  fi
+  "$SCRIPT_DIR/fm-worker-sandbox.sh" preflight "$HARNESS" || exit 1
+fi
 
 # config/secondmate-harness may carry optional model/effort tokens alongside the
 # harness ("<harness> [<model>] [<effort>]"). They apply only when this is a
@@ -4510,9 +4531,14 @@ else
 fi
 SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
+  # secondmate_stopped_by/secondmate_stopped_at (bin/fm-control.sh's `exit`
+  # verb doc owns the write contract) are OWNED here but never echoed below,
+  # so a relaunch always drops a deliberate-stop marker forward from
+  # RELAUNCH_META rather than carrying it onto the freshly launched agent -
+  # the same owned-but-unechoed technique `traceparent` already uses above.
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx secondmate_stopped_by secondmate_stopped_at", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -4755,7 +4781,9 @@ fi
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
-LAUNCH="export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
+# Unset beside it: the Jev key reaches Firstmate's tools only through
+# $FM_HOME/.env, never a worker's inherited environment (header above).
+LAUNCH="unset TYPESAFE_API_KEY; export COMPACT_ADVISER_DISABLE=1; $LAUNCH"
 if [ -z "$SPAWN_TRACEPARENT" ] && [ "$RELAUNCH" -eq 1 ]; then
   LAUNCH="unset TRACEPARENT; $LAUNCH"
 fi
@@ -4895,6 +4923,18 @@ LAUNCH_STAGE="$LAUNCH_DIR/.launch.$SPAWN_GEN.tmp"
 if [ -e "$LAUNCH_FILE" ] || [ -L "$LAUNCH_FILE" ]; then
   echo "error: task launch file $LAUNCH_FILE already exists; refusing to replace it" >&2
   exit 1
+fi
+# Worker sandbox (bin/fm-worker-sandbox.sh header): the profile is staged in
+# this private launch directory, outside every path the worker may write, and
+# the whole launch - environment prefix included - runs under it. A profile
+# that cannot be generated or loaded refuses the launch rather than dropping
+# the fence.
+if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
+  SANDBOX_PROFILE="$LAUNCH_DIR/sandbox.$SPAWN_GEN.sb"
+  SANDBOX_EXEC_BIN=$("$SCRIPT_DIR/fm-worker-sandbox.sh" profile --id "$ID" --harness "$HARNESS" \
+    --worktree "$WT" --task-tmp "$TASK_TMP" --state "$STATE_REAL" --data "$DATA" \
+    --output "$SANDBOX_PROFILE") || exit 1
+  LAUNCH="$(shell_quote "$SANDBOX_EXEC_BIN") -f $(shell_quote "$SANDBOX_PROFILE") /bin/sh -c $(shell_quote "$LAUNCH")"
 fi
 if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   chmod 0600 "$LAUNCH_STAGE" && mv -f "$LAUNCH_STAGE" "$LAUNCH_FILE"); then

@@ -1,10 +1,14 @@
-// Jev credential resolution for OMP extensions. Values never enter logs or process.env.
+// Jev credential and home resolution for OMP extensions. Values never enter logs or process.env.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+/** The owning Firstmate home: FM_HOME, then FM_ROOT_OVERRIDE, then the repository containing the extension. */
+export function jevHome(extensionFile: string): string {
+  return process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || resolve(dirname(extensionFile), "../..");
+}
+
 export function resolveTypesafeKey(extensionFile: string): string | null {
-  const home = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || resolve(dirname(extensionFile), "../..");
-  return process.env.TYPESAFE_API_KEY || envFileValue(`${home}/.env`, "TYPESAFE_API_KEY") || null;
+  return process.env.TYPESAFE_API_KEY || envFileValue(`${jevHome(extensionFile)}/.env`, "TYPESAFE_API_KEY") || null;
 }
 /**
  * The one-key .env read of bin/fm-env-lib.sh's fmx_env_get: the last

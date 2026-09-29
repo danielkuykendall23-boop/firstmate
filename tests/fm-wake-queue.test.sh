@@ -1566,6 +1566,44 @@ test_interruption_before_and_after_raw_commit() {
   pass "interruptions preserve durable rows until post-handling acknowledgement"
 }
 
+# Finding #15 (data/env-bug-audit/report.md): a drain killed while it is
+# preparing the UNREAD STATUS/OPEN DECISIONS presentation left its
+# .status-presentation.prepared.* scratch file behind. print_status_sections
+# runs inside the (print_status_presentation) subshell, whose inherited traps
+# bash resets, so the outer drain's cleanup() trap never reaches that file. A
+# PATH-stubbed cat TERMs its parent - that subshell - when asked to present
+# the prepared file, landing the interruption while the scratch file exists.
+test_interrupted_status_presentation_leaves_no_prepared_temp_file() {
+  local dir state status fakebin real_cat f glob_count
+  dir=$(make_case interrupted-status-presentation)
+  state="$dir/state"
+  status="$state/task1.status"
+  fakebin="$dir/fakebin"
+  real_cat=$(command -v cat)
+  mkdir -p "$fakebin"
+  # shellcheck disable=SC2016 # The stub expands $*, $PPID and $@ itself.
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'case "$*" in\n'
+    printf '  *.status-presentation.prepared.*) : > %q; kill -TERM "$PPID" ;;\n' "$dir/interrupted"
+    printf 'esac\n'
+    printf 'exec %q "$@"\n' "$real_cat"
+  } > "$fakebin/cat"
+  chmod +x "$fakebin/cat"
+  printf 'note: captain said use REST not RPC\n' > "$status"
+
+  PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2>"$dir/drain.err" || true
+  [ -e "$dir/interrupted" ] || fail "drain never presented its status-presentation scratch file"
+  glob_count=0
+  for f in "$state"/.status-presentation.prepared.*; do
+    [ -e "$f" ] || continue
+    glob_count=$((glob_count + 1))
+  done
+  [ "$glob_count" -eq 0 ] \
+    || fail "interrupted drain leaked its status-presentation scratch file: $(ls "$state"/.status-presentation.prepared.* 2>/dev/null)"
+  pass "an interrupted drain leaves no status-presentation.prepared.* residue behind"
+}
+
 # The guarded self-announced status append (fm_wake_status_append_self_announced)
 # and the seen-signature gate it shares with the watcher's signal scan. Both
 # directions of the dedup contract are pinned through the real library
@@ -2051,3 +2089,4 @@ test_stale_ack_that_consumes_nothing_names_the_current_wake
 test_branch_stale_ack_that_consumes_nothing_names_its_granted_wake
 test_recovery_ack_failure_is_reported
 test_interruption_before_and_after_raw_commit
+test_interrupted_status_presentation_leaves_no_prepared_temp_file

@@ -15,7 +15,7 @@ No import-extension or credential patch is needed: esbuild resolves upstream `.j
 `dist/review.js` is generated from that entry with Zod 4.6.5 included, not a reimplementation of evaluation logic.
 `dist/review.d.ts` exposes the corresponding upstream types.
 The old server bundle is removed; no MCP client, subprocess, or user-scope installation is used.
-The OMP adapter owns key resolution, native secret-protection refusal, the local fake-endpoint fetch seam and sanitized fallback messages.
+The OMP adapter owns key resolution, native secret-protection refusal, the local fake-endpoint fetch seam, forwarding only the evaluator's own input fields to its strict schema, and sanitized fallback messages.
 
 ## Dependency notice and reproducibility
 

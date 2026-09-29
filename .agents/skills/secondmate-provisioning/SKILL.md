@@ -235,6 +235,10 @@ Each secondmate is a firstmate in its own home, so it runs recovery on startup a
 A secondmate's recovery reconciles only work that is already its own and then idles.
 It never initiates a survey or audit during recovery.
 
+A secondmate deliberately stopped through `bin/fm-control.sh <id> exit` records a durable `secondmate_stopped_by=control-exit` / `secondmate_stopped_at=<epoch>` marker in its meta.
+The session-start liveness sweep in `bin/fm-bootstrap.sh` skips a marked record instead of treating its dead endpoint as a crash, and prints `SECONDMATE_LIVENESS: secondmate <id>: skipped: deliberately stopped (...)` rather than respawning it.
+`bin/fm-control.sh <id> relaunch` and `bin/fm-spawn.sh <id> --secondmate` both clear the marker as part of publishing the replacement record, so either normal recovery path un-stops it; there is no separate command to clear the marker alone.
+
 ## Retirement and teardown
 
 A secondmate is persistent by default.

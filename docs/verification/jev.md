@@ -4,7 +4,7 @@ Audience: maintainer verification.
 
 [The Jev operator guide](../jev.md) owns activation, privacy, fallback and desktop consent.
 This record distinguishes installed-runtime proof with local fake responses from live authenticated inference.
-No credentials, purchases, private desktop observations, primary restarts or global OMP setting changes were used.
+The credential-free sections used no credentials, purchases, private desktop observations, primary restarts or global OMP setting changes.
 
 ## Credential-free OMP proof
 
@@ -81,27 +81,53 @@ The deterministic wrapper test executes controlled child programs and proves mis
 This is not evidence of a successful desktop interaction.
 Agent Desktop 0.9.2's installed `act` interface lacks `--no-values`; the wrapper must not silently promise that protection.
 
-## Pending live activation and verification
+## Live authenticated verification
 
-A valid TypeSafe key with usable credits is still required for authenticated inference.
-The user must enter the key privately and perform any OMP `/login typesafe` themselves; the extension key reader is separate from OMP's built-in judge login.
-Starting a new session is required to replace already-loaded extension factories.
-The primary environment's installation and restart are not proven by this worktree's isolated runtime tests.
+Verified on 2026-09-28 on macOS arm64 with OMP 18.2.10 against live `jev-1.13.0`, using the key in the owning home's `.env`, synthetic inputs only, and Hide Secrets off.
 
-After authorization, use a fresh synthetic project and the owning private home, leaving the fake endpoint unset:
+`jev_review` had failed every OMP worker call with the generic unavailable reason because OMP hands `execute` its intent field `i` (the eval tool bridge always does), which upstream's strict input schema rejects before any request; the adapter now forwards only the evaluator's own fields.
+A fresh session exercised the direct tool, the eval bridge and the reviewer:
 
 ```sh
-env -u FM_JEV_ENDPOINT FM_HOME="<authorized-private-home>" \
-  omp --cwd "<synthetic-project>" -e "<firstmate-code-root>/.omp"
+cd <synthetic-git-project-with-uncommitted-diff>
+env -u FM_JEV_ENDPOINT -u FM_TASK_ID -u TYPESAFE_API_KEY FM_HOME=<home> \
+  omp -p --no-session --thinking low --mode json -e <code-root>/.omp \
+  "<call jev_review directly, then via eval's tool.jev_review, then the reviewer agent, on the same task and diff>"
 ```
 
-In that session, call `jev_review` with a small nonsecret task and diff, preserve the complete evaluation, make an independently justified improvement and rescore using `previousEvaluation`.
-Run the read-only reviewer on the same diff and verify that its returned structured evaluation agrees with the tool result.
-Use a fresh synthetic tool-heavy history and `/compact` to verify an authenticated compaction request and installed audit record.
+All three returned scores (correctness 3.4 for a divide function missing the requested zero check); the reviewer reported correctness 3.4 at confidence 0.58.
+A direct adapter run with the intent field present also scored a 53,019-character input (task, a 27,000-character diff and one 24,000-character file) in 2.4 seconds, and a rescore with `previousEvaluation` returned comparison deltas.
+
+Compaction was checked by driving the registered `session_before_compact` handler directly (not `/compact` in a session) with a synthetic 9-call worker region.
+Before the change, the vendored library at its 0.5 default dropped all 10 calls of a matching probe, including both edits and the latest failing test run; live keep-call answers were 0.18-0.51 and keep-result answers 0.10-0.21.
+With the session goal and a fixed 0.3 threshold the handler reported `kept 0, truncated 7, dropped 2 of 9 calls (74% reduction ...)`, dropping only a grep and `git status`, and the summary retained the latest failing test's head.
+
+### Compaction calibration on saved worker sessions
+
+Measured on 2026-09-28 with OMP 18.2.10, Node 24.11.1 and live `jev-1.13.0`, using the home key, Hide Secrets off, and read-only copies of five saved OMP worker sessions in the owning home, each holding one live Jev compaction whose region had already been sent to Jev at the time.
+Each region was rebuilt from its session journal as the entries before the compaction's `firstKeptEntryId`, with the later entries as the recent messages that supply the goal; every rebuilt region produced the same candidate-call count the live audit recorded.
+`compactOmpRegion` then ran against live Jev with the session goal, recording every answer; the whole measurement made 84 requests totalling about 2.35 million input tokens, about $0.10 at the published $0.042 per million input tokens.
+
+Across the five regions, median keep-call answers were 0.25-0.31 (10th to 90th percentile 0.18-0.42) and median keep-result answers 0.13-0.15.
+Candidate calls kept whole or truncated, of the total:
+
+| Session region | Live compaction as recorded | Fixed 0.3 | Calibrated (threshold) |
+| --- | --- | --- | --- |
+| Worker A, 154 calls | 2 (0.5, no goal) | 45 (29%) | 84 (55%, 0.25) |
+| Worker B, 251 calls | 17 (0.5, no goal) | 149 (59%) | 144 (57%, 0.30) |
+| Worker C, 276 calls | 2 (0.5, no goal) | 77 (28%) | 139 (50%, 0.27) |
+| Worker D, 360 calls | 2 (0.5, no goal) | 111 (31%) | 186 (52%, 0.27) |
+| Worker E, 313 calls | 163 (0.3, goal) | 165 (53%) | 166 (53%, 0.30) |
+
+Calibrated region character reductions were 59-69%, and at most three results per region were kept whole.
+Offline replay of the recorded answers through the calibrated rule kept 83-91% of edit calls per region and 79-100% of edited file paths, beside the summary's own `<files>` block; the dropped edits were mostly failed edits, cosmetic touch-ups and throwaway scripts outside the project.
+The latest failing and latest passing test runs stayed in every region that had them, except Worker C's latest passing run, rated 0.26 against its 0.27 threshold.
+A goal extended with an explicit sentence about edits, test runs and file paths raised answers across the board on two regions without improving edit retention under the calibrated rule, so the adapter keeps the plain session goal.
+Repeat runs of the same region moved its middle-rank answer by at most 0.01 and its retained count by at most 23 of 360 calls.
+
+Desktop: `bin/fm-jev-desktop.sh act --access-approved --ui-approved --app Finder "select the file calc.py"`, without `--execute`, on a Finder window showing only the synthetic project returned `ok: true`, `decision: act`, target confidence 0.98 and `executed: null`.
+The same resolve on a Finder window of `/Applications` returned `typesafe 503 Service Unavailable` on four attempts over about two minutes while small review requests succeeded.
+
+Still pending: `/compact` inside a live OMP session with its installed audit record, and a desktop `run` that executes a reversible synthetic-app goal.
 Honor an enabled or unprovable native secret-protection setting: refusal is the expected result, not permission to bypass protection.
 Never reuse a private production transcript just to obtain a successful test.
-
-Desktop success remains pending exact-app access approval, consent to send that synthetic app's UI descriptions, and a usable key.
-Load both desktop skills, consult `bin/fm-jev-desktop.sh --help` and the installed operator's current help, then use the wrapper for one reversible synthetic-app goal.
-The two approval flags attest the recorded permission; they do not create it.
-Confirm the real UI result and operator exit status, and keep private windows, populated forms, credentials and destructive operations out of the proof.

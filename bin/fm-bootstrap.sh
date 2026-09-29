@@ -734,8 +734,23 @@ secondmate_liveness_one_timed() {  # <meta> <id> <label>
 secondmate_liveness_one() {  # <meta> <id>
   local meta=$1 id=$2
   local window harness backend target agent_state out cause remote_host remote_rc readiness_reason route_out remote_backend
+  local stopped_by stopped_at
   window=$(fm_meta_get "$meta" window)
   [ -n "$window" ] || return 0
+  # A secondmate stopped ON PURPOSE through `bin/fm-control.sh <id> exit`
+  # records this durable marker (bin/fm-control.sh's `exit` verb doc owns the
+  # write contract). Respect it before any local or remote probe: treating a
+  # marked record's dead endpoint as a crash is exactly the bug this check
+  # exists to prevent. `bin/fm-control.sh <id> relaunch` and
+  # `bin/fm-spawn.sh <id> --secondmate` both clear the marker when they
+  # publish the replacement record, so either normal recovery path un-stops
+  # it without a separate command to clear the marker alone.
+  stopped_by=$(fm_meta_get "$meta" secondmate_stopped_by)
+  if [ -n "$stopped_by" ]; then
+    stopped_at=$(fm_meta_get "$meta" secondmate_stopped_at)
+    echo "SECONDMATE_LIVENESS: secondmate $id: skipped: deliberately stopped ($stopped_by at ${stopped_at:-unknown time})"
+    return 0
+  fi
   harness=$(fm_meta_get "$meta" harness)
   remote_host=$(fm_meta_get "$meta" remote_host)
   if [ -n "$remote_host" ]; then

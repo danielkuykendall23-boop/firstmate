@@ -600,18 +600,17 @@ export default function (pi: ExtensionAPI) {
     const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
     const result = await runGuard(stopHookActive);
     if (result.code !== 2) return undefined;
+    const body = (result.stderr.includes("WATCHER BEACON STALE - RECHECK BEFORE REPAIRING")
+      ? "WATCHER BEACON STALE - the watcher process is alive but its beacon is stale. " +
+        "Follow the recheck instruction below before ending the turn.\n\n"
+      : "TURN WOULD END BLIND - supervision is off. " +
+        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n") +
+      result.stderr;
     let content: string;
     try {
-      content = encodeFirstmateOperationalInput(
-        "turn-end-guard",
-        "TURN WOULD END BLIND - supervision is off. " +
-          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-          result.stderr,
-      );
+      content = encodeFirstmateOperationalInput("turn-end-guard", body);
     } catch {
-      content = "TURN WOULD END BLIND - supervision is off. " +
-        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-        result.stderr;
+      content = body;
     }
     return { continue: true, additionalContext: content };
   });

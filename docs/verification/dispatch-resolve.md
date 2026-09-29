@@ -105,10 +105,12 @@ The guard checks the isolated saved config's bytes and modification time and the
 An RPC `prompt` response acknowledges a slash command before its handler completes; the guard waits for that command's matching `prompt_result` before checking its final model.
 `FM_JEV_ROUTE_LIVE_E2E=1` requires the installed runtime and tools rather than allowing a capability skip.
 
-## Pending live proof
+## Live proof
 
-The following checks remain unrun until a real key, credits, and user-authorized OMP login exist.
-The fake-endpoint results above do not establish production authentication, account access, or real Jev rule quality.
+Verified on 2026-09-28 with OMP 18.2.10, the home's `.env` key and live `jev-1.13.0`; the fake-endpoint results above do not establish production authentication, account access, or real Jev rule quality.
+The resolver returned `clear`, `rule_1`, confidence 0.67-0.70 and 4,744 input tokens on a real ship brief, with `--json` carrying `.chosen.profile` `{harness: omp, model: openai-codex/gpt-6-astra, effort: xhigh}` for `--resolve` to adopt; two of five calls that hour instead returned `error` (`http 503` and `http 000 after 5000 ms`).
+The RPC process below, run with the home as its working directory (routing acts only when the session cwd is `FM_HOME`) and `FM_STATE_OVERRIDE` pointed at a scratch directory, switched `anthropic/claude-opus-5-5 high` to `openai-codex/gpt-6-astra xhigh`, notified `Jev route: openai-codex/gpt-6-astra xhigh (rule_1, confidence 0.66)`, logged one `clear` record, and left the global OMP config's size and modification time unchanged.
+Spawn-time `--resolve` remains unrun live.
 Run from the real Firstmate home, with real `curl` and quota tools on `PATH`, no fake provider or transport, and no worker marker:
 
 ```sh

@@ -23,8 +23,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LAUNCH="$ROOT/bin/fm-afk-launch.sh"
 START="$ROOT/bin/fm-afk-start.sh"
 CONTRACT="$ROOT/bin/fm-afk-contract.sh"
-# The daemon paths refuse on a Pi primary, so pin a daemon-running harness for
-# every unit below; the Pi refusal has its own units (unit_pi_never_launches_the_daemon).
+# The daemon paths refuse on a Pi or omp primary, so pin a daemon-running harness
+# for every unit below; the Pi/omp refusal has its own units (unit_pi_and_omp_never_launch_the_daemon).
 unset PI_CODING_AGENT FM_PI_HARNESS CURSOR_AGENT CURSOR_INVOKED_AS GEMINI_CLI ATLASSIAN_AGENT_TYPE ROVODEV_CLI
 export CLAUDECODE=1
 
@@ -45,6 +45,21 @@ GLOBAL_CLEANUP() {
 }
 trap GLOBAL_CLEANUP EXIT
 
+# run_launch <subcommand> [args...]: invoke fm-afk-launch.sh with
+# fm_afk_launch_primary_harness pinned to a fixed daemon-running harness
+# (claude), independent of the REAL ancestry of whatever process executes
+# this suite. Every unit below except unit_pi_and_omp_never_launch_the_daemon
+# and unit_non_refusing_harness_still_launches_daemon expects the daemon
+# paths to be ALLOWED; without this pin, running this suite itself inside a
+# live omp- or Pi-hosted session (a supported, real execution shape for this
+# codebase) would make unmocked ancestry detection report that harness and
+# spuriously trip the daemon refusal, which those two units mock per case
+# instead. `env CLAUDECODE=1` alone cannot pin this: a genuine omp or Pi
+# ancestor outranks it (bin/fm-harness.sh detect_own).
+run_launch() {
+  bash -c '. "$1"; shift; fm_afk_launch_primary_harness() { printf claude; }; fm_afk_launch_main "$@"' _ "$LAUNCH" "$@"
+}
+
 confirm_posture() {  # <home>
   FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" "$CONTRACT" propose >/dev/null 2>&1 \
     && FM_HOME="$1" FM_STATE_OVERRIDE="$1/state" "$CONTRACT" confirm >/dev/null 2>&1
@@ -59,7 +74,7 @@ unit_propose_confirm_records_the_posture_without_a_daemon() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-propose.XXXXXX")
   mkdir -p "$st/state"
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" propose \
+  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch propose \
     --words 'merge the windows fix when green' --expected-return 2026-09-08T08:00Z --spend 2 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] && [ -f "$st/state/.afk-contract.proposed" ] \
@@ -71,14 +86,14 @@ unit_propose_confirm_records_the_posture_without_a_daemon() {
   else
     fail "propose: read-back or proposal wrong (rc=$rc): $out"
   fi
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" propose --words 'merge it' --grant fix-windows 2>&1)
+  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch propose --words 'merge it' --grant fix-windows 2>&1)
   rc=$?
   if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -F -- '--grant was retired' >/dev/null; then
     pass "propose: the retired --grant flag is refused by name"
   else
     fail "propose: --grant was not refused by name (rc=$rc): $out"
   fi
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" confirm 2>&1)
+  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch confirm 2>&1)
   rc=$?
   if [ "$rc" -eq 0 ] && [ -f "$st/state/.afk-contract" ] && [ ! -e "$st/state/.afk-contract.proposed" ] \
     && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ] \
@@ -88,7 +103,7 @@ unit_propose_confirm_records_the_posture_without_a_daemon() {
     fail "confirm: record, announcement, or daemon state wrong (rc=$rc): $out"
   fi
   printf 'schema\tfm-afk-return.v1\nphase\tblocked\n' > "$st/state/.afk-return-catchup"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" propose --words 'merge task a PR when green' >/dev/null 2>&1; then
+  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch propose --words 'merge task a PR when green' >/dev/null 2>&1; then
     fail "propose: accepted a new mandate while the prior return catch-up was pending"
   else
     pass "propose: refuses while the prior return catch-up is pending"
@@ -96,9 +111,9 @@ unit_propose_confirm_records_the_posture_without_a_daemon() {
   rm -rf "$st"
 }
 
-unit_pi_never_launches_the_daemon() {
+unit_pi_and_omp_never_launch_the_daemon() {
   local st harness out rc
-  for harness in pi pi-signed; do
+  for harness in pi pi-signed omp; do
     st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-pi.XXXXXX")
     mkdir -p "$st/state"
     out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_TEST_HARNESS="$harness" \
@@ -123,12 +138,36 @@ unit_pi_never_launches_the_daemon() {
   done
 }
 
+unit_non_refusing_harness_still_launches_daemon() {
+  command -v tmux >/dev/null 2>&1 || { echo "skip: tmux not found (non-refusing harness still launches)"; return 0; }
+  local st cap_session cap_pane out rc rec
+  st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-codex.XXXXXX")
+  mkdir -p "$st/state"
+  cap_session="fm-afk-codex-cap-$$"
+  tmux new-session -d -s "$cap_session" 2>/dev/null || { fail "non-refusing harness: could not create captain session"; rm -rf "$st"; return 0; }
+  TRACK_TMUX_SESSIONS="$TRACK_TMUX_SESSIONS $cap_session"
+  cap_pane=$(tmux display-message -p -t "$cap_session" '#{pane_id}')
+  confirm_posture "$st" || fail "non-refusing harness: could not confirm fixture posture"
+  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_TEST_HARNESS=codex \
+    FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
+    bash -c '. "$1"; fm_afk_launch_primary_harness() { printf "%s" "$FM_TEST_HARNESS"; }; fm_afk_launch_main start' _ "$LAUNCH" 2>&1)
+  rc=$?
+  rec=$(cut -f2 "$st/state/.afk-daemon-terminal" 2>/dev/null || true)
+  [ -n "$rec" ] && TRACK_TMUX_SESSIONS="$TRACK_TMUX_SESSIONS $rec"
+  if [ "$rc" -eq 0 ] && [ -e "$st/state/.afk" ] && [ -n "$rec" ] && tmux has-session -t "$rec" 2>/dev/null; then
+    pass "codex: start still launches the daemon terminal (the omp/pi refusal did not overreach)"
+  else
+    fail "codex: start did not launch the daemon (rc=$rc): $out"
+  fi
+  rm -rf "$st"
+}
+
 unit_daemon_entry_requires_confirmation() {
   local st out rc
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-entry-record.XXXXXX")
   mkdir -p "$st/state"
   FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" propose --words 'merge task a PR when green' >/dev/null 2>&1
-  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native 2>&1)
+  out=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch start-native 2>&1)
   rc=$?
   if [ "$rc" -ne 0 ] && [ -f "$st/state/.afk-contract.proposed" ] && [ ! -e "$st/state/.afk-contract" ] \
     && [ ! -e "$st/state/.afk" ] && printf '%s' "$out" | grep -F 'a confirmed away-posture record is required' >/dev/null; then
@@ -137,13 +176,13 @@ unit_daemon_entry_requires_confirmation() {
     fail "daemon entry: pending proposal was promoted or refusal was unclear (rc=$rc): $out"
   fi
   FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" confirm >/dev/null 2>&1
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
+  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch start-native >/dev/null 2>&1 \
     && [ -e "$st/state/.afk" ]; then
     pass "daemon entry: an explicitly confirmed record permits lifecycle preparation"
   else
     fail "daemon entry: rejected an explicitly confirmed record"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1
   rm -rf "$st"
 }
 
@@ -153,7 +192,7 @@ unit_failed_daemon_launch_preserves_confirmed_record() {
   mkdir -p "$st/state"
   confirm_posture "$st" || fail "failed start: could not confirm fixture posture"
   if ! FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-    FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1 \
+    FM_SUPERVISOR_BACKEND=unsupported run_launch start >/dev/null 2>&1 \
     && [ -f "$st/state/.afk-contract" ] && [ ! -e "$st/state/afk-contracts" ]; then
     pass "failed start: preserves the pre-confirmed posture record"
   else
@@ -167,9 +206,9 @@ unit_stop_archives_the_record_last() {
   st=$(mktemp -d "${TMPDIR:-/tmp}/fm-afk-stop-archive.XXXXXX")
   mkdir -p "$st/state"
   confirm_posture "$st" || fail "stop archive: could not confirm fixture posture"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 || fail "stop archive: native entry failed"
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch start-native >/dev/null 2>&1 || fail "stop archive: native entry failed"
   epoch=$(FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$CONTRACT" field entered_epoch)
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 \
+  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1 \
     && [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-contract" ] \
     && [ -f "$st/state/afk-contracts/$epoch.afk-contract" ]; then
     pass "stop: clears the away flag and archives the posture record under its entry time"
@@ -236,7 +275,7 @@ unit_relative_paths_are_absolute_before_daemon_launch() {
   fi
   out=$(
     cd "$root" || exit 1
-    FM_HOME=missing-home "$LAUNCH" help 2>&1
+    FM_HOME=missing-home run_launch help 2>&1
   )
   status=$?
   if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "FM_HOME directory cannot be resolved: missing-home" >/dev/null; then
@@ -246,7 +285,7 @@ unit_relative_paths_are_absolute_before_daemon_launch() {
   fi
   out=$(
     cd "$root" || exit 1
-    FM_HOME=home FM_STATE_OVERRIDE=missing-state "$LAUNCH" help 2>&1
+    FM_HOME=home FM_STATE_OVERRIDE=missing-state run_launch help 2>&1
   )
   status=$?
   if [ "$status" -ne 0 ] && printf '%s\n' "$out" | grep -F "FM_STATE_OVERRIDE directory cannot be resolved: missing-state" >/dev/null; then
@@ -416,7 +455,7 @@ unit_stop_ordering() {
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/fm-wake-lib.sh"; fm_pid_identity "$daemon_pid" > "$lock/pid-identity" 2>/dev/null ) || true
   printf 'none\t-\tnative\n' > "$st/state/.afk-daemon-terminal"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1
   # shellcheck disable=SC2031 # The background daemon writes this shared file; no shell variable is reassigned.
   if [ "$(cat "$marker" 2>/dev/null || echo missing)" = present ]; then
     pass "stop-ordering: daemon SIGTERM'd while .afk still present (flush is not a no-op)"
@@ -450,7 +489,7 @@ unit_stop_rejects_reused_pid() {
   mkdir -p "$lock"
   printf '%s' "$sleeper_pid" > "$lock/pid"
   printf 'different-process-identity' > "$lock/pid-identity"
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1
   if kill -0 "$sleeper_pid" 2>/dev/null; then
     pass "stop identity: stale lock cannot signal an unrelated live process"
   else
@@ -469,7 +508,7 @@ unit_failed_start_rolls_back_state() {
   printf 'wedged\n' > "$st/state/.subsuper-inject-wedged"
   confirm_posture "$st" || fail "failed start: could not confirm fixture posture"
   if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET=unused \
-    FM_SUPERVISOR_BACKEND=unsupported "$LAUNCH" start >/dev/null 2>&1; then
+    FM_SUPERVISOR_BACKEND=unsupported run_launch start >/dev/null 2>&1; then
     fail "failed start: unsupported backend unexpectedly succeeded"
   elif [ ! -e "$st/state/.afk" ] \
     && [ "$(cat "$st/state/.subsuper-escalations")" = pending ] \
@@ -491,11 +530,11 @@ unit_concurrent_start_serialized() {
   cap_pane=$(tmux display-message -p -t "$cap_session" '#{pane_id}')
   confirm_posture "$st" || fail "concurrent start: could not confirm fixture posture"
   FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET="$cap_pane" \
-    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
+    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" run_launch start >/dev/null 2>&1 &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   first=$!
   FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" FM_SUPERVISOR_TARGET="$cap_pane" \
-    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" "$LAUNCH" start >/dev/null 2>&1 &
+    FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" run_launch start >/dev/null 2>&1 &
   # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   second=$!
   wait "$first"; wait "$second"
@@ -507,7 +546,7 @@ unit_concurrent_start_serialized() {
   else
     fail "concurrent start: leaked or lost daemon terminal (count $count, record $rec)"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1
   tmux kill-session -t "$cap_session" 2>/dev/null || true
   rm -rf "$st"
 }
@@ -747,7 +786,7 @@ unit_native_lifecycle() {
   mkdir -p "$st/state"
   : > "$st/state/.subsuper-escalations"
   confirm_posture "$st" || fail "native lifecycle: could not confirm fixture posture"
-  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" start-native >/dev/null 2>&1 \
+  if FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch start-native >/dev/null 2>&1 \
     && [ "$(cut -f1 "$st/state/.afk-daemon-terminal")" = none ] \
     && [ -e "$st/state/.afk" ] \
     && [ ! -e "$st/state/.subsuper-escalations" ]; then
@@ -755,7 +794,7 @@ unit_native_lifecycle() {
   else
     fail "native lifecycle: state preparation or no-terminal record failed"
   fi
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1
   if [ ! -e "$st/state/.afk" ] && [ ! -e "$st/state/.afk-daemon-terminal" ]; then
     pass "native lifecycle: uniform stop clears state without closing a terminal"
   else
@@ -917,7 +956,7 @@ unit_stop_validates_before_signal() {
   printf '%s' "$sleeper_pid" > "$st/state/.supervise-daemon.lock/pid"
   # shellcheck source=/dev/null
   ( . "$ROOT/bin/fm-wake-lib.sh"; fm_pid_identity "$sleeper_pid" > "$st/state/.supervise-daemon.lock/pid-identity" )
-  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" "$LAUNCH" stop >/dev/null 2>&1 || true
+  FM_HOME="$st" FM_STATE_OVERRIDE="$st/state" run_launch stop >/dev/null 2>&1 || true
   if kill -0 "$sleeper_pid" 2>/dev/null && [ -e "$st/state/.afk" ]; then
     pass "stop validation: malformed record causes no daemon or state side effects"
   else
@@ -1111,7 +1150,7 @@ e2e_herdr() {
   E2E_HERDR_CLEANUP() {
     # shellcheck disable=SC2031 # Cleanup reads the caller's resolved target; it does not reassign it.
     FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-      FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1 || true
+      FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr run_launch stop >/dev/null 2>&1 || true
     herdr_safe_stop_and_delete "$SESSION" >/dev/null 2>&1 || true
     rm -rf "$home_tmp" 2>/dev/null || true
   }
@@ -1131,7 +1170,7 @@ e2e_herdr() {
 
   FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
     FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
-    "$LAUNCH" start >/dev/null 2>&1
+    run_launch start >/dev/null 2>&1
 
   during=$(fm_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
   ws_during=$(fm_backend_herdr_cli "$SESSION" workspace list 2>/dev/null | jq '[.result.workspaces[]?]|length')
@@ -1144,7 +1183,7 @@ e2e_herdr() {
   case "$dtgt" in "$SESSION":*) pass "herdr e2e: daemon terminal scoped to the lab session" ;; *) fail "herdr e2e: daemon terminal not in the lab session ($dtgt)" ;; esac
 
   FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr "$LAUNCH" stop >/dev/null 2>&1
+    FM_SUPERVISOR_TARGET="$target" FM_SUPERVISOR_BACKEND=herdr run_launch stop >/dev/null 2>&1
 
   after=$(fm_backend_herdr_cli "$SESSION" pane list --workspace "$cap_ws" 2>/dev/null | jq --arg t "$cap_tab" '[.result.panes[]?|select(.tab_id==$t)]|length')
   ws_after=$(fm_backend_herdr_cli "$SESSION" workspace list 2>/dev/null | jq '[.result.workspaces[]?]|length')
@@ -1172,7 +1211,7 @@ e2e_tmux() {
 
   FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
     FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux FM_AFK_LAUNCH_ENTRY="$SLEEPER" \
-    "$LAUNCH" start >/dev/null 2>&1
+    run_launch start >/dev/null 2>&1
 
   during=$(tmux list-panes -t "$cap_session" | wc -l | tr -d ' ')
   rec=$(cut -f2 "$home_tmp/state/.afk-daemon-terminal" 2>/dev/null || true)
@@ -1181,7 +1220,7 @@ e2e_tmux() {
   if [ -n "$rec" ] && tmux has-session -t "$rec" 2>/dev/null && [ "$rec" != "$cap_session" ]; then pass "tmux e2e: daemon launched in a separate detached session"; else fail "tmux e2e: no separate daemon session ($rec)"; fi
 
   FM_HOME="$home_tmp" FM_STATE_OVERRIDE="$home_tmp/state" \
-    FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux "$LAUNCH" stop >/dev/null 2>&1
+    FM_SUPERVISOR_TARGET="$cap_pane" FM_SUPERVISOR_BACKEND=tmux run_launch stop >/dev/null 2>&1
 
   after=$(tmux list-panes -t "$cap_session" | wc -l | tr -d ' ')
   if [ "$after" = "$before" ]; then pass "tmux e2e: captain window pane count unchanged after stop"; else fail "tmux e2e: captain window changed ($before -> $after)"; fi
@@ -1194,7 +1233,8 @@ e2e_tmux() {
 
 unit_clear_stale
 unit_propose_confirm_records_the_posture_without_a_daemon
-unit_pi_never_launches_the_daemon
+unit_pi_and_omp_never_launch_the_daemon
+unit_non_refusing_harness_still_launches_daemon
 unit_daemon_entry_requires_confirmation
 unit_failed_daemon_launch_preserves_confirmed_record
 unit_stop_archives_the_record_last

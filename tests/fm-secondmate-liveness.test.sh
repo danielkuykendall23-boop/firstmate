@@ -370,6 +370,27 @@ test_sweep_respawns_confirmed_dead_secondmate() {
   pass "sweep: a confirmed-dead secondmate endpoint is killed and respawned"
 }
 
+test_sweep_skips_deliberately_stopped_secondmate() {
+  local w fb tmuxfb log out
+  w=$(new_world sweep-stopped)
+  add_sm_home "$w" sm1 firstmate:fm-sm1
+  {
+    printf 'secondmate_stopped_by=control-exit\n'
+    printf 'secondmate_stopped_at=1234567890\n'
+  } >> "$w/home/state/sm1.meta"
+  fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
+  log="$w/calls.log"; : > "$log"
+
+  # Same "zsh" bare-shell pane the dead-secondmate test above proves is
+  # confirmed-dead; the only variable here is the marker.
+  out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")
+
+  assert_contains "$out" "SECONDMATE_LIVENESS: secondmate sm1: skipped: deliberately stopped (control-exit at 1234567890)" \
+    "a marked record should be reported as deliberately stopped, not silently dropped"
+  [ ! -s "$log" ] || fail "a deliberately stopped secondmate's dead endpoint must never be killed or respawned: $(cat "$log")"
+  pass "sweep: a secondmate deliberately stopped through fm-control exit is never relaunched"
+}
+
 test_sweep_leaves_alive_secondmate_untouched() {
   local w fb tmuxfb log out
   w=$(new_world sweep-alive)
@@ -545,6 +566,7 @@ test_tmux_agent_state_rejects_malformed_targets_before_probe
 test_herdr_agent_state_preserves_husk_classifier
 test_agent_state_dispatcher_and_compatibility
 test_sweep_respawns_confirmed_dead_secondmate
+test_sweep_skips_deliberately_stopped_secondmate
 test_sweep_leaves_alive_secondmate_untouched
 test_sweep_respawns_authoritatively_missing_pi_secondmate
 test_sweep_respawns_authoritatively_missing_pi_signed_secondmate

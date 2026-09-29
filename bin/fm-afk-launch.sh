@@ -13,11 +13,13 @@
 # `confirm` promotes it into state/.afk-contract and prints the entry
 # announcement (hold-for-return only: no phone channel exists). The record is
 # the posture in every harness.
-# On Pi and pi-signed the entry ENDS there: the away daemon is no longer launched
-# on Pi, the ordinary supervision session keeps running in both postures, and
-# `start` refuses on those harnesses. Every other harness still runs the daemon
-# for now, so `start` and `start-native` require the confirmed record before they
-# launch the daemon.
+# On Pi, pi-signed, and omp the entry ENDS there: the away daemon is no longer
+# launched on those harnesses. Pi's ordinary supervision session keeps running
+# in both postures, and the omp watch extension (.omp/extensions/fm-primary-omp-watch.ts)
+# keeps delivering every wake to this same conversation exactly as when attended
+# (docs/supervision-protocols/omp.md); `start` refuses on all three. Every other
+# harness still runs the daemon for now, so `start` and `start-native` require
+# the confirmed record before they launch the daemon.
 # `stop` (the return, driven by bin/fm-afk-return.sh) shuts the daemon down,
 # clears state/.afk last, and archives the record under state/afk-contracts/.
 #
@@ -185,14 +187,19 @@ fm_afk_launch_primary_harness() {
   "$FM_AFK_LAUNCH_DIR/fm-harness.sh" 2>/dev/null || printf unknown
 }
 
-# The away daemon is no longer launched on Pi: the posture record is the whole
-# entry there and the ordinary supervision session runs in both postures.
+# The away daemon is no longer launched on Pi or the omp primary: the posture
+# record is the whole entry there, and continuity stays owned by the ordinary
+# supervision session (Pi) or the omp watch extension (omp) rather than by the
+# daemon.
 fm_afk_launch_daemon_allowed() {
   local harness
   harness=$(fm_afk_launch_primary_harness)
   case "$harness" in
     pi|pi-signed)
       fm_afk_launch_log "the away daemon is no longer launched on $harness; the away-posture record is the posture there (run bin/fm-afk-launch.sh confirm and stop)"
+      return 1 ;;
+    omp)
+      fm_afk_launch_log "the away daemon is no longer launched on omp; the omp watch extension keeps delivering every wake under the away-posture record (run bin/fm-afk-launch.sh confirm and stop)"
       return 1 ;;
   esac
   return 0

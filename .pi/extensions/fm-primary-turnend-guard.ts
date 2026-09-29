@@ -613,8 +613,11 @@ export default function (pi: ExtensionAPI) {
     try {
       const content = encodeFirstmateOperationalInput(
         "turn-end-guard",
-        "TURN WOULD END BLIND - supervision is off. " +
-          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
+        (result.stderr.includes("WATCHER BEACON STALE - RECHECK BEFORE REPAIRING")
+          ? "WATCHER BEACON STALE - the watcher process is alive but its beacon is stale. " +
+            "Follow the recheck instruction below before ending the turn.\n\n"
+          : "TURN WOULD END BLIND - supervision is off. " +
+            "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n") +
           result.stderr,
       );
       await pi.sendUserMessage(content, { deliverAs: "followUp" });

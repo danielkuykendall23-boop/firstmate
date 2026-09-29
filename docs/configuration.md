@@ -379,6 +379,25 @@ Any other value, or an unreadable file, refuses every spawn from that home, whic
 The file is a captain-wide safety preference, so it is inherited into secondmate homes under the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract; a secondmate's own Claude crewmates then launch on the same posture.
 The [Claude adapter reference](../.agents/skills/harness-adapters/references/harness/claude.md) records the verified shape of both launches and which once-per-machine dialog each one can meet.
 
+## Worker sandbox (config/worker-sandbox)
+
+The optional local, gitignored `config/worker-sandbox` holds one token that decides whether ship and scout workers run inside an operating-system write fence.
+The token is the file's whitespace-trimmed content.
+`off` keeps today's unfenced launch and is also the default when the file is absent, so an unconfigured home launches byte-for-byte as before.
+`on` launches every new ship and scout worker, and every control-plane relaunch of one, under the macOS Seatbelt sandbox, so the whole worker process and everything it starts can write only its own task worktree, the parts of the repository's shared git data its own branch needs (objects, reflogs, its worktree admin directory, its `fm/<id>` branch, and the shared remote-tracking and tag refs a fetch or push updates), its task temp directory, its own Firstmate task files (status, turn-end, busy-state, steering inbox, task record, and `data/<id>/`), the files the no-mistakes client writes and, in a no-mistakes gate repository, only the objects, reflogs, lock files, push log, and `fm/<id>` branch a push of its task branch writes (never a gate's hooks, configuration, other branches, or pipeline worktree admin directories), per-user temporary and package-cache directories, and its harness's session state.
+Reads and network access stay open; the fence exists so one worker cannot move another worker's branch or checkout, change another task's records or the primary checkout, or plant shared configuration or code (git hooks and config, omp rules, extensions and settings, no-mistakes configuration) that every other session loads.
+The worktree's `.git` gitlink and its admin directory's `commondir`, `gitdir`, and `config.worktree` stay denied, so a worker cannot redirect its checkout or plant a git hook for the primary's own git commands there.
+It does not stop a worker from creating or moving a tag or remote-tracking ref, or from writing the shared no-mistakes state database, and the worktree's files remain worker-written, so running anything other than git in a worker's worktree outside the fence runs worker-chosen code.
+[`bin/fm-worker-sandbox.sh`](../bin/fm-worker-sandbox.sh)'s header owns the exact writable set and why each entry is there.
+
+The fence is verified only for omp workers, the harness in [`docs/verification/worker-sandbox.md`](verification/worker-sandbox.md); with the setting on, a spawn of any other harness, a raw launch command, or a spawn on a machine where `/usr/bin/sandbox-exec` is missing or does not enforce a probe fence refuses before any endpoint, worktree, or task record exists and names the reason.
+Any other token, or an unreadable file, refuses every spawn from that home the same way; Firstmate never falls back to an unfenced worker while the setting is on.
+Persistent secondmates are never fenced, because each runs a whole Firstmate home of its own.
+The fence applies at launch, so a native resume typed into a worker's pane instead of a control-plane relaunch runs outside it.
+A fenced scout cannot arm a crew-hosted Lavish board, because arming it writes home-wide process-event state outside the fence; launch a scout that must host a board with the setting off.
+`bin/fm-spawn.sh` reads the file on every spawn and relaunch, so a change takes effect at the next launch without a restart.
+The file is local to one home and is not inherited into secondmate homes, because a secondmate home may run on a machine without Seatbelt, where an inherited `on` would refuse every worker there.
+
 ## Lavish server address (config/lavish-axi-host)
 
 The optional local, gitignored `config/lavish-axi-host` contains one non-empty address without whitespace for the per-machine Lavish server.
@@ -386,6 +405,16 @@ The optional local, gitignored `config/lavish-axi-host` contains one non-empty a
 When the file is absent, worker launches do not add a board address and retain the existing ambient-environment behavior.
 Malformed or unreadable values refuse the launch before the worker starts, while the adapter refuses the same malformed value before polling.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
+
+## Jev compaction (config/jev-compaction)
+
+The optional local, gitignored `config/jev-compaction` turns [Jev-guided compaction](jev.md) off for this home's primary and every OMP worker launched from it, so OMP's native compaction runs instead.
+It holds one word: `off` disables it, while `on` or an absent file keeps the default, where a resolved `TYPESAFE_API_KEY` enables it.
+Any other content, or a file that cannot be read, reads as off and is named on the session's stderr, so a mistyped value never silently keeps Jev on.
+The compaction extension reads it under the effective Firstmate home, from `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the tracked code root, or under `FM_CONFIG_OVERRIDE` when that test and specialized-setup override is present; worker launches already carry `FM_HOME`.
+A session started with the setting off registers no compaction hook, and a session started before it was turned off falls back to native compaction at its next compaction.
+`FM_JEV_COMPACTION=0` in a launching environment still disables it independently; neither switch changes `jev_review` or dispatch routing.
+The file is inherited into secondmate homes through the primary-authoritative configuration contract, so their workers follow the same choice.
 
 ## Home brief include (config/brief-include.md)
 
@@ -398,7 +427,7 @@ The text is static and never executed or expanded; secondmate charters never tak
 ## Worker launch environment (config/launch-env-allowlist)
 
 The optional local, gitignored `config/launch-env-allowlist` limits the ambient environment passed to newly launched workers, scouts, and secondmates, including relaunches.
-With no file, ambient inheritance remains unfiltered: selected harness markers are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
+With no file, ambient inheritance remains unfiltered: selected harness markers and the [Jev key](jev.md#key-and-activation) are cleared, while the provider, long-lived terminal daemon, and shell initialization determine which other variables reach the worker.
 Do not assume every worker inherits the invoking Firstmate process's current environment.
 The file is inherited into secondmate homes through the [primary-authoritative configuration contract](../.agents/skills/secondmate-provisioning/SKILL.md).
 Changes apply to subsequent launches; existing processes keep their environment.
@@ -1152,7 +1181,7 @@ FM_HEARTBEAT=600        # base seconds between heartbeat scans; no-change heartb
 FM_HEARTBEAT_MAX=7200   # heartbeat backoff cap
 FM_INACTIVE_RECONCILE_SECS=900  # 60..1800-second watcher cadence and inactivity threshold; locked session start also requests an immediate scan in the deferred worker
 FM_INACTIVE_RECONCILE_BUDGET_SECS=10  # 1..30-second scan deadline; wedged-scan kill backstop follows one second later
-FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls, custom checks, or Relay dispatch)
+FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls, custom checks, Relay dispatch, and the Herdr projection cleanup sweep)
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
 FM_CHECK_TIMEOUT=30     # seconds allowed per slow check script

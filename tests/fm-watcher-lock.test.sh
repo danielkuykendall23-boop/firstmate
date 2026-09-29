@@ -299,6 +299,58 @@ test_lock_steals_dead_pid_lock() {
   pass "dead-pid stale lock is reclaimed by a single acquirer"
 }
 
+# A lock whose create is refused (here an unwritable directory; under the
+# worker sandbox, a Seatbelt denial) has no holder to wait for or steal. The
+# acquirer once read that as a stale lock and recursed onto ever-longer
+# .steal paths, so fm_lock_try_acquire and fm_lock_acquire_wait hung. Both
+# must now fail fast, name the lock, and never run the caller's critical
+# section. Each probe runs under a deadline so a regression fails, not hangs.
+run_lock_probe_bounded() {  # <out> <rc> <script> <lib> <lockdir>
+  local out=$1 rcfile=$2 script=$3 pid i
+  rm -f "$out" "$rcfile"
+  ( bash -c "$script" _ "$4" "$5" > "$out" 2>&1; echo "$?" > "$rcfile" ) &
+  pid=$!
+  for i in $(seq 1 100); do
+    [ -s "$rcfile" ] && { wait "$pid" 2>/dev/null; return 0; }
+    sleep 0.1
+  done
+  pkill -P "$pid" 2>/dev/null
+  kill "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+  return 1
+}
+
+test_lock_uncreatable_fails_without_stealing() {
+  local dir locked lockdir out bounded
+  if [ "$(id -u)" = 0 ]; then
+    printf '# skip - an unwritable directory requires a non-root user\n'
+    return 0
+  fi
+  dir=$(make_case lock-uncreatable)
+  locked="$dir/locked"
+  mkdir "$locked"
+  lockdir="$locked/.meta-t.lock"
+  chmod 0555 "$locked"
+  # shellcheck disable=SC2016 # expanded by the probe shell
+  run_lock_probe_bounded "$dir/try.out" "$dir/try.rc" \
+    '. "$1"; fm_lock_try_acquire "$2"; rc=$?; printf "%s\n%s\n" "$rc" "$FM_LOCK_ERROR"' "$LIB" "$lockdir"
+  bounded=$?
+  # shellcheck disable=SC2016 # expanded by the probe shell
+  [ "$bounded" -ne 0 ] || run_lock_probe_bounded "$dir/wait.out" "$dir/wait.rc" \
+    '. "$1"; fm_lock_acquire_wait "$2"; echo CRITICAL-SECTION-RAN' "$LIB" "$lockdir" || bounded=1
+  chmod 0755 "$locked"
+  [ "$bounded" -eq 0 ] || fail "acquiring a lock that can never be created did not finish"
+  out=$(cat "$dir/try.out")
+  [ "$(printf '%s\n' "$out" | sed -n 1p)" = 2 ] || fail "try_acquire on an uncreatable lock must return 2"$'\n'"$out"
+  assert_contains "$out" "cannot create lock $lockdir" "try_acquire must name the uncreatable lock"
+  [ "$(cat "$dir/wait.rc")" = 1 ] || fail "acquire_wait on an uncreatable lock must exit 1 (got $(cat "$dir/wait.rc"))"
+  out=$(cat "$dir/wait.out")
+  assert_contains "$out" "cannot create lock $lockdir" "acquire_wait must report the uncreatable lock"
+  assert_not_contains "$out" "CRITICAL-SECTION-RAN" "the caller's critical section ran without the lock"
+  [ -z "$(find "$locked" -name '*.steal*' -print)" ] || fail "an uncreatable lock must not be stolen"
+  pass "an uncreatable lock fails fast with a clear error instead of stealing or waiting forever"
+}
+
 test_lock_stale_steal_single_winner_under_concurrency() {
   local dir state lockdir dead marker i pids pid wins
   dir=$(make_case lock-stale-concurrency)
@@ -1173,6 +1225,7 @@ test_live_stale_watch_lock_is_actionable
 test_guard_warnings
 test_lock_single_winner_under_concurrency
 test_lock_steals_dead_pid_lock
+test_lock_uncreatable_fails_without_stealing
 test_lock_stale_steal_single_winner_under_concurrency
 test_lock_live_steal_mutex_is_not_reclaimed
 test_lock_does_not_steal_live_lock
