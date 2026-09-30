@@ -163,6 +163,9 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-fetch-stage sh -c 'git -C "$0" fetch -q --no-tags --no-write-fetch-head "$1" "HEAD:refs/no-mistakes/fetch/4242-17" &&
     git -C "$0" update-ref -d refs/no-mistakes/fetch/4242-17' "$nm/repos/gate.git" "$PROBE_WT"
   try tmpdir sh -c '[ "$TMPDIR" = "/tmp/fm-$0/tmp" ] && mktemp "$TMPDIR/probe.XXXXXX"' "$id"
+  try heredoc /bin/bash -c 'cat <<EOF >/dev/null
+here
+EOF'
   try omp-puppeteer sh -c 'echo "{}" > "$0"' "$omp/puppeteer/package.json"
   try herdr-own-lab sh -c 'mkdir "$0" && echo up > "$0/herdr-server.log"' "$HOME/.config/herdr/sessions/$PROBE_LAB-4242-17"
   try axi-session sh -c '[ "$CHROME_DEVTOOLS_AXI_SESSION" = "fm-$0" ] && [ "$CHROME_DEVTOOLS_AXI_USER_DATA_DIR" = "/tmp/fm-$0/chrome-profile" ] &&
@@ -217,6 +220,7 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-other-nm-ref git -C "$nm/repos/gate.git" fetch -q --no-tags --no-write-fetch-head "$PROBE_WT" "HEAD:refs/no-mistakes/sync/4242-17"
   try gate-fetch-head touch "$nm/repos/gate.git/FETCH_HEAD"
   try shared-tmp touch "/tmp/fm-sandbox-shared-$id"
+  try shared-var-tmp touch "/var/tmp/fm-sandbox-shared-$id"
   try other-worker-tmp touch "/tmp/fm-$PROBE_OTHER_ID/tmp/planted"
   try herdr-other-lab sh -c 'mkdir "$0"' "$HOME/.config/herdr/sessions/fm-lab-othertask-4242-17"
   try herdr-default sh -c 'echo x >> "$0"' "$HOME/.config/herdr/session.json"
@@ -284,14 +288,14 @@ test_on_fences_the_spawned_worker() {
       bash -c "$launch" >"$CASE_DIR/launch.out" 2>&1
     [ -s "$result" ] || fail "the $kind launch never ran the worker"$'\n'"$(cat "$CASE_DIR/launch.out")"
     allowed="commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push
-      gate-notify-log ps branch-suffix gate-push-suffix gate-fetch-stage tmpdir omp-puppeteer axi-session"
+      gate-notify-log ps branch-suffix gate-push-suffix gate-fetch-stage tmpdir heredoc omp-puppeteer axi-session"
     denied="other-meta home-state other-status other-data primary-checkout git-hooks git-config
       other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir
       wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move
       omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config
       gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info
       gate-other-ref gate-fm-move gate-fm-symlink gate-fm-file other-branch-suffix branch-id-prefix
-      gate-other-branch-suffix sibling-branch gate-sibling-branch gate-other-nm-ref gate-fetch-head shared-tmp other-worker-tmp
+      gate-other-branch-suffix sibling-branch gate-sibling-branch gate-other-nm-ref gate-fetch-head shared-tmp shared-var-tmp other-worker-tmp
       herdr-other-lab herdr-default axi-default axi-other-session home"
     # Only a --herdr-lab brief may write its own lab session.
     if [ "$kind" = ship ]; then allowed="$allowed herdr-own-lab"; else denied="$denied herdr-own-lab"; fi

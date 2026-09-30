@@ -71,7 +71,7 @@ Sandbox: node deny(1) file-write-create /private/tmp/puppeteer_dev_chrome_profil
 ```
 
 - The kernel refuses every setuid or setgid exec from a sandboxed process, and no file rule changes that; `(allow process-exec (literal "/bin/ps") (with no-sandbox))` lets `/bin/ps` alone run, outside the sandbox.
-- The `sh-thd-<n>` here-document files land in the gate directory because bash falls back to its working directory when `TMPDIR` is unset and `/tmp` refuses writes; a `TMPDIR` inside the fence removes that.
+- macOS `/bin/bash` 3.2 ignores `TMPDIR` for here-documents: it makes `sh-thd-<n>` in `/var/tmp` when `access()` reports that directory writable, and otherwise falls back to its working directory (here the gate). The profile allows only `/private/var/tmp/sh-thd-<n>` files and a `file-write-data` check on `/private/var/tmp` itself, so no other `/var/tmp` entry is writable; a worker could still rewrite another process's short-lived here-document file.
 - The v1.84.0 binary carries `refs/no-mistakes/fetch/%d-%d`, `--no-tags`, and `--no-write-fetch-head`, and the refusal log shows no `FETCH_HEAD` write, so the gate's `FETCH_HEAD` stays denied.
 - chrome-devtools-axi 0.1.33 starts chrome-devtools-mcp through the MCP SDK's stdio transport without an explicit environment, which passes on only `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, and `USER`, so Chrome's default profile ignores `TMPDIR`; `CHROME_DEVTOOLS_AXI_USER_DATA_DIR` moves it into the task temp.
   Without `--no-sandbox`, Chrome's renderers crash under the fence (crash dumps under `~/Library/Application Support/Google/Chrome/Crashpad/new/` and `Requesting main frame too early!`), because its own sandbox is Seatbelt and cannot nest.

@@ -83,9 +83,8 @@
 #     configuration) runs worker-chosen code outside the fence. The task worktree must be a linked
 #     worktree, never the primary checkout.
 #   - the task temp root (/tmp/fm-<id>), whose tmp/ subdirectory the env
-#     prefix exports as TMPDIR, so tools that default to /tmp (bash
-#     here-documents, puppeteer's Chrome profile, test suites, the Herdr lab
-#     helper's state) get a private temp that no other worker can write
+#     prefix exports as TMPDIR, so tools that default to /tmp (puppeteer's
+#     Chrome profile, test suites, the Herdr lab helper's state) get a private temp that no other worker can write
 #   - the task's own chrome-devtools-axi session state
 #     ~/.chrome-devtools-axi/sessions/fm-<id>/; the default session's bridge
 #     state and every other session stay denied
@@ -117,6 +116,11 @@
 #   - the per-user macOS temp and cache dirs, ~/Library/Caches, ~/.cache and
 #     the npm, bun, Go module and Cargo download caches, so builds and test
 #     runs keep working; the tmux socket dir /private/tmp/tmux-<uid>
+#   - bash 3.2 here-document files /private/var/tmp/sh-thd-<n>, plus a
+#     write-data check on /private/var/tmp itself, because macOS /bin/bash
+#     ignores TMPDIR for here-documents and uses /var/tmp only when access()
+#     reports it writable; no other /var/tmp entry is writable. Residual: a
+#     worker could rewrite another process's short-lived here-document file.
 #   - the harness's own session state. omp: agent/sessions, agent/blobs,
 #     agent/terminal-sessions, agent/cache, the agent, models and history
 #     databases, logs/, cache/, run/, webcache/, stats.db, gpu_cache.json and
@@ -343,6 +347,8 @@ cmd_profile() {
   paths+=("subpath|$home/.bun/install/cache" "subpath|$home/go/pkg/mod")
   paths+=("subpath|$home/.cargo/registry" "subpath|$home/.cargo/git")
   paths+=("subpath|/private/tmp/tmux-$uid")
+  # bash 3.2 ignores TMPDIR for here-documents and makes them in /var/tmp.
+  paths+=("regex|^/private/var/tmp/sh-thd-[0-9]+\$")
   case "$harness" in
   omp)
     omp="$home/.omp"
@@ -380,6 +386,8 @@ cmd_profile() {
     sbpl_rules "${creates[@]}"
     printf ')))\n'
     printf '(allow process-exec (literal "/bin/ps") (with no-sandbox))\n'
+    # bash 3.2 uses /var/tmp only when access(W_OK) on it succeeds.
+    printf '(allow file-write-data (literal "/private/var/tmp"))\n'
     if [ "${#modes[@]}" -gt 0 ]; then
       printf '(allow file-write-mode'
       sbpl_rules ${modes[@]+"${modes[@]}"}
