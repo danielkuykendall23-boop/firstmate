@@ -1,0 +1,26 @@
+=== before 3fd2f70  (FM_HOME=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.LXAoguqQNo/home-before)
+armed: when-crashprobe
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+arm rc=0
+when: when-crashprobe
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 2
+action_exit: 0
+output:
+run rc=0
+>>> ACTION RAN (crashing condition treated as true)
+=== after 25abdd6  (FM_HOME=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/tmp.LXAoguqQNo/home-after)
+armed: when-crashprobe
+starts on the watcher's next cycle; or run: bin/fm-procevent.sh reconcile
+reminder: deterministic, safe, reversible actions only; judgment and destructive actions stay on the wake-and-decide path
+arm rc=0
+when: when-crashprobe
+status: condition-error
+detail: the condition exited 139 on 3 consecutive polls; the action was not run
+condition_polls: 3
+output:
+condition crashing
+run rc=0
+>>> action did NOT run

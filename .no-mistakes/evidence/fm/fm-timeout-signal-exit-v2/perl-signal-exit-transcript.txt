@@ -1,0 +1,26 @@
+=== lib: before (3fd2f70)
+mechanism=perl
+fm_run_timed 2 sh -c 'kill -SEGV $$' -> 0 (0s)
+fm_run_timed 2 sh -c 'kill -KILL $$' -> 0 (0s)
+fm_run_timed 2 sh -c 'kill -TERM $$' -> 0 (0s)
+fm_run_timed 2 sh -c 'kill -ABRT $$' -> 0 (0s)
+fm_run_timed 2 sh -c 'exit 0' -> 0 (0s)
+fm_run_timed 2 sh -c 'exit 3' -> 3 (0s)
+fm_run_timed 2 sh -c 'exit 255' -> 255 (0s)
+fm_run_timed 2 sh -c 'sleep 10' -> 124 (2s)
+=== lib: after (25abdd6)
+mechanism=perl
+fm_run_timed 2 sh -c 'kill -SEGV $$' -> 139 (0s)
+fm_run_timed 2 sh -c 'kill -KILL $$' -> 137 (0s)
+fm_run_timed 2 sh -c 'kill -TERM $$' -> 143 (1s)
+fm_run_timed 2 sh -c 'kill -ABRT $$' -> 134 (0s)
+fm_run_timed 2 sh -c 'exit 0' -> 0 (0s)
+fm_run_timed 2 sh -c 'exit 3' -> 3 (0s)
+fm_run_timed 2 sh -c 'exit 255' -> 255 (0s)
+fm_run_timed 2 sh -c 'sleep 10' -> 124 (2s)
+=== bash fallback (after) for parity
+bin/fm-timeout-lib.sh: line 45: 96523 Segmentation fault: 11  "$@"
+fm_run_bash_timeout sh -c 'kill -SEGV $$' -> 139
+fm_run_bash_timeout sh -c 'exit 3' -> 3
+=== shell reference
+plain sh -> 139

@@ -1,0 +1,6 @@
+=== test_perl_timeout_reports_signal_death against fixed lib (25abdd6)
+ok - the perl timeout path reports a signal death as 128+signal
+rc=0
+=== same test against pre-fix lib (3fd2f70)
+not ok - perl timeout path command killed by SIGSEGV: expected exit 139, got 0
+rc=1
