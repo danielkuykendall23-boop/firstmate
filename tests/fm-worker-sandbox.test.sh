@@ -157,6 +157,19 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try nm-cli-log sh -c 'echo line >> "$0"' "$nm/logs/cli.log"
   try gate-push git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/$PROBE_ID"
   try gate-notify-log sh -c 'echo pushed >> "$0"' "$nm/repos/gate.git/notify-push.log"
+  try ps sh -c '/bin/ps -o pid= -p "$$" >/dev/null'
+  try branch-suffix git -C "$PROBE_WT" branch "fm/$id-v2"
+  try gate-push-suffix git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/$id-v2"
+  try gate-fetch-stage sh -c 'git -C "$0" fetch -q --no-tags --no-write-fetch-head "$1" "HEAD:refs/no-mistakes/fetch/4242-17" &&
+    git -C "$0" update-ref -d refs/no-mistakes/fetch/4242-17' "$nm/repos/gate.git" "$PROBE_WT"
+  try tmpdir sh -c '[ "$TMPDIR" = "/tmp/fm-$0/tmp" ] && mktemp "$TMPDIR/probe.XXXXXX"' "$id"
+  try omp-puppeteer sh -c 'echo "{}" > "$0"' "$omp/puppeteer/package.json"
+  try herdr-own-lab sh -c 'mkdir "$0" && echo up > "$0/herdr-server.log"' "$HOME/.config/herdr/sessions/$PROBE_LAB-4242-17"
+  try axi-session sh -c '[ "$CHROME_DEVTOOLS_AXI_SESSION" = "fm-$0" ] && [ "$CHROME_DEVTOOLS_AXI_USER_DATA_DIR" = "/tmp/fm-$0/chrome-profile" ] &&
+    [ "$CHROME_DEVTOOLS_AXI_CHROME_ARGS" = --no-sandbox ] &&
+    mkdir "$HOME/.chrome-devtools-axi/sessions/$CHROME_DEVTOOLS_AXI_SESSION" && echo 1 > "$HOME/.chrome-devtools-axi/sessions/$CHROME_DEVTOOLS_AXI_SESSION/bridge.pid"' "$id"
+  try axi-default sh -c 'echo 1 > "$0"' "$HOME/.chrome-devtools-axi/bridge.pid"
+  try axi-other-session mkdir "$HOME/.chrome-devtools-axi/sessions/fm-$PROBE_OTHER_ID"
   try other-meta sh -c 'echo harness=evil >> "$0"' "$st/other-task.meta"
   try home-state touch "$st/.wake-queue"
   try other-status sh -c 'echo x >> "$0"' "$st/other-task.status"
@@ -196,6 +209,15 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-fm-move mv "$nm/repos/gate.git/refs/heads/fm" "/tmp/fm-$id/gate-fm"
   try gate-fm-symlink ln -s "/tmp/fm-$id" "$nm/repos/fresh.git/refs/heads/fm"
   try gate-fm-file touch "$nm/repos/fresh.git/refs/heads/fm"
+  try other-branch-suffix git -C "$PROBE_WT" branch "fm/other-task-v2"
+  try branch-id-prefix git -C "$PROBE_WT" branch "fm/${id}x"
+  try gate-other-branch-suffix git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/other-task-v2"
+  try gate-other-nm-ref git -C "$nm/repos/gate.git" fetch -q --no-tags --no-write-fetch-head "$PROBE_WT" "HEAD:refs/no-mistakes/sync/4242-17"
+  try gate-fetch-head touch "$nm/repos/gate.git/FETCH_HEAD"
+  try shared-tmp touch "/tmp/fm-sandbox-shared-$id"
+  try other-worker-tmp touch "/tmp/fm-$PROBE_OTHER_ID/tmp/planted"
+  try herdr-other-lab sh -c 'mkdir "$0"' "$HOME/.config/herdr/sessions/fm-lab-othertask-4242-17"
+  try herdr-default sh -c 'echo x >> "$0"' "$HOME/.config/herdr/session.json"
   try home touch "$HOME/planted"
 } > "$PROBE_OUT"
 SH
@@ -203,7 +225,7 @@ SH
 }
 
 test_on_fences_the_spawned_worker() {
-  local kind id out status launch result label user_home gate
+  local kind id out status launch result label user_home gate lab other_id allowed denied
   if [ "$(uname -s)" != Darwin ] || [ ! -x /usr/bin/sandbox-exec ]; then
     printf '# skip - the worker sandbox uses macOS Seatbelt (/usr/bin/sandbox-exec)\n'
     return 0
@@ -215,6 +237,8 @@ test_on_fences_the_spawned_worker() {
     write_worker_omp "$FAKEBIN"
     printf 'on\n' > "$HOME_DIR/config/worker-sandbox"
     if [ "$kind" = ship ]; then
+      # A --herdr-lab scaffold carries this heading; the scout's brief does not.
+      printf '\n# Herdr isolation - HARD SAFETY CONTRACT\nUse the lab helper.\n' >> "$HOME_DIR/data/$id/brief.md"
       out=$(spawn "$id" "$PROJ_DIR" --mode no-mistakes --yolo off); status=$?
     else
       out=$(spawn "$id" "$PROJ_DIR" --scout); status=$?
@@ -226,10 +250,16 @@ test_on_fences_the_spawned_worker() {
     git -C "$PROJ_DIR" worktree add --quiet -b "other-$kind" "$CASE_DIR/other-wt"
     user_home="$HOME_DIR/user-home"
     mkdir -p "$user_home/.omp/agent/sessions" "$user_home/.omp/agent/rules" \
-      "$user_home/.omp/agent/extensions" "$user_home/.omp/cache" \
-      "$user_home/.no-mistakes/logs" "$user_home/.no-mistakes/bin" "$user_home/.no-mistakes/worktrees/repo/run"
+      "$user_home/.omp/agent/extensions" "$user_home/.omp/cache" "$user_home/.omp/puppeteer" \
+      "$user_home/.no-mistakes/logs" "$user_home/.no-mistakes/bin" "$user_home/.no-mistakes/worktrees/repo/run" \
+      "$user_home/.config/herdr/sessions"
     : > "$user_home/.omp/agent/config.yml"
     : > "$user_home/.no-mistakes/config.yaml"
+    : > "$user_home/.config/herdr/session.json"
+    # Another worker's private temp, present so a denial is observable.
+    other_id="sandbox.other-$kind"
+    mkdir -p "/tmp/fm-$other_id/tmp"
+    lab=$("$ROOT/bin/fm-herdr-lab.sh" name "$id") && lab=${lab%-*-*}
     gate="$user_home/.no-mistakes/repos/gate.git"
     git init --quiet --bare "$gate"
     git init --quiet --bare "$user_home/.no-mistakes/repos/fresh.git"
@@ -248,18 +278,25 @@ test_on_fences_the_spawned_worker() {
     # omp first on PATH and the spawn's own throwaway HOME.
     HOME="$user_home" PATH="$FAKEBIN:$PATH" PROBE_OUT="$result" PROBE_ID="$id" \
       PROBE_STATE="$(cd "$HOME_DIR/state" && pwd -P)" PROBE_DATA="$(cd "$HOME_DIR/data" && pwd -P)" \
-      PROBE_WT="$WT_DIR" PROBE_PROJ="$PROJ_DIR" bash -c "$launch" >"$CASE_DIR/launch.out" 2>&1
+      PROBE_WT="$WT_DIR" PROBE_PROJ="$PROJ_DIR" PROBE_LAB="$lab" PROBE_OTHER_ID="$other_id" \
+      bash -c "$launch" >"$CASE_DIR/launch.out" 2>&1
     [ -s "$result" ] || fail "the $kind launch never ran the worker"$'\n'"$(cat "$CASE_DIR/launch.out")"
-    for label in commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push \
-      gate-notify-log; do
+    allowed="commit fetch status busy turnend inbox report tasktmp meta omp-session nm-cli-log gate-push
+      gate-notify-log ps branch-suffix gate-push-suffix gate-fetch-stage tmpdir omp-puppeteer axi-session"
+    denied="other-meta home-state other-status other-data primary-checkout git-hooks git-config
+      other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir
+      wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move
+      omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config
+      gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info
+      gate-other-ref gate-fm-move gate-fm-symlink gate-fm-file other-branch-suffix branch-id-prefix
+      gate-other-branch-suffix gate-other-nm-ref gate-fetch-head shared-tmp other-worker-tmp
+      herdr-other-lab herdr-default axi-default axi-other-session home"
+    # Only a --herdr-lab brief may write its own lab session.
+    if [ "$kind" = ship ]; then allowed="$allowed herdr-own-lab"; else denied="$denied herdr-own-lab"; fi
+    for label in $allowed; do
       assert_grep "allowed $label" "$result" "$kind worker write '$label' must be allowed"$'\n'"$(cat "$result")"
     done
-    for label in other-meta home-state other-status other-data primary-checkout git-hooks git-config \
-      other-branch primary-head primary-index other-worktree packed-refs omp-rules omp-rule-dir \
-      wt-gitlink wt-commondir wt-gitdir wt-config-worktree wt-move wt-admin-move \
-      omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config \
-      gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info \
-      gate-other-ref gate-fm-move gate-fm-symlink gate-fm-file home; do
+    for label in $denied; do
       assert_grep "denied $label" "$result" "$kind worker write '$label' must be denied"$'\n'"$(cat "$result")"
     done
     assert_absent "$PROJ_DIR/planted.txt" "the $kind worker planted a file in the primary checkout"
@@ -271,9 +308,11 @@ test_on_fences_the_spawned_worker() {
     git -C "$gate" rev-parse --verify -q "refs/heads/fm/$id" >/dev/null ||
       fail "the $kind worker's push never reached the no-mistakes gate"
     assert_present "$HOME_DIR/state/$id.inbox/handled/001.msg" "the $kind worker could not acknowledge its inbox"
-    rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+    git -C "$gate" rev-parse --verify -q "refs/heads/fm/$id-v2" >/dev/null ||
+      fail "the $kind worker's fresh-branch push never reached the no-mistakes gate"
+    rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"* "/tmp/fm-$other_id"
   done
-  pass "a sandboxed worker writes its task files, own branch, omp session and gate push, and nothing shared"
+  pass "a sandboxed worker writes its task files, own branches, private temp, omp session, gate push and staging, and (with --herdr-lab) its own lab session, and nothing shared"
 }
 
 test_setting_tokens
