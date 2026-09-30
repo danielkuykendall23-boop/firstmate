@@ -1,0 +1,8 @@
+===== head: guard that reads its payload normally (regression control) =====
+  host alive after session.idle; guard prompt delivered: true
+  payload received by guard: {"stop_hook_active":false}
+===== head: healthy guard (exit 0) that closes stdin early =====
+  host alive after session.idle; guard prompt delivered: false
+  node exit=
+===== base: 150 runs, natural race (no ordering preload): ok=150 crash=0 =====
+===== head: 150 runs, natural race (no ordering preload): ok=150 crash=0 =====
