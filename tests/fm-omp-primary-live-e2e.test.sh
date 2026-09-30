@@ -13,7 +13,11 @@
 #      ledger-linked successor, and the wake arrives as one follow-up turn;
 #   4. with the successor watcher frozen until its beacon passes the lab grace,
 #      the next turn end is genuinely unsupervised, so session_stop must compel
-#      the turn-end guard continuation and the model reaches for the tool.
+#      the turn-end guard continuation and the model reaches for the tool;
+#   5. an in-process task subagent, which omp runs as another runner of the
+#      same process with the watch extension auto-loaded, stays inert: the
+#      primary's watcher survives its start and shutdown and the primary still
+#      owns the arm.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -291,6 +295,42 @@ if [ -z "$repaired_pid" ] || ! kill -0 "$repaired_pid" 2>/dev/null; then
   fail "no live watcher after the guard stage"
 fi
 pass "omp $OMP_VERSION: session_stop compelled the guard continuation (guard rc=2, then a stop_hook_active stop) and the model reached for fm_watch_arm_omp"
+
+# --- 4. an in-process task subagent stays inert ---------------------------------
+# omp runs a task subagent as another runner of this same process that auto-loads
+# the watch extension. It must neither arm (which would replace the primary's
+# watcher at its session_start) nor strand the primary when its runner shuts
+# down: the watcher survives the whole subagent lifecycle, the subagent's own
+# fm_watch_arm_omp is refused, and the primary's next call is the ownership no-op.
+sub_watcher_pid=$(cat "$PROJECT/state/.watch.lock/pid" 2>/dev/null || true)
+[ -n "$sub_watcher_pid" ] || fail "no watcher recorded before the subagent stage"
+sub_line=$(( $(wc -l < "$RPC_LOG") + 1 ))
+sub_ends=$(agent_end_count)
+rpc_send '{"id":"p4","type":"prompt","message":"Use the task tool now to spawn exactly one subagent whose whole assignment is: Call the fm_watch_arm_omp tool exactly once, then yield its result text verbatim. Wait for it to finish, then reply with the subagent result text verbatim and nothing else. Do not call fm_watch_arm_omp yourself."}'
+wait_for_agent_ends $((sub_ends + 1)) 720 || fail "omp did not finish the subagent turn"
+task_calls=$(jq -r 'select(.type == "tool_execution_start" and (.toolName == "task" or (.toolName == "write" and (.args.path // "") == "xd://task"))) | .type' "$RPC_LOG" 2>/dev/null | grep -c .) || true
+[ "${task_calls:-0}" -ge 1 ] || fail "the model never spawned a task subagent, so the subagent stage checked nothing"
+sub_reply=$(assistant_text_since "$sub_line")
+case "$sub_reply" in
+  *"not the supervising session (mode=print)"*) ;;
+  *"watcher: "*) fail "a task subagent's fm_watch_arm_omp was not refused; the reply was: $sub_reply" ;;
+  *) note "the subagent reply did not relay its fm_watch_arm_omp result: $sub_reply" ;;
+esac
+sleep 3
+now_watcher_pid=$(cat "$PROJECT/state/.watch.lock/pid" 2>/dev/null || true)
+if [ "$now_watcher_pid" != "$sub_watcher_pid" ] || ! kill -0 "$sub_watcher_pid" 2>/dev/null; then
+  fail "the task subagent's lifecycle replaced or stopped the primary's watcher (was $sub_watcher_pid, now ${now_watcher_pid:-none})"
+fi
+arm_line=$(( $(wc -l < "$RPC_LOG") + 1 ))
+arm_ends=$(agent_end_count)
+rpc_send '{"id":"p5","type":"prompt","message":"Call the fm_watch_arm_omp tool exactly once now, then reply with its result text verbatim and nothing else."}'
+wait_for_agent_ends $((arm_ends + 1)) 360 || fail "omp did not finish the post-subagent arm turn"
+arm_reply=$(assistant_text_since "$arm_line")
+case "$arm_reply" in
+  *"watcher: unchanged - omp extension already owns an arm child"*) ;;
+  *) fail "after the subagent ended the primary's fm_watch_arm_omp did not report the ownership no-op; the reply was: $arm_reply" ;;
+esac
+pass "omp $OMP_VERSION: a task subagent runner stayed inert - the primary's watcher survived its start and shutdown and the primary still owns the arm"
 
 # --- shutdown -------------------------------------------------------------------
 # omp documents that closing rpc stdin disposes the session and exits 0. On

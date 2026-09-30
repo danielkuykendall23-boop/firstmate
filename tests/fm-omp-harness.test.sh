@@ -28,7 +28,9 @@
 #   6. The turn-end guard extension compels one continuation on exit 2 and
 #      stands down when the payload already carries stop_hook_active.
 #   7. The watch extension arms through fm_watch_arm_omp and delivers an
-#      actionable close as one follow-up.
+#      actionable close as one follow-up; only the primary runner (with or
+#      without a runner mode) arms, an in-process print-mode subagent runner
+#      stays inert, and the primary re-arms after a shutdown it outlived.
 #   8. The Calm extension touches nothing while off, persists /calm to the
 #      shared preference file and reloads it on session_start and session_switch, and reports
 #      only working, waiting-for-you, quiet-age, and idle from omp's events;
@@ -595,11 +597,13 @@ mod.default(pi);
 if (!tool || tool.name !== "fm_watch_arm_omp") throw new Error("fm_watch_arm_omp was not registered");
 if (!command) throw new Error("/fm-watch-arm-omp was not registered");
 if (tool.parameters?.type !== "object") throw new Error("tool parameters must be an empty object schema");
-const result = await tool.execute();
+// omp hands a tool its runner context as the fifth argument; this is the tui primary.
+const ctx = { mode: "tui", hasUI: true };
+const result = await tool.execute("arm-1", {}, undefined, undefined, ctx);
 if (!/^watcher: started omp extension arm child 1;/.test(result.content[0].text)) throw new Error(`unexpected arm result: ${result.content[0].text}`);
 const marker = readFileSync(`${process.env.FM_HOME}/state/.omp-watch-extension-loaded`, "utf8").split("\n");
 if (marker[1] !== String(process.pid)) throw new Error("loaded marker must record the session pid");
-const again = await tool.execute();
+const again = await tool.execute("arm-2", {}, undefined, undefined, ctx);
 if (!/^watcher: unchanged - omp extension already owns an arm child/.test(again.content[0].text)) throw new Error(`redundant arm was not an ownership no-op: ${again.content[0].text}`);
 await new Promise((r) => setTimeout(r, 2500));
 if (sent.length !== 1) throw new Error(`expected one follow-up wake, saw ${sent.length}: ${JSON.stringify(sent)}`);
@@ -607,7 +611,7 @@ if (!sent[0].m.startsWith("⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: 
 if (sent[0].o?.deliverAs !== "followUp") throw new Error("wake must be delivered as a follow-up");
 // The wake is consumed when omp starts the next run with that exact prompt.
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
-await handlers.get("session_shutdown")({}, {});
+await handlers.get("session_shutdown")({}, ctx);
 if (existsSync(`${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("a consumed wake must not ride the replacement handoff");
 process.exit(0);
 EOF
@@ -616,6 +620,140 @@ EOF
   expect_code 0 "$status" "omp watch extension contract: $out"
   [ -z "$out" ] || fail "omp watch extension test printed output: $out"
   pass ".omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up"
+}
+
+# One process per scenario, because the extension module is shared by every
+# runner omp binds in a process. Contexts are the ones omp 18.2.10 hands a
+# runner: the primary is initialized in tui or rpc mode, an in-process task
+# subagent in print mode. Scenarios: C the primary alone; D a subagent runner
+# binds and starts; A it also shuts down; B the primary shuts down and then
+# switches sessions with no session_start; R the primary shuts down and its own
+# fm_watch_arm_omp re-arms; N a primary on an omp build whose contexts carry no
+# mode still arms.
+drive_watch_runner_scenario() {  # <home> <repo> <scenario>
+  FM_HOME="$1" FM_ROOT_OVERRIDE="$2" SCENARIO="$3" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 \
+    FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$2/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, writeFileSync } from "node:fs";
+const home = process.env.FM_HOME;
+const scenario = process.env.SCENARIO;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const mainCtx = scenario === "C" ? { mode: "rpc", hasUI: true } : scenario === "N" ? { hasUI: true } : { mode: "tui", hasUI: true };
+const subCtx = { mode: "print", hasUI: false };
+function runner() {
+  const handlers = new Map(); const sent = []; let tool = null;
+  mod.default({
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { tool = t; },
+    sendUserMessage(m) { sent.push(m); return undefined; },
+  });
+  return {
+    sent,
+    fire: (e, ctx) => handlers.get(e)?.({ type: e }, ctx),
+    arm: async (ctx) => (await tool.execute("arm", {}, undefined, undefined, ctx)).content[0].text,
+  };
+}
+const settle = () => new Promise((r) => setTimeout(r, 300));
+const launches = () => readFileSync(`${home}/state/arm-launches`, "utf8").trim().split("\n").length;
+const unchanged = "watcher: unchanged - omp extension already owns an arm child";
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const main = runner();
+await main.fire("session_start", mainCtx);
+const first = await main.arm(mainCtx);
+if (!first.startsWith(unchanged)) throw new Error(`${scenario}: session_start did not arm the primary: ${first}`);
+await settle();
+if (scenario === "D" || scenario === "A") {
+  const sub = runner();
+  await sub.fire("session_start", subCtx);
+  await settle();
+  const refused = await sub.arm(subCtx);
+  if (!refused.startsWith("watcher: not armed - this omp runner is not the supervising session (mode=print)")) {
+    throw new Error(`${scenario}: a subagent runner's fm_watch_arm_omp was not refused: ${refused}`);
+  }
+  if (scenario === "A") await sub.fire("session_shutdown", subCtx);
+  if (sub.sent.length !== 0) throw new Error(`${scenario}: a subagent runner received a wake`);
+} else if (scenario === "B") {
+  await main.fire("session_shutdown", mainCtx);
+  await main.fire("session_switch", mainCtx);
+} else if (scenario === "R") {
+  await main.fire("session_shutdown", mainCtx);
+  const rearmed = await main.arm(mainCtx);
+  if (!rearmed.startsWith("watcher: started omp extension arm child 1;")) throw new Error(`R: the primary's own re-arm after shutdown: ${rearmed}`);
+}
+await settle();
+const after = await main.arm(mainCtx);
+if (!after.startsWith(unchanged)) throw new Error(`${scenario}: primary arm afterwards: ${after}`);
+const expected = scenario === "B" || scenario === "R" ? 2 : 1;
+if (launches() !== expected) throw new Error(`${scenario}: expected ${expected} arm launches, saw ${launches()}`);
+process.exit(0);
+EOF
+}
+
+test_watch_extension_arms_only_from_supervising_runner() {
+  local repo scenario home out status
+  repo="$TMP_ROOT/watch-runners/repo"
+  install_omp_extension_fixture "$repo"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" >> "${FM_HOME:?}/state/arm-launches"
+printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+exec sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  for scenario in C D A B R N; do
+    home="$TMP_ROOT/watch-runners/home-$scenario"
+    mkdir -p "$home/state"
+    out=$(drive_watch_runner_scenario "$home" "$repo" "$scenario")
+    status=$?
+    expect_code 0 "$status" "omp watch runner scenario $scenario: $out"
+    [ -z "$out" ] || fail "omp watch runner scenario $scenario printed output: $out"
+  done
+  pass ".omp watch extension: only the primary arms, even with no runner mode; a print-mode subagent runner stays inert through start and shutdown, and the primary re-arms after a shutdown via session_switch or fm_watch_arm_omp"
+}
+
+# The lock holder loads both primary extensions, then a nested omp-like process
+# started from a shell under it loads them too and exits. The ancestor walk reads
+# the nested process as owning the lock, yet only the holder itself may record the
+# loaded markers, so both keep naming the lock pid and the ownership proof holds.
+test_nested_omp_under_lock_holder_keeps_holder_markers() {
+  local repo home out status
+  repo="$TMP_ROOT/nested-marker/repo"; home="$TMP_ROOT/nested-marker/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/load-primary-extensions.mjs" <<'EOF'
+import { pathToFileURL } from "node:url";
+for (const source of ["fm-primary-turnend-guard.ts", "fm-primary-omp-watch.ts"]) {
+  const mod = await import(pathToFileURL(`${process.env.REPO}/.omp/extensions/${source}`).href);
+  mod.default({ on() {}, registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {} });
+}
+EOF
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" REPO="$repo" WAKE_LIB="$ROOT/bin/fm-wake-lib.sh" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const state = `${process.env.FM_HOME}/state`;
+const loader = `${process.env.REPO}/load-primary-extensions.mjs`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+await import(pathToFileURL(loader).href);
+const nested = spawnSync("bash", ["-c", 'node --input-type=module -e "await import(process.argv[1]); console.log(process.pid); process.exit(0)" "$1"', "_", pathToFileURL(loader).href], { encoding: "utf8" });
+const nestedPid = nested.stdout.trim();
+if (nested.status !== 0 || !/^[0-9]+$/.test(nestedPid)) throw new Error(`nested omp did not load the extensions: ${nested.status} ${nested.stdout}${nested.stderr}`);
+if (nestedPid === String(process.pid)) throw new Error("nested omp must be a distinct process from the lock holder");
+for (const marker of [".omp-turnend-extension-loaded", ".omp-watch-extension-loaded"]) {
+  const recorded = readFileSync(`${state}/${marker}`, "utf8").split("\n")[1];
+  if (recorded !== String(process.pid)) throw new Error(`${marker} names ${recorded}, not the lock holder ${process.pid} (nested omp was ${nestedPid})`);
+}
+const proof = spawnSync("bash", ["-c", '. "$1"; fm_omp_extension_owns_supervision "$2" "$3"', "_", process.env.WAKE_LIB, state, process.env.REPO], { encoding: "utf8" });
+if (proof.status !== 0) throw new Error(`the lock holder lost the omp ownership proof: ${proof.stdout}${proof.stderr}`);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "nested omp under the lock holder: $out"
+  [ -z "$out" ] || fail "nested omp marker test printed output: $out"
+  pass ".omp primary extensions: a nested omp under the lock holder leaves both loaded markers naming the holder, so the ownership proof holds"
 }
 
 test_calm_extension_presents_only_observed_run_state() {
@@ -775,4 +913,6 @@ test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation
 test_turnend_guard_extension_relays_stale_beacon_recheck
 test_watch_extension_arms_and_delivers
+test_watch_extension_arms_only_from_supervising_runner
+test_nested_omp_under_lock_holder_keeps_holder_markers
 test_calm_extension_presents_only_observed_run_state
