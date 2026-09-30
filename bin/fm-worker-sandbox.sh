@@ -133,7 +133,10 @@
 #     bin/fm-herdr-lab.sh name derives from the task id. That label is capped
 #     at 16 characters, so tasks whose ids share their first 16 label
 #     characters share it. The default session and every other Herdr file
-#     stay denied.
+#     stay denied. bin/fm-spawn.sh passes --herdr-lab when the task's brief
+#     carries the --herdr-lab contract heading; data/<id>/ is worker-writable,
+#     so a relaunch honors a heading the worker added, which gains it only
+#     these same lab directories.
 #   - terminal and null devices
 #
 # Exec: the kernel refuses a sandboxed process every setuid or setgid binary.
