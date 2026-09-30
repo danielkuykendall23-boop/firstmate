@@ -2013,6 +2013,26 @@ SH
   pass "the portable timeout path force-kills a command that ignores TERM"
 }
 
+test_perl_timeout_reports_signal_death() {
+  local permbin="$TMP_ROOT/perl-only-bin" mechanism status=0 tool
+  mkdir -p "$permbin"
+  # A PATH holding only perl and sh hides timeout/gtimeout so the perl mechanism is selected.
+  for tool in perl sh; do
+    ln -sf "$(command -v "$tool")" "$permbin/$tool"
+  done
+  mechanism=$(PATH="$permbin" /bin/bash -c '. "$1"; fm_timeout_mechanism' _ "$ROOT/bin/fm-timeout-lib.sh")
+  [ "$mechanism" = perl ] || fail "the perl-only fixture selected '$mechanism'"
+
+  PATH="$permbin" /bin/bash -c '. "$1"; fm_run_timed 5 sh -c "kill -SEGV \$\$"' \
+    _ "$ROOT/bin/fm-timeout-lib.sh" || status=$?
+  expect_code 139 "$status" "perl timeout path command killed by SIGSEGV"
+  status=0
+  PATH="$permbin" /bin/bash -c '. "$1"; fm_run_timed 5 sh -c "exit 3"' \
+    _ "$ROOT/bin/fm-timeout-lib.sh" || status=$?
+  expect_code 3 "$status" "perl timeout path natural exit 3"
+  pass "the perl timeout path reports a signal death as 128+signal"
+}
+
 test_runtime_bound_leaves_a_healthy_digest_untouched() {
   local rec root home fakebin out
   rec=$(new_world runtime-bound-healthy)
@@ -2716,6 +2736,7 @@ test_pi_diagnostic_rejects_missing_turnend_guard_marker
 test_pi_diagnostic_rejects_previous_session_loaded_marker
 test_runtime_bound_truncates_loudly_and_exits_zero
 test_portable_timeout_escalates_term_resistant_process
+test_perl_timeout_reports_signal_death
 test_runtime_bound_leaves_a_healthy_digest_untouched
 test_runtime_bound_leaves_harness_ancestry_headroom
 test_reemit_skips_startup_sweeps_but_keeps_the_wake_drain
