@@ -80,11 +80,12 @@
 #     packed remote-tracking ref) fails because packed-refs is denied. The
 #     worktree's files are still worker-written, so anything the primary does
 #     beyond git in it (running its scripts, tests or project-local tool
-#     configuration) runs worker-chosen code outside the fence. The task worktree must be a linked
-#     worktree, never the primary checkout.
+#     configuration) runs worker-chosen code outside the fence. The task
+#     worktree must be a linked worktree, never the primary checkout.
 #   - the task temp root (/tmp/fm-<id>), whose tmp/ subdirectory the env
 #     prefix exports as TMPDIR, so tools that default to /tmp (puppeteer's
-#     Chrome profile, test suites, the Herdr lab helper's state) get a private temp that no other worker can write
+#     Chrome profile, test suites, the Herdr lab helper's state) get a
+#     private temp that no other worker can write
 #   - the task's own chrome-devtools-axi session state
 #     ~/.chrome-devtools-axi/sessions/fm-<id>/; the default session's bridge
 #     state and every other session stay denied
