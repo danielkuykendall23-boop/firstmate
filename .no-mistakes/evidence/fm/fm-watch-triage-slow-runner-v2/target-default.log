@@ -1,0 +1,8 @@
+== target default: test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
+ok - a declared wait is not wedge-escalated by a working verdict, while an elapsed declaration and an undeclared lane both keep the unchanged ladder
+FM_TEST_ONLY=$t bash tests/fm-watch-triage.test.sh  19.90s user 37.01s system 59% cpu 1:36.44 total
+exit=0
+== target default: test_wedge_threshold_recheck_names_the_captain_for_a_held_lane
+ok - a captain-held lane is rechecked as a hold on the captain, never as an external wait, and never at all while the captain is away
+FM_TEST_ONLY=$t bash tests/fm-watch-triage.test.sh  20.03s user 36.77s system 54% cpu 1:45.01 total
+exit=0

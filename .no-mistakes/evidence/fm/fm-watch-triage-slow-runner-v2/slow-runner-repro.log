@@ -1,0 +1,8 @@
+== base-3fd2f70, FM_TEST_PAUSE_RESURFACE=5 (declaration ages past window in real time): test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
+not ok - a declared wait wedge-escalated at threshold 1 under a working verdict: stale: test:fm-wedge (idle 22s, waiting 49s - declared wait, awaiting external, rechecked on a long cadence not a wedge; confirm the wait still holds)
+== base-3fd2f70, FM_TEST_PAUSE_RESURFACE=5 (declaration ages past window in real time): test_wedge_threshold_recheck_names_the_captain_for_a_held_lane
+not ok - a captain-held lane older than the recheck cadence was never rechecked: 
+== target-404c3be, FM_TEST_PAUSE_RESURFACE=5 (declaration ages past window in real time): test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
+not ok - an undeclared working lane stopped escalating at threshold 3
+== target-404c3be, FM_TEST_PAUSE_RESURFACE=5 (declaration ages past window in real time): test_wedge_threshold_recheck_names_the_captain_for_a_held_lane
+ok - a captain-held lane is rechecked as a hold on the captain, never as an external wait, and never at all while the captain is away

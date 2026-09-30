@@ -1,0 +1,6 @@
+12:30  up 3 days,  2:08, 2 users, load averages: 37.50 69.72 63.13
+== rerun target-404c3be, FM_TEST_PAUSE_RESURFACE=5: test_wedge_threshold_defers_to_a_declared_wait_under_a_working_verdict
+ok - a declared wait is not wedge-escalated by a working verdict, while an elapsed declaration and an undeclared lane both keep the unchanged ladder
+== rerun base-3fd2f70, FM_TEST_PAUSE_RESURFACE=5: test_wedge_threshold_recheck_names_the_captain_for_a_held_lane
+not ok - a captain-held lane wedge-escalated at threshold 1 under a working verdict: stale: test:fm-wedge (idle 3s, waiting 6s - captain-held, awaiting the captain - verified hold transfer, rechecked on a long cadence not a wedge; answer the held decision or release the hold)
+12:31  up 3 days,  2:09, 2 users, load averages: 14.62 54.90 58.06
