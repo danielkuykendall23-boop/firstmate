@@ -89,7 +89,6 @@ import {
   DefaultResourceLoader,
   DynamicBorder,
   getAgentDir,
-  keyHint,
   ModelRuntime,
   type ModelRegistry,
   SessionManager,
@@ -2096,41 +2095,37 @@ ${context.command}
       .replace(/\r/g, "");
   };
 
-  let stockOutcomesPreviewLines: number | null | undefined;
-  const getStockOutcomesPreviewLines = (): number | undefined => {
-    if (stockOutcomesPreviewLines !== undefined) return stockOutcomesPreviewLines ?? undefined;
-    const probeTokens = Array.from(
-      { length: 64 },
-      (_, index) => `FM_OUTCOMES_PREVIEW_PROBE_${String(index).padStart(2, "0")}`,
-    );
-    try {
-      const probeDefinition: ToolDefinition = {
-        name: "fm_outcomes_preview_probe",
-        label: "Preview probe",
-        description: "Preview probe",
-        parameters: Type.Object({}),
-        execute: async () => ({ content: [], details: undefined }),
-      };
-      const probe = new ToolExecutionComponent(
-        probeDefinition.name,
-        "fm-outcomes-preview-probe",
-        {},
+  type StockOutcomesState = {
+    row?: ToolExecutionComponent;
+    presentation?: { render(width: number): string[]; invalidate(): void };
+  };
+  const stockOutcomesRow = (
+    context: Parameters<NonNullable<ToolDefinition["renderCall"]>>[2],
+  ): StockOutcomesState & { row: ToolExecutionComponent } => {
+    const state = context.state as StockOutcomesState;
+    if (!state.row) {
+      const definition = { ...outcomesDefinition };
+      delete definition.renderShell;
+      delete definition.renderCall;
+      delete definition.renderResult;
+      const row = new ToolExecutionComponent(
+        definition.name,
+        context.toolCallId,
+        context.args,
         { showImages: false },
-        probeDefinition,
-        { requestRender() {} } as ConstructorParameters<typeof ToolExecutionComponent>[5],
-        root,
+        definition,
+        { requestRender: context.invalidate } as ConstructorParameters<typeof ToolExecutionComponent>[5],
+        context.cwd,
       );
-      probe.updateResult({
-        content: [{ type: "text", text: probeTokens.join("\n") }],
-        isError: false,
-      });
-      const rendered = probe.render(4096).join("\n");
-      const visibleLines = probeTokens.filter((token) => rendered.includes(token)).length;
-      stockOutcomesPreviewLines = visibleLines > 0 && visibleLines < probeTokens.length ? visibleLines : null;
-    } catch {
-      stockOutcomesPreviewLines = null;
+      state.row = row;
+      state.presentation = {
+        // The outer self-rendered row supplies the inter-tool spacer.
+        // Leave every stock content line, including its own padding, intact.
+        render: (width) => row.render(width).slice(1),
+        invalidate: () => row.invalidate(),
+      };
     }
-    return stockOutcomesPreviewLines ?? undefined;
+    return state as StockOutcomesState & { row: ToolExecutionComponent };
   };
 
   type OutcomesToolShellState = {
@@ -2157,7 +2152,7 @@ ${context.command}
     return shell;
   };
 
-  registerFirstmateTool(pi, {
+  const outcomesDefinition: ToolDefinition = {
     name: "fm_branch_outcomes",
     label: "Read supervision branch outcomes",
     description:
@@ -2167,33 +2162,20 @@ ${context.command}
       recent: Type.Optional(Type.Number({ description: "How many most-recent outcomes to read (default 20)" })),
     }),
     renderShell: "self",
-    renderCall: (_args, theme, context) => {
+    renderCall: (args, _theme, context) => {
       if (calmPresentation.stockExportRendering) throw new Error("Use Pi stock export rendering");
       if (calmHides("assistant-tool-call")) return new Container();
-      const shellState = context.state as OutcomesToolShellState;
-      shellState.call = new Text(theme.fg("toolTitle", theme.bold("fm_branch_outcomes")), 0, 0);
-      return refreshOutcomesToolShell(shellState, theme, context);
+      const state = stockOutcomesRow(context);
+      state.row.updateArgs(args);
+      state.row.setExpanded(context.expanded);
+      return state.presentation!;
     },
-    renderResult: (result, options, theme, context) => {
+    renderResult: (result, options, _theme, context) => {
       if (calmPresentation.stockExportRendering) throw new Error("Use Pi stock export rendering");
       if (calmHides("tool-result")) return new Container();
-      const output = result.content
-        .filter((item) => item.type === "text")
-        .map((item) => normalizeOutcomesToolOutput(item.text))
-        .join("\n");
-      const shellState = context.state as OutcomesToolShellState;
-      // Keep each line's ANSI scope independent, matching Pi's stock fallback.
-      // Pi 0.84.4 no longer supplies an implicit reset at multiline boundaries.
-      const lines = output.split("\n");
-      const previewLines = getStockOutcomesPreviewLines();
-      const displayLines = options.expanded || previewLines === undefined ? lines : lines.slice(0, previewLines);
-      const remaining = lines.length - displayLines.length;
-      let renderedOutput = displayLines.map((line) => theme.fg("toolOutput", line)).join("\n");
-      if (remaining > 0) {
-        renderedOutput += `${theme.fg("muted", `\n... (${remaining} more lines,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
-      }
-      shellState.result = output ? new Text(renderedOutput, 0, 0) : new Container();
-      refreshOutcomesToolShell(shellState, theme, context);
+      const { row } = stockOutcomesRow(context);
+      row.setExpanded(options.expanded);
+      row.updateResult({ ...result, isError: context.isError }, options.isPartial);
       return new Container();
     },
     execute: async (_toolCallId, params) => {
@@ -2212,7 +2194,8 @@ ${context.command}
         details: undefined,
       };
     },
-  });
+  };
+  registerFirstmateTool(pi, outcomesDefinition);
 
   // Main's only way to close a captain outcome. The acknowledgement is keyed
   // to the sequence main names, validated by the store (never past the read
