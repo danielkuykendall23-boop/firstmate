@@ -1,0 +1,60 @@
+== run 1
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 2
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 3
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 4
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 5
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 6
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 7
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 8
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 9
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 10
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 11
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 12
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 13
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 14
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
+== run 15
+ok - a later URL waits when fewer than fifteen seconds remain for its observation
+ok - parallel forge reads replace the controllable clock rather than rewriting it
+rc=0
