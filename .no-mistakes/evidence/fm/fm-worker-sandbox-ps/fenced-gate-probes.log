@@ -1,0 +1,18 @@
+# fenced gate probes, task id nmtest-gate, disposable HOME=/tmp/nmtest-sbx-nmtest-gate/home, profile from HEAD 94d82ae
+allowed push task branch to gate (already-pushed branch, fast-forward)
+allowed stage head into gate refs/no-mistakes/fetch/<pid>-<n> (no-mistakes v1.84 'prepare private mirror' fetch)
+allowed staged ref holds pushed head
+allowed delete staged ref
+allowed push recovery branch fm/nmtest-gate-v2 to gate
+--- adversarial ---
+denied  push sibling fm/nmtest-gate-other to gate
+denied  push gate main
+denied  fetch into other no-mistakes ref namespace refs/no-mistakes/sync/1-1
+denied  non-numeric staging ref refs/no-mistakes/fetch/evil
+denied  gate FETCH_HEAD
+denied  gate hooks
+denied  gate config
+# gate refs after (outside fence):
+refs/heads/fm/nmtest-gate
+refs/heads/fm/nmtest-gate-v2
+refs/heads/main

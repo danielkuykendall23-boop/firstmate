@@ -1,0 +1,3 @@
+$ sandbox-exec -f /tmp/nmtest-sbx-nmtest-sbx/sb.sb /bin/sh -c '$(cat env.sh) bash tests/fm-ask-user-authority.test.sh'
+ok - primary workers and secondmates receive the authority rule through generated instructions
+exit=0

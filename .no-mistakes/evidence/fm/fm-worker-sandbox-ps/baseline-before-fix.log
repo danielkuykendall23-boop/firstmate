@@ -1,0 +1,11 @@
+# BASE commit 328d39c profile (before the fix)
+$ sandbox-exec -f base.sb bash tests/fm-ask-user-authority.test.sh
+tests/fm-ask-user-authority.test.sh: line 26: assert_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 28: assert_no_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 35: assert_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 37: assert_no_grep: command not found
+ok - primary workers and secondmates receive the authority rule through generated instructions
+exit=
+$ sandbox-exec -f base.sb /bin/ps -o pid= -p <pid>
+sandbox-exec: execvp() of '/bin/ps' failed: Operation not permitted
+exit=71

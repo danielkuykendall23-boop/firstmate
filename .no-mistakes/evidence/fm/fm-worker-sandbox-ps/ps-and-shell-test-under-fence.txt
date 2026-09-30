@@ -1,0 +1,16 @@
+=== profile base: fm_pid_identity (bin/fm-wake-lib.sh) inside the fence
+exit=1
+=== profile base: bash tests/fm-ask-user-authority.test.sh (sources tests/lib.sh) inside the fence
+tests/fm-ask-user-authority.test.sh: line 26: assert_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 28: assert_no_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 35: assert_grep: command not found
+tests/fm-ask-user-authority.test.sh: line 37: assert_no_grep: command not found
+ok - primary workers and secondmates receive the authority rule through generated instructions
+exit=0
+=== profile new: fm_pid_identity (bin/fm-wake-lib.sh) inside the fence
+Wed Sep 30 14:23:12 2026     bash -c . "/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M3SMBXVE2F37QP1HKQW1BQBQ/bin/fm-wake-lib.sh"; fm_pid_identity $$
+exit=0
+=== profile new: bash tests/fm-ask-user-authority.test.sh (sources tests/lib.sh) inside the fence
+grep: /private/tmp/fm-nmtest-sbx/tmp/fm-ask-user-authority.xKx1kL/home/data/authority-worker/brief.md: No such file or directory
+not ok - generated implementation brief lets the worker own an ask-user decision
+exit=1

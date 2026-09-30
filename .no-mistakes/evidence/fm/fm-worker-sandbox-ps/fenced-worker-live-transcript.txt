@@ -1,0 +1,45 @@
+env prefix: export TMPDIR='/tmp/fm-nmtest-sbx/tmp' CHROME_DEVTOOLS_AXI_SESSION='fm-nmtest-sbx' CHROME_DEVTOOLS_AXI_USER_DATA_DIR='/tmp/fm-nmtest-sbx/chrome-profile' CHROME_DEVTOOLS_AXI_CHROME_ARGS=--no-sandbox; 
+--- profile: base
+base  ps via fm_pid_identity       DENIED   (/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M3SMBXVE2F37QP1HKQW1BQBQ: fm_pid_identity: comma)
+base  own branch push to gate      ALLOWED
+base  nm stage head fetch/<n>-<n>  DENIED   (error: cannot lock ref 'refs/no-mistakes/fetch/64180-1': unable to create directory for ./refs/no-mistakes/fet)
+base  recovery branch fm/<id>-v2   DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbx-v2': Unable to create '/private/tmp/fm-nmtest-root/proj/.git/)
+base  gate push fm/<id>-v2         DENIED   (error: failed to push some refs to '/tmp/fm-nmtest-root/home/.no-mistakes/repos/gate.git')
+base  ADV sibling fm/<id>-other    DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbx-other': Unable to create '/private/tmp/fm-nmtest-root/proj/.g)
+base  ADV gate fm/<id>-other       DENIED   (error: failed to push some refs to '/tmp/fm-nmtest-root/home/.no-mistakes/repos/gate.git')
+base  ADV fm/<id>x prefix          DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbxx': Unable to create '/private/tmp/fm-nmtest-root/proj/.git/re)
+base  ADV fm/<id>-v2x              DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbx-v2x': Unable to create '/private/tmp/fm-nmtest-root/proj/.git)
+base  ADV main branch move         DENIED   (fatal: cannot force update the branch 'main' used by worktree at '/private/tmp/fm-nmtest-root/proj')
+base  ADV gate refs/no-mistakes/x  DENIED   (error: cannot lock ref 'refs/no-mistakes/sync/1-1': unable to create directory for ./refs/no-mistakes/sync/1-1)
+base  ADV gate FETCH_HEAD          DENIED   (touch: /tmp/fm-nmtest-root/home/.no-mistakes/repos/gate.git/FETCH_HEAD: Operation not permitted)
+base  TMPDIR mktemp                ALLOWED
+base  python tempfile.mkdtemp      ALLOWED
+base  ADV direct /tmp write        DENIED   (touch: /tmp/fm-nmtest-shared: Operation not permitted)
+base  omp puppeteer cache          DENIED   (mkdir: /tmp/fm-nmtest-root/home/.omp/puppeteer: Operation not permitted)
+base  axi own session dir          DENIED   (mkdir: /tmp/fm-nmtest-root/home/.chrome-devtools-axi/sessions/fm-nmtest-sbx: Operation not permitted)
+base  ADV axi default bridge       DENIED   (touch: /tmp/fm-nmtest-root/home/.chrome-devtools-axi/bridge.pid: Operation not permitted)
+--- profile: new
+new   ps via fm_pid_identity       DENIED   (/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M3SMBXVE2F37QP1HKQW1BQBQ: fm_pid_identity: comma)
+new   own branch push to gate      ALLOWED
+new   nm stage head fetch/<n>-<n>  ALLOWED
+new   recovery branch fm/<id>-v2   ALLOWED
+new   gate push fm/<id>-v2         ALLOWED
+new   ADV sibling fm/<id>-other    DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbx-other': Unable to create '/private/tmp/fm-nmtest-root/proj/.g)
+new   ADV gate fm/<id>-other       DENIED   (error: failed to push some refs to '/tmp/fm-nmtest-root/home/.no-mistakes/repos/gate.git')
+new   ADV fm/<id>x prefix          DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbxx': Unable to create '/private/tmp/fm-nmtest-root/proj/.git/re)
+new   ADV fm/<id>-v2x              DENIED   (fatal: cannot lock ref 'refs/heads/fm/nmtest-sbx-v2x': Unable to create '/private/tmp/fm-nmtest-root/proj/.git)
+new   ADV main branch move         DENIED   (fatal: cannot force update the branch 'main' used by worktree at '/private/tmp/fm-nmtest-root/proj')
+new   ADV gate refs/no-mistakes/x  DENIED   (error: cannot lock ref 'refs/no-mistakes/sync/1-1': unable to create directory for ./refs/no-mistakes/sync/1-1)
+new   ADV gate FETCH_HEAD          DENIED   (touch: /tmp/fm-nmtest-root/home/.no-mistakes/repos/gate.git/FETCH_HEAD: Operation not permitted)
+new   TMPDIR mktemp                ALLOWED
+new   python tempfile.mkdtemp      ALLOWED
+new   ADV direct /tmp write        DENIED   (touch: /tmp/fm-nmtest-shared: Operation not permitted)
+new   omp puppeteer cache          ALLOWED
+new   axi own session dir          ALLOWED
+new   ADV axi default bridge       DENIED   (touch: /tmp/fm-nmtest-root/home/.chrome-devtools-axi/bridge.pid: Operation not permitted)
+--- gate refs after run:
+refs/heads/fm/nmtest-sbx
+refs/no-mistakes/fetch/64180-1
+--- repo branches:
+fm/nmtest-sbx
+main

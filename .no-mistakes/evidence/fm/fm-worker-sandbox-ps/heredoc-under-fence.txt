@@ -1,0 +1,12 @@
+host bash: /bin/bash GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+=== new profile (ca5174d), env prefix applied (TMPDIR=/tmp/fm-nmtest-sbx/tmp): /bin/bash here-document
+TMPDIR=/tmp/fm-nmtest-sbx/tmp
+bash: cannot create temp file for here document: Operation not permitted
+exit=1
+=== new profile: bash tests/fm-ask-user-authority.test.sh
+grep: /private/tmp/fm-nmtest-sbx/tmp/fm-ask-user-authority.ZEz8Nb/home/data/authority-worker/brief.md: No such file or directory
+not ok - generated implementation brief lets the worker own an ask-user decision
+exit=1
+=== diagnostic only: new profile + (allow file-write* (literal /private/var/tmp) (regex ^/private/var/tmp/sh-thd-))
+ok - primary workers and secondmates receive the authority rule through generated instructions
+exit=0

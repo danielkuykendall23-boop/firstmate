@@ -1,0 +1,9 @@
+ok - config/worker-sandbox reads absent and off as off, on as on, and rejects anything else
+ok - a malformed config/worker-sandbox refuses the spawn before metadata or launch
+ok - an unverified harness refuses instead of launching unsandboxed
+ok - a raw launch command refuses under the sandbox setting
+ok - a machine that cannot enforce the fence refuses the spawn
+ok - config/worker-sandbox=off launches exactly as an absent file does
+ok - persistent secondmates are outside the worker sandbox
+ok - a sandboxed worker writes its task files, own branches, private temp, omp session, gate push and staging, and (with --herdr-lab) its own lab session, and nothing shared
+# all fm-worker-sandbox tests passed

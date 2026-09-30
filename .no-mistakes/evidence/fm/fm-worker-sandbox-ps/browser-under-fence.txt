@@ -1,0 +1,28 @@
+session=fm-nmtest-sbx udd=/tmp/fm-nmtest-sbx/chrome-profile
+page:
+  title: fenced proof
+  url: "file:///tmp/fm-nmtest-sbx/page/index.html"
+  refs: 3
+snapshot:
+uid=g1:1_0 RootWebArea "fenced proof" url="file:///tmp/fm-nmtest-sbx/page/index.html"
+  uid=g1:1_1 heading "Rendered inside the worker fence" level="1"
+  uid=g1:1_2 button "Proof button"
+help[2]:
+  Run `chrome-devtools-axi click @g1:1_2` to click the "Proof button" button
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+open exit=0
+page:
+  title: fenced proof
+  refs: 3
+snapshot:
+uid=g2:1_0 RootWebArea "fenced proof" url="file:///tmp/fm-nmtest-sbx/page/index.html"
+  uid=g2:1_1 heading "Rendered inside the worker fence" level="1"
+  uid=g2:1_2 button "Proof button"
+help[2]:
+  Run `chrome-devtools-axi click @g2:1_2` to click the "Proof button" button
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+snapshot exit=0
+screenshot: /tmp/fm-nmtest-sbx/fenced-browser.png
+screenshot exit=0
+status: stopped
+stop exit=0

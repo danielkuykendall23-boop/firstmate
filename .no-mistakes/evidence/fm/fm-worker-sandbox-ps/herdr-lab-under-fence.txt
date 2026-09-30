@@ -1,0 +1,17 @@
+===== profile: nolab
+session=fm-lab-nmtest-sbx-96339-2895 TMPDIR=/tmp/fm-nmtest-sbx/tmp
+fm-herdr-lab: lab session 'fm-lab-nmtest-sbx-96339-2895' did not report running within 60 seconds
+provision exit=1
+{"id":"cli:workspace:list","error":{"code":"server_not_running","message":"no herdr server is running at /Users/danielkuykendall/.config/herdr/sessions/fm-lab-nmtest-sbx-96339-2895/herdr.sock; run `herdr session attach fm-lab-nmtest-sbx-96339-2895` to start or attach it"}}
+run exit=1
+teardown exit=0
+ls: /Users/danielkuykendall/.config/herdr/sessions/fm-lab-nmtest-sbx-96339-2895: No such file or directory
+===== profile: lab
+session=fm-lab-nmtest-sbx-17579-3841 TMPDIR=/tmp/fm-nmtest-sbx/tmp
+provision exit=0
+{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":[]}}
+run exit=0
+teardown exit=0
+ls: /Users/danielkuykendall/.config/herdr/sessions/fm-lab-nmtest-sbx-17579-3841: No such file or directory
+===== session list after (unsandboxed read)
+[{"name":"default","running":true,"default":true},{"name":"fm-lab-calm-omp-evidence","running":false,"default":false},{"name":"fm-remote","running":false,"default":false}]

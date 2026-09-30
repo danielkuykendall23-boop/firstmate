@@ -1,0 +1,27 @@
+# fenced chrome-devtools-axi browser proof, task nmtest-sbx
+session=fm-nmtest-sbx userdata=/tmp/fm-nmtest-sbx/chrome-profile
+page:
+  title: Fenced worker browser proof
+  url: "file:///tmp/fm-nmtest-sbx/page.html"
+  refs: 3
+snapshot:
+uid=g1:1_0 RootWebArea url="file:///tmp/fm-nmtest-sbx/page.html"
+  uid=g1:1_1 heading "Fenced worker browser proof" level="1"
+  uid=g1:1_2 StaticText "chrome-devtools-axi inside the Seatbelt write fence (task nmtest-sbx)"
+help[1]:
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+open exit=0
+page:
+  title: Fenced worker browser proof
+  refs: 3
+snapshot:
+uid=g2:1_0 RootWebArea url="file:///tmp/fm-nmtest-sbx/page.html"
+  uid=g2:1_1 heading "Fenced worker browser proof" level="1"
+  uid=g2:1_2 StaticText "chrome-devtools-axi inside the Seatbelt write fence (task nmtest-sbx)"
+help[1]:
+  Use `chrome-devtools-axi eval <expr>` for JS expressions. For multi-statement code, pass a function: `eval "() => { ...; return result }"`
+snapshot exit=0
+screenshot: /tmp/fm-nmtest-sbx/tmp/fenced-browser.png
+screenshot exit=0
+status: stopped
+stop exit=0

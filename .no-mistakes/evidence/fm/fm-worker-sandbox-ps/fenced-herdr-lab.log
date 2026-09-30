@@ -1,0 +1,20 @@
+# fenced Herdr lab lifecycle (provision, run, teardown), task nmtest-lab, profile built with --herdr-lab
+session=fm-lab-nmtest-lab-63682-20683
+provision exit=0
+{"id":"cli:workspace:list","result":{"type":"workspace_list","workspaces":[]}}
+run workspace list exit=0
+denied  other lab dir (adversarial)
+denied  herdr default config (adversarial)
+teardown exit=0
+lab dir gone after teardown
+
+# same lifecycle, task nmtest-nolab, profile WITHOUT --herdr-lab (adversarial)
+session=fm-lab-nmtest-nolab-63826-21476
+fm-herdr-lab: lab session 'fm-lab-nmtest-nolab-63826-21476' did not report running within 60 seconds
+provision exit=1
+{"id":"cli:workspace:list","error":{"code":"server_not_running","message":"no herdr server is running at /Users/danielkuykendall/.config/herdr/sessions/fm-lab-nmtest-nolab-63826-21476/herdr.sock; run `herdr session attach fm-lab-nmtest-nolab-63826-21476` to start or attach it"}}
+run workspace list exit=1
+denied  other lab dir (adversarial)
+denied  herdr default config (adversarial)
+teardown exit=0
+lab dir gone after teardown

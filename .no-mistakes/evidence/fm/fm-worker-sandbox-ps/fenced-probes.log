@@ -1,0 +1,17 @@
+# fenced probes, task id nmtest-sbx, profile from HEAD 94d82ae
+allowed ps (setuid /bin/ps)
+allowed fm_pid_identity via bin/fm-wake-lib.sh
+allowed bash 3.2 here-document
+allowed mktemp in TMPDIR (/tmp/fm-nmtest-sbx/tmp)
+allowed python tempfile.mkstemp (default /tmp-style tool)
+allowed create recovery branch fm/nmtest-sbx-v2
+allowed commit on fm/nmtest-sbx-v2
+--- adversarial ---
+denied  sibling branch fm/nmtest-sbx-other
+denied  other task branch fm/other-v2
+denied  move main
+denied  write /tmp directly
+denied  write another worker temp /tmp/fm-other
+denied  write /var/tmp/evil
+denied  write /private/var/tmp/sh-thd-evil (non-numeric)
+denied  write HOME file
