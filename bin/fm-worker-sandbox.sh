@@ -66,7 +66,7 @@
 #     config.worktree, so a worker cannot repoint its checkout at a repository
 #     it controls or set a hook or fsmonitor command that the unfenced primary
 #     would run when it inspects the worktree with git; its own branches
-#     refs/heads/fm/<id> and refs/heads/fm/<id>-<suffix> (a fresh PR branch
+#     refs/heads/fm/<id> and refs/heads/fm/<id>-v<n> (a fresh PR branch
 #     such as fm/<id>-v2, the supported recovery path) and their locks, and
 #     the shared refs/remotes/ and refs/tags/ a fetch and push update, plus
 #     packed-refs.lock, which git 2.50 takes on every ref update and reports
@@ -78,11 +78,9 @@
 #     still create or move a tag or remote-tracking ref and briefly hold the
 #     packed-refs lock, and deleting a packed ref (e.g. fetch --prune of a
 #     packed remote-tracking ref) fails because packed-refs is denied. The
-#     suffix rule matches by name, so a task whose id is <id>-<suffix> has
-#     its fm/ branch inside this task's prefix. The worktree's files are
-#     still worker-written, so anything the primary does beyond git in it
-#     (running its scripts, tests or project-local tool configuration) runs
-#     worker-chosen code outside the fence. The task worktree must be a linked
+#     worktree's files are still worker-written, so anything the primary does
+#     beyond git in it (running its scripts, tests or project-local tool
+#     configuration) runs worker-chosen code outside the fence. The task worktree must be a linked
 #     worktree, never the primary checkout.
 #   - the task temp root (/tmp/fm-<id>), whose tmp/ subdirectory the env
 #     prefix exports as TMPDIR, so tools that default to /tmp (bash
@@ -102,7 +100,7 @@
 #     (logs/cli.log, state.sqlite and its journal files, update-check.json,
 #     telemetry-gate.json) and, in each gate repository repos/<gate>/, only
 #     what a push of the task branch and a run's head staging write: objects/,
-#     logs/, the refs refs/heads/fm/<id> and refs/heads/fm/<id>-<suffix> and
+#     logs/, the refs refs/heads/fm/<id> and refs/heads/fm/<id>-v<n> and
 #     their locks, creating (never renaming, and never as a symlink or file)
 #     the refs/heads/fm directory, packed-refs.lock, the notify-push.log the
 #     gate's hooks append to, and the staging refs a run on an already-pushed
@@ -322,8 +320,8 @@ cmd_profile() {
   paths+=("subpath|$home/.chrome-devtools-axi/sessions/fm-$id")
   paths+=("subpath|$common/objects" "subpath|$common/logs" "regex|^$(regex_quote "$gitdir")/")
   denies+=("literal|$wt/.git" "literal|$gitdir/commondir" "literal|$gitdir/gitdir" "literal|$gitdir/config.worktree")
-  # fm/<id> and fm/<id>-<suffix>, one path component, plus each ref's lock.
-  paths+=("regex|^$(regex_quote "$common/refs/heads/fm/")${qid}(-[^/]+)?(\.lock)?\$")
+  # fm/<id> and its fm/<id>-v<n> recovery branches, plus each ref's lock.
+  paths+=("regex|^$(regex_quote "$common/refs/heads/fm/")${qid}(-v[0-9]+)?(\.lock)?\$")
   paths+=("subpath|$common/refs/remotes" "subpath|$common/refs/tags" "literal|$common/packed-refs.lock")
   paths+=("literal|$st/$id.status" "literal|$st/$id.turn-ended" "literal|$st/$id.progress")
   paths+=("literal|$st/$id.busy-state" "literal|$st/$id.busy-state.lock" "prefix|$st/$id.busy-state.tmp.")
@@ -335,7 +333,7 @@ cmd_profile() {
   paths+=("prefix|$nm/update-check.json" "prefix|$nm/telemetry-gate.json")
   gate="^$(regex_quote "$nm/repos/")[^/]+/"
   paths+=("regex|${gate}objects/" "regex|${gate}logs/" "regex|${gate}packed-refs\.lock\$")
-  paths+=("regex|${gate}refs/heads/fm/${qid}(-[^/]+)?(\.lock)?\$" "regex|${gate}notify-push\.log\$")
+  paths+=("regex|${gate}refs/heads/fm/${qid}(-v[0-9]+)?(\.lock)?\$" "regex|${gate}notify-push\.log\$")
   paths+=("regex|${gate}refs/no-mistakes/fetch/[0-9]+-[0-9]+(\.lock)?\$")
   creates+=("regex|${gate}refs/heads/fm\$" "regex|${gate}refs/no-mistakes\$" "regex|${gate}refs/no-mistakes/fetch\$")
   for p in DARWIN_USER_TEMP_DIR DARWIN_USER_CACHE_DIR; do

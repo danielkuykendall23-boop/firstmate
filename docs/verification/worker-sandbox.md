@@ -51,7 +51,7 @@ Known residuals of the fence as a whole:
 
 - a worker can create or move a tag or remote-tracking ref, briefly hold `packed-refs.lock`, write the shared no-mistakes `state.sqlite`, and write any gate's `refs/no-mistakes/fetch/<n>-<n>` staging refs, which no-mistakes names by process rather than task;
 - deleting a packed ref fails, because `packed-refs` is denied;
-- branch and Herdr lab permissions match by name, so a task whose id is this id plus `-<suffix>`, or whose lab label shares this task's first 16 label characters, falls inside them;
+- Herdr lab permissions match by name, so a task whose lab label shares this task's first 16 label characters falls inside them;
 - the worktree's files stay worker-written, so anything the primary runs beyond git in a worker's worktree (its scripts, tests, or project-local tool configuration) runs worker-chosen code outside the fence, and the same holds for the download caches, including `~/.omp/puppeteer/`, whose browser the primary may later run;
 - a tool or test that hardcodes a `/tmp/...` path instead of honoring `TMPDIR` still fails;
 - only omp is supported; other harnesses refuse to spawn while the setting is on.

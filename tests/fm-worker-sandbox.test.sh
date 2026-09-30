@@ -211,6 +211,8 @@ st=$PROBE_STATE; id=$PROBE_ID; git_dir=$PROBE_PROJ/.git; omp=$HOME/.omp; nm=$HOM
   try gate-fm-file touch "$nm/repos/fresh.git/refs/heads/fm"
   try other-branch-suffix git -C "$PROBE_WT" branch "fm/other-task-v2"
   try branch-id-prefix git -C "$PROBE_WT" branch "fm/${id}x"
+  try sibling-branch git -C "$PROBE_WT" branch "fm/$id-other"
+  try gate-sibling-branch git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/$id-other"
   try gate-other-branch-suffix git -C "$PROBE_WT" push -q "$nm/repos/gate.git" "HEAD:refs/heads/fm/other-task-v2"
   try gate-other-nm-ref git -C "$nm/repos/gate.git" fetch -q --no-tags --no-write-fetch-head "$PROBE_WT" "HEAD:refs/no-mistakes/sync/4242-17"
   try gate-fetch-head touch "$nm/repos/gate.git/FETCH_HEAD"
@@ -289,7 +291,7 @@ test_on_fences_the_spawned_worker() {
       omp-extension omp-config omp-agent-move nm-config nm-bin nm-worktrees gate-hooks gate-config
       gate-move gate-config-worktree gate-run-admin gate-run-config gate-nm-config gate-info
       gate-other-ref gate-fm-move gate-fm-symlink gate-fm-file other-branch-suffix branch-id-prefix
-      gate-other-branch-suffix gate-other-nm-ref gate-fetch-head shared-tmp other-worker-tmp
+      gate-other-branch-suffix sibling-branch gate-sibling-branch gate-other-nm-ref gate-fetch-head shared-tmp other-worker-tmp
       herdr-other-lab herdr-default axi-default axi-other-session home"
     # Only a --herdr-lab brief may write its own lab session.
     if [ "$kind" = ship ]; then allowed="$allowed herdr-own-lab"; else denied="$denied herdr-own-lab"; fi
