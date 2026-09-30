@@ -3848,23 +3848,50 @@ if (!serialized.includes("firstmate-synthetic-input") || !serialized.includes("/
 const synthetic = entries.find((entry) => entry.type === "custom_message" && entry.customType === "firstmate-synthetic-input");
 if (!synthetic || synthetic.display) process.exit(1);
 JS
+  # Observe visibility in the browser, not DOM membership: newer Pi exports keep
+  # display:false entries behind their stock "Show hidden messages" control.
+  local export_probe="$TMP_ROOT/calm-export-probe.html"
+  node - "$export_file" "$export_probe" <<'JS' || fail "could not prepare export visibility observation"
+const fs = require("node:fs");
+const script = `<script>
+window.addEventListener("load", () => {
+  const messages = document.getElementById("messages");
+  const tree = document.getElementById("tree-container");
+  if (!messages || !tree) return;
+  const observed = {
+    messages: messages.innerText,
+    users: Array.from(messages.querySelectorAll(".user-message"), el => el.innerText),
+    assistants: Array.from(messages.querySelectorAll(".assistant-message"), el => el.innerText),
+    hooks: Array.from(messages.querySelectorAll(".hook-message")).filter(el => el.checkVisibility()).map(el => el.innerText),
+    tree: tree.innerText,
+  };
+  const record = document.createElement("script");
+  record.id = "fm-export-visibility";
+  record.type = "application/json";
+  record.textContent = btoa(Array.from(new TextEncoder().encode(JSON.stringify(observed)), byte => String.fromCharCode(byte)).join(""));
+  document.body.append(record);
+});
+</script>`;
+fs.writeFileSync(process.argv[3], fs.readFileSync(process.argv[2], "utf8").replace("</body>", script + "</body>"));
+JS
   chrome=$(find_chrome) \
     || fail "Chrome or Chromium is required for rendered export DOM assertions; set FM_CHROME_BIN to one"
-  chrome_report=$(render_export_dom "$chrome" "$export_file" "$export_dom" "$version") \
+  chrome_report=$(render_export_dom "$chrome" "$export_probe" "$export_dom" "$version") \
     || fail "could not render calm-mode HTML export DOM: $chrome_report"
   node - "$export_dom" <<'JS' || fail "rendered export DOM violated the Calm conversation boundary"
 const dom = require("node:fs").readFileSync(process.argv[2], "utf8");
-const messages = dom.match(/<div id="messages">([\s\S]*?)<\/main>/)?.[1];
-const tree = dom.match(/<div[^>]*id="tree-container"[^>]*>([\s\S]*?)<div[^>]*id="tree-status"/)?.[1];
-if (!messages || !tree) process.exit(1);
-if (!/<div class="user-message"[^>]*>[\s\S]*Show a deterministic tool example\./.test(messages)) process.exit(1);
-if (!/<div class="assistant-message"[^>]*>[\s\S]*The deterministic tool example is complete\./.test(messages)) process.exit(1);
-if (messages.includes('<div class="hook-message"')) process.exit(1);
-if (messages.includes("[firstmate-synthetic-input]")) process.exit(1);
-for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_FIRSTMATE_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
-  if (!messages.includes(current)) process.exit(1);
+const record = dom.match(/<script id="fm-export-visibility" type="application\/json">([^<]+)<\/script>/);
+if (!record) throw new Error("browser did not record export visibility");
+const { messages, users, assistants, hooks, tree } = JSON.parse(Buffer.from(record[1], "base64").toString("utf8"));
+if (!users.some(text => text.includes("Show a deterministic tool example."))) throw new Error("genuine user prompt is hidden");
+if (!assistants.some(text => text.includes("The deterministic tool example is complete."))) throw new Error("genuine assistant reply is hidden");
+if (hooks.length || messages.includes("[firstmate-synthetic-input]") || messages.includes("/tmp/probe.status")) {
+  throw new Error("hidden operational message is visible in the conversation");
 }
-if (!tree.includes("firstmate-synthetic-input") || !tree.includes("/tmp/probe.status")) process.exit(1);
+for (const current of ["CURRENT_WATCHER_E2E", "CURRENT_TURN_END_E2E", "CURRENT_AWAY_E2E", "CURRENT_FROM_FIRSTMATE_E2E", "CURRENT_LAUNCH_BRIEF_E2E"]) {
+  if (!messages.includes(current)) throw new Error("stock export hid user-role input " + current);
+}
+if (!tree.includes("firstmate-synthetic-input") || !tree.includes("/tmp/probe.status")) throw new Error("export tree lost synthetic provenance");
 JS
   # Calm returns the transcript to its own presentation once the export has been
   # rendered. That repaint runs on the macrotask right after Pi prints the export
