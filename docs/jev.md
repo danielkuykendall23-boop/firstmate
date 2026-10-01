@@ -7,7 +7,7 @@ These extensions cover Firstmate and its OMP workers, not unrelated sessions, Pi
 ## Worker compaction default
 
 Native `shake` trimming is the worker default, and Jev compaction stays off.
-Every Firstmate-launched OMP session carries `.omp/fm-worker-overlay.yml`, whose `compaction.methodOrder` puts `shake` first, ahead of `remote`, `snapcompact`, `handoff` and `soft`.
+Every Firstmate-launched OMP session carries `.omp/fm-worker-overlay.yml`, whose `compaction.methodOrder` puts `shake` first.
 Automatic shake moves bulky older tool output into a session artifact and leaves a short marker naming `artifact://<id>` and a region number in its place, with no model, key or network.
 The agent recovers the exact original by locating `### region <n>` in that artifact and reading its lines with `read artifact://<id>:raw:<first>-<last>`.
 Recent tool output inside OMP's protected window stays verbatim.
