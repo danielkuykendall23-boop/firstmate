@@ -61,6 +61,7 @@ WORKER_LOCK=
 WORKER_LOCK_HELD=0
 WORKER_RELEASE_OWNERSHIP=1
 WORKER_SUPERVISED_PID=
+WORKER_SUPERVISED_START=
 WORKER_PREEMPTIBLE=0
 WORKER_PREEMPTED=0
 WORKER_LANE_HOME=
@@ -1062,18 +1063,23 @@ worker_supervisor_cleanup_dead_child() { # <account-home> <pid>
 # serving loop parses one in nearly every statement, so a single forwarded TERM
 # can be lost, and the child then keeps serving and holding ownership while this
 # shell waits for it forever. A repeat is harmless once the child's shutdown has
-# begun, because worker_shutdown ignores the signals it answers. Every re-send
-# first confirms the pid still carries the child's start identity, so a reaped
-# child's reused pid is never signalled. A child that stops answering is still
-# stopped: whoever signalled this supervisor escalates to KILL.
+# begun, because worker_shutdown ignores the signals it answers. Every TERM,
+# the first included, is sent only while the pid still carries the start
+# identity recorded when the child was spawned. Bash reaps an exited child
+# asynchronously, so after a crash the pid stays recorded through the dead-child
+# cleanup and may already belong to an unrelated process when this runs; an
+# identity read here instead would be that process's. A stop that lands before
+# the spawn finished recording reads the identity of the moments-old child. A
+# child that stops answering is still stopped: whoever signalled this supervisor
+# escalates to KILL.
 worker_supervisor_shutdown() {
-  local pid=${WORKER_SUPERVISED_PID:-} start
+  local pid=${WORKER_SUPERVISED_PID:-} start=${WORKER_SUPERVISED_START:-}
   trap - HUP INT TERM
   if [ -n "$pid" ]; then
-    start=$(fm_remote_job_process_start "$pid" 2>/dev/null || true)
-    kill -TERM "$pid" 2>/dev/null || true
-    while sleep "$FM_REMOTE_JOB_POLL_SECONDS" && worker_process_identity_matches "$pid" "$start"; do
+    [ -n "$start" ] || start=$(fm_remote_job_process_start "$pid" 2>/dev/null || true)
+    while worker_process_identity_matches "$pid" "$start"; do
       kill -TERM "$pid" 2>/dev/null || true
+      sleep "$FM_REMOTE_JOB_POLL_SECONDS"
     done
     wait "$pid" 2>/dev/null || true
   fi
@@ -1093,8 +1099,13 @@ worker_supervise_linux() {
       return 0
     fi
     started=$SECONDS
+    WORKER_SUPERVISED_START=
     "$SCRIPT_DIR/fm-remote-job-worker.sh" --serve &
     WORKER_SUPERVISED_PID=$!
+    # worker_supervisor_shutdown trusts only this identity; a child already gone
+    # records a marker no process start can match.
+    WORKER_SUPERVISED_START=$(fm_remote_job_process_start "$WORKER_SUPERVISED_PID" 2>/dev/null) ||
+      WORKER_SUPERVISED_START=gone
     wait "$WORKER_SUPERVISED_PID" 2>/dev/null
     child_status=$?
     if [ "$child_status" -eq 0 ]; then

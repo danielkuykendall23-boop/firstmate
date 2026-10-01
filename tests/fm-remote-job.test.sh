@@ -807,6 +807,99 @@ FORWARD_CHILD_PID=
   || fail "$FORWARD_CASE: the serving child did not receive a re-sent TERM"
 pass "$FORWARD_CASE"
 
+# A crashed serving child stays recorded through the supervisor's dead-child
+# cleanup, but bash has already reaped it, so an unrelated process can take its
+# pid before a stop lands. The supervisor must check the identity it recorded at
+# spawn, never one read from whatever holds that pid at shutdown. Pid reuse can
+# be forced only inside a pid namespace through ns_last_pid, so the case skips
+# where unprivileged pid namespaces are unavailable. A PATH rm fixture parks the
+# supervisor inside that cleanup without forking, so the planted process gets
+# exactly the dead child's pid, and the stop lands while it is parked there.
+REUSE_CASE="a supervisor stop never signals an unrelated process that took a crashed child's pid"
+if ! command -v unshare >/dev/null 2>&1 \
+  || ! unshare -rpf --mount-proc sh -c 'echo 1 > /proc/sys/kernel/ns_last_pid' >/dev/null 2>&1; then
+  printf '# skip: unprivileged PID namespaces with a writable ns_last_pid are unavailable here, so "%s" is unverified\n' "$REUSE_CASE"
+else
+  REUSE_ROOT="$TMP_ROOT/reuse-root"
+  REUSE_WORK="$TMP_ROOT/reuse-work"
+  mkdir -p "$REUSE_ROOT/bin" "$REUSE_ROOT/test-bin" "$REUSE_WORK/home"
+  chmod 700 "$REUSE_WORK/home"
+  cp "$ROOT/bin/fm-remote-job-lib.sh" "$REUSE_ROOT/bin/"
+  cp "$ROOT/bin/fm-remote-job-worker.sh" "$REUSE_ROOT/bin/fm-remote-job-supervisor-under-test.sh"
+  printf 'fixture\n' > "$REUSE_ROOT/AGENTS.md"
+  cat > "$REUSE_ROOT/bin/fm-remote-job-worker.sh" <<'SH'
+#!/bin/bash
+set -u
+[ "${1:-}" = --serve ] || exit 2
+printf '%s %s\n' "${BASHPID:-$$}" "$(date +%s)" > "$FM_TEST_CHILD.tmp"
+mv "$FM_TEST_CHILD.tmp" "$FM_TEST_CHILD"
+while [ ! -e "$FM_TEST_CRASH" ]; do sleep 0.05; done
+mkdir -p "$FM_REMOTE_JOB_STATE_ROOT/worker.lock"
+printf '%s\n' "${BASHPID:-$$}" > "$FM_REMOTE_JOB_STATE_ROOT/worker.lock/pid"
+exit 1
+SH
+  cat > "$REUSE_ROOT/test-bin/rm" <<'SH'
+#!/bin/bash
+if [ -p "${FM_TEST_HOLD:-}" ]; then
+  : > "$FM_TEST_HELD"
+  read -r _ < "$FM_TEST_HOLD"
+  /bin/rm -f -- "$FM_TEST_HOLD"
+fi
+exec /bin/rm "$@"
+SH
+  cat > "$REUSE_WORK/scenario.sh" <<'SH'
+#!/bin/bash
+# Runs as pid 1 of a private pid namespace; its exit ends every process in it.
+set -u
+root=$1 work=$2
+hold="$work/rm-hold" held="$work/rm-held" child_file="$work/child" terms="$work/sentinel-terms"
+PATH="$root/test-bin:$PATH" HOME="$work/home" FM_ROOT_OVERRIDE="$root" \
+  FM_REMOTE_JOB_STATE_ROOT="$work/state" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  FM_TEST_HOLD="$hold" FM_TEST_HELD="$held" FM_TEST_CHILD="$child_file" FM_TEST_CRASH="$work/crash" \
+  "$root/bin/fm-remote-job-supervisor-under-test.sh" > "$work/supervisor.out" 2> "$work/supervisor.err" &
+sup=$!
+for _ in $(seq 1 100); do [ -s "$child_file" ] && break; sleep 0.05; done
+[ -s "$child_file" ] || { echo "error: the supervisor never started its serving child"; exit 1; }
+read -r child child_epoch < "$child_file"
+# Process identity is a one-second start stamp: the planted process must start
+# in a later second than the child, or it would share the child's identity.
+while [ "$(date +%s)" -le "$child_epoch" ]; do sleep 0.05; done
+mkfifo "$hold"
+: > "$work/crash"
+for _ in $(seq 1 200); do [ -e "$held" ] && break; sleep 0.05; done
+[ -e "$held" ] || { echo "error: the supervisor never reached its dead-child cleanup"; exit 1; }
+[ ! -e "/proc/$child" ] || { echo "error: the crashed child $child was not reaped before the cleanup"; exit 1; }
+planted=
+for _ in 1 2 3 4 5; do
+  echo $((child - 1)) > /proc/sys/kernel/ns_last_pid
+  bash -c 'trap "echo TERM >> \"\$0\"" TERM; : > "$1"; while :; do sleep 0.05; done' "$terms" "$work/sentinel-up" &
+  sentinel=$!
+  [ "$sentinel" = "$child" ] && { planted=1; break; }
+  kill -KILL "$sentinel"
+  wait "$sentinel" 2>/dev/null
+done
+[ -n "$planted" ] || { echo "error: could not plant a process at the dead child's pid $child"; exit 1; }
+for _ in $(seq 1 100); do [ -e "$work/sentinel-up" ] && break; sleep 0.05; done
+kill -TERM "$sup"
+echo go > "$hold"
+for _ in $(seq 1 100); do kill -0 "$sup" 2>/dev/null || break; sleep 0.1; done
+if kill -0 "$sup" 2>/dev/null; then
+  echo "evidence: $(ps -o pid=,ppid=,stat=,etime=,args= -p "$sup,$sentinel" | tr '\n' ';')"
+  echo "result supervisor_alive=yes sentinel_terms=$(wc -l < "$terms" 2>/dev/null || echo 0)"
+  exit 0
+fi
+wait "$sup"
+rc=$?
+echo "result supervisor_alive=no supervisor_rc=$rc sentinel_terms=$( [ -e "$terms" ] && wc -l < "$terms" | tr -d ' ' || echo 0)"
+SH
+  chmod +x "$REUSE_ROOT/bin"/*.sh "$REUSE_ROOT/test-bin/rm"
+  REUSE_OUT=$(unshare -rpf --mount-proc bash "$REUSE_WORK/scenario.sh" "$REUSE_ROOT" "$REUSE_WORK" 2>&1) || true
+  case "$REUSE_OUT" in
+    *"result supervisor_alive=no supervisor_rc=0 sentinel_terms=0"*) pass "$REUSE_CASE" ;;
+    *) fail "$REUSE_CASE: $(printf '%s' "$REUSE_OUT" | tr '\n' ' '); supervisor stderr: $(tail -n 5 "$REUSE_WORK/supervisor.err" 2>/dev/null | tr '\n' ' ')" ;;
+  esac
+fi
+
 # A child that stays up for FM_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS clears the
 # consecutive-failure backoff, so a child that dies just past that threshold
 # used to reset the only guard the supervisor had and restart forever. The
