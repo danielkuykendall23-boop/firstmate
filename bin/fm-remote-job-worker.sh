@@ -355,26 +355,28 @@ worker_stop_recorded_execution() { # <job-dir>
     "$job/.claim/group" "$job/.claim/group_start" "$job/.claim/armed"
 }
 
-# Stop every tracked lane process and its recorded command execution. The lane
-# is signalled first so it cannot dispatch further work, then the job's
-# recorded supervisor and group are verified stopped; a job interrupted here
-# stays running-with-a-dead-owner for the replacement worker's orphan recovery,
-# exactly as a crashed single-process worker's job did.
-worker_lane_identity_matches() { # <pid> <start>
+# True only while <pid> still carries the recorded process start identity, so a
+# reaped process whose pid was reused is never mistaken for it.
+worker_process_identity_matches() { # <pid> <start>
   local pid=$1 start=$2 actual_start
   [ -n "$start" ] || return 1
   actual_start=$(fm_remote_job_process_start "$pid" 2>/dev/null) || return 1
   [ "$actual_start" = "$start" ]
 }
 
+# Stop every tracked lane process and its recorded command execution. The lane
+# is signalled first so it cannot dispatch further work, then the job's
+# recorded supervisor and group are verified stopped; a job interrupted here
+# stays running-with-a-dead-owner for the replacement worker's orphan recovery,
+# exactly as a crashed single-process worker's job did.
 worker_stop_active_execution() {
   local i=0 count=${#WORKER_LANE_PIDS[@]} job pid start failed=0
   while [ "$i" -lt "$count" ]; do
     pid=${WORKER_LANE_PIDS[$i]}
     start=${WORKER_LANE_STARTS[$i]}
     job=${WORKER_LANE_JOBS[$i]}
-    if worker_lane_identity_matches "$pid" "$start"; then kill -TERM "$pid" 2>/dev/null || true; fi
-    if worker_lane_identity_matches "$pid" "$start"; then kill -KILL "$pid" 2>/dev/null || true; fi
+    if worker_process_identity_matches "$pid" "$start"; then kill -TERM "$pid" 2>/dev/null || true; fi
+    if worker_process_identity_matches "$pid" "$start"; then kill -KILL "$pid" 2>/dev/null || true; fi
     wait "$pid" 2>/dev/null || true
     if [ -d "$job" ] && [ ! -L "$job" ]; then
       worker_stop_recorded_execution "$job" || failed=1
@@ -811,7 +813,7 @@ worker_reap_finished_lanes() {
   while [ "$i" -lt "$count" ]; do
     pid=${WORKER_LANE_PIDS[$i]}
     start=${WORKER_LANE_STARTS[$i]}
-    if worker_lane_identity_matches "$pid" "$start"; then
+    if worker_process_identity_matches "$pid" "$start"; then
       live_homes+=("${WORKER_LANE_HOMES[$i]}")
       live_pids+=("$pid")
       live_starts+=("$start")
@@ -1053,11 +1055,26 @@ worker_supervisor_cleanup_dead_child() { # <account-home> <pid>
   rmdir "$lock"
 }
 
+# Forward the stop to the serving child and keep re-sending it until that child
+# is gone. Bash 5.2 drops a trapped signal that is still pending when the shell
+# starts parsing a $(...) command substitution: the trap action is parsed in the
+# substitution's parser state, fails as a syntax error, and never runs. The
+# serving loop parses one in nearly every statement, so a single forwarded TERM
+# can be lost, and the child then keeps serving and holding ownership while this
+# shell waits for it forever. A repeat is harmless once the child's shutdown has
+# begun, because worker_shutdown ignores the signals it answers. Every re-send
+# first confirms the pid still carries the child's start identity, so a reaped
+# child's reused pid is never signalled. A child that stops answering is still
+# stopped: whoever signalled this supervisor escalates to KILL.
 worker_supervisor_shutdown() {
-  local pid=${WORKER_SUPERVISED_PID:-}
+  local pid=${WORKER_SUPERVISED_PID:-} start
   trap - HUP INT TERM
   if [ -n "$pid" ]; then
+    start=$(fm_remote_job_process_start "$pid" 2>/dev/null || true)
     kill -TERM "$pid" 2>/dev/null || true
+    while sleep "$FM_REMOTE_JOB_POLL_SECONDS" && worker_process_identity_matches "$pid" "$start"; do
+      kill -TERM "$pid" 2>/dev/null || true
+    done
     wait "$pid" 2>/dev/null || true
   fi
   exit 0

@@ -20,6 +20,8 @@ OTHER_PID=
 RECOVERY_WORKER_PID=
 REPEAT_WORKER_PID=
 RESTART_SUPERVISOR_PID=
+FORWARD_SUPERVISOR_PID=
+FORWARD_CHILD_PID=
 mkdir -p "$REMOTE_ROOT/bin" "$REMOTE_HOME" "$ACCOUNT_HOME" "$RUNTIME_BIN"
 # worker.pid records the serving child, not its restart supervisor, so stopping
 # that pid alone leaves the supervisor to respawn - the leak
@@ -29,6 +31,8 @@ cleanup_remote_job_fixture() {
   [ -z "$RECOVERY_WORKER_PID" ] || kill "$RECOVERY_WORKER_PID" 2>/dev/null || true
   [ -z "$REPEAT_WORKER_PID" ] || kill "$REPEAT_WORKER_PID" 2>/dev/null || true
   [ -z "$RESTART_SUPERVISOR_PID" ] || kill -KILL "$RESTART_SUPERVISOR_PID" 2>/dev/null || true
+  [ -z "$FORWARD_SUPERVISOR_PID" ] || kill -KILL "$FORWARD_SUPERVISOR_PID" 2>/dev/null || true
+  [ -z "$FORWARD_CHILD_PID" ] || kill -KILL "$FORWARD_CHILD_PID" 2>/dev/null || true
   if [ -f "$STATE_ROOT/worker.pid" ]; then
     fm_remote_job_stop_worker_tree "$(cat "$STATE_ROOT/worker.pid")" || true
   fi
@@ -666,6 +670,40 @@ pass "quarantine recovery refuses unverifiable supervisors and ignores reused pi
 # shutdown's first file operation, so the repeat this pins is unchanged: with
 # the default disposition restored instead of ignored, the ownership lock is
 # left behind every run.
+#
+# Both stops in this case keep re-sending TERM until the worker is gone, as the
+# supervisor's forward does, and neither ever waits without a bound. Bash 5.2
+# drops a TERM that is still pending when the worker starts parsing a $(...)
+# command substitution (worker_supervisor_shutdown owns the detail), so a single
+# TERM followed by an unbounded wait hung this case until the CI job timed out.
+# A worker still alive at the deadline fails the case at once with its process
+# state and stderr, and a pid is signalled only while it still carries the
+# started worker's identity.
+REPEAT_CASE="a repeatedly signalled shutdown still releases ownership for the next worker"
+repeat_signal_worker_running() { # <pid> <start>
+  [ -n "$2" ] && [ "$(fm_remote_job_process_start "$1" 2>/dev/null || true)" = "$2" ]
+}
+repeat_signal_stop() { # <pid> <start> <burst> <label>; returns the worker's exit status
+  local pid=$1 start=$2 burst=$3 label=$4 sent=0 deadline evidence
+  deadline=$((SECONDS + 30))
+  if repeat_signal_worker_running "$pid" "$start"; then
+    while [ "$sent" -lt "$burst" ]; do
+      kill -TERM "$pid" 2>/dev/null || true
+      sent=$((sent + 1))
+    done
+  fi
+  while [ "$SECONDS" -lt "$deadline" ] && sleep 0.05 && repeat_signal_worker_running "$pid" "$start"; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  if repeat_signal_worker_running "$pid" "$start"; then
+    evidence=$(ps -o pid=,ppid=,pgid=,stat=,etime=,command= -p "$pid" 2>/dev/null || true)
+    kill -KILL "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    REPEAT_WORKER_PID=
+    fail "$REPEAT_CASE: the $label worker was still running 30s after its first TERM; process: ${evidence:-unreadable}; stderr: $(tail -n 5 "$TMP_ROOT/repeat-signal.err" 2>/dev/null | tr '\n' ' ')"
+  fi
+  wait "$pid" 2>/dev/null
+}
 REPEAT_HOME="$TMP_ROOT/repeat-signal-account"
 REPEAT_STATE="$TMP_ROOT/repeat-signal-jobs"
 mkdir -p "$REPEAT_HOME"
@@ -674,29 +712,19 @@ HOME="$REPEAT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$R
   FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/fm-remote-job-worker.sh" --serve \
   > "$TMP_ROOT/repeat-signal.out" 2> "$TMP_ROOT/repeat-signal.err" &
 REPEAT_WORKER_PID=$!
+REPEAT_WORKER_START=$(fm_remote_job_process_start "$REPEAT_WORKER_PID") \
+  || fail "$REPEAT_CASE: the repeated-signal worker's process identity was unreadable"
 for _ in $(seq 1 300); do
   [ -f "$REPEAT_STATE/worker.ready" ] && break
   sleep 0.05
 done
 assert_present "$REPEAT_STATE/worker.ready" "the repeated-signal worker did not become ready"
-REPEAT_DEADLINE=$((SECONDS + 30))
-REPEAT_BURST=0
-while [ "$REPEAT_BURST" -lt 10 ]; do
-  kill -TERM "$REPEAT_WORKER_PID" 2>/dev/null || true
-  REPEAT_BURST=$((REPEAT_BURST + 1))
-done
-while kill -0 "$REPEAT_WORKER_PID" 2>/dev/null && [ "$SECONDS" -lt "$REPEAT_DEADLINE" ]; do
-  kill -TERM "$REPEAT_WORKER_PID" 2>/dev/null || true
-  sleep 0.05
-done
-if kill -0 "$REPEAT_WORKER_PID" 2>/dev/null; then
-  kill -KILL "$REPEAT_WORKER_PID" 2>/dev/null || true
-  wait "$REPEAT_WORKER_PID" 2>/dev/null || true
-  REPEAT_WORKER_PID=
-  fail "the repeatedly signalled worker never finished its shutdown"
-fi
-wait "$REPEAT_WORKER_PID" 2>/dev/null || true
+set +e
+repeat_signal_stop "$REPEAT_WORKER_PID" "$REPEAT_WORKER_START" 10 "repeatedly signalled"
+REPEAT_RC=$?
+set -e
 REPEAT_WORKER_PID=
+[ "$REPEAT_RC" -eq 0 ] || fail "$REPEAT_CASE: the repeatedly signalled shutdown exited $REPEAT_RC instead of 0"
 assert_absent "$REPEAT_STATE/worker.lock" \
   "a repeatedly signalled shutdown left its ownership lock behind"
 assert_absent "$REPEAT_STATE/worker.ready" \
@@ -705,16 +733,79 @@ HOME="$REPEAT_HOME" FM_ROOT_OVERRIDE="$REMOTE_ROOT" FM_REMOTE_JOB_STATE_ROOT="$R
   FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux "$REMOTE_ROOT/bin/fm-remote-job-worker.sh" --serve \
   >> "$TMP_ROOT/repeat-signal.out" 2>> "$TMP_ROOT/repeat-signal.err" &
 REPEAT_WORKER_PID=$!
+REPEAT_WORKER_START=$(fm_remote_job_process_start "$REPEAT_WORKER_PID") \
+  || fail "$REPEAT_CASE: the successor worker's process identity was unreadable"
 for _ in $(seq 1 600); do
   [ -f "$REPEAT_STATE/worker.ready" ] && break
   sleep 0.05
 done
 assert_present "$REPEAT_STATE/worker.ready" \
   "the worker after a repeatedly signalled shutdown never reported ready"
-kill -TERM "$REPEAT_WORKER_PID"
-wait "$REPEAT_WORKER_PID" 2>/dev/null || true
+set +e
+repeat_signal_stop "$REPEAT_WORKER_PID" "$REPEAT_WORKER_START" 1 successor
+REPEAT_RC=$?
+set -e
 REPEAT_WORKER_PID=
-pass "a repeatedly signalled shutdown still releases ownership for the next worker"
+[ "$REPEAT_RC" -eq 0 ] || fail "$REPEAT_CASE: the successor's shutdown exited $REPEAT_RC instead of 0"
+assert_absent "$REPEAT_STATE/worker.lock" \
+  "the successor's shutdown left its ownership lock behind"
+pass "$REPEAT_CASE"
+
+# The Linux supervisor forwards its stop to the serving child. Bash 5.2 can drop
+# that one TERM (see worker_supervisor_shutdown), which left the supervisor
+# waiting on a child that kept serving and holding ownership. The fixture child
+# loses its first TERM deterministically and stops on the next one, so the
+# supervisor has to keep re-sending until the child is gone.
+FORWARD_CASE="a supervisor stop re-sends TERM until a serving child that lost the first one is gone"
+FORWARD_ROOT="$TMP_ROOT/forward-root"
+FORWARD_HOME="$TMP_ROOT/forward-account"
+FORWARD_CHILD_FILE="$TMP_ROOT/forward-child"
+FORWARD_TERMS="$TMP_ROOT/forward-child-terms"
+mkdir -p "$FORWARD_ROOT/bin" "$FORWARD_HOME"
+cp "$ROOT/bin/fm-remote-job-lib.sh" "$FORWARD_ROOT/bin/"
+cp "$ROOT/bin/fm-remote-job-worker.sh" "$FORWARD_ROOT/bin/fm-remote-job-supervisor-under-test.sh"
+printf 'fixture\n' > "$FORWARD_ROOT/AGENTS.md"
+cat > "$FORWARD_ROOT/bin/fm-remote-job-worker.sh" <<'SH'
+#!/bin/bash
+set -u
+[ "${1:-}" = --serve ] || exit 2
+terms=0
+trap 'terms=$((terms + 1)); printf "TERM %s\n" "$terms" >> "$FM_TEST_FORWARD_TERMS"; [ "$terms" -lt 2 ] || exit 0' TERM
+printf '%s\n' "${BASHPID:-$$}" > "$FM_TEST_FORWARD_CHILD"
+while :; do sleep 0.05; done
+SH
+chmod +x "$FORWARD_ROOT/bin"/*.sh
+HOME="$FORWARD_HOME" FM_ROOT_OVERRIDE="$FORWARD_ROOT" \
+  FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/forward-state" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux \
+  FM_TEST_FORWARD_CHILD="$FORWARD_CHILD_FILE" FM_TEST_FORWARD_TERMS="$FORWARD_TERMS" \
+  "$FORWARD_ROOT/bin/fm-remote-job-supervisor-under-test.sh" \
+  > "$TMP_ROOT/forward-supervisor.out" 2> "$TMP_ROOT/forward-supervisor.err" &
+FORWARD_SUPERVISOR_PID=$!
+for _ in $(seq 1 100); do
+  [ -s "$FORWARD_CHILD_FILE" ] && break
+  sleep 0.05
+done
+[ -s "$FORWARD_CHILD_FILE" ] || fail "$FORWARD_CASE: the supervisor never started its serving child"
+FORWARD_CHILD_PID=$(cat "$FORWARD_CHILD_FILE")
+kill -TERM "$FORWARD_SUPERVISOR_PID"
+for _ in $(seq 1 100); do
+  kill -0 "$FORWARD_SUPERVISOR_PID" 2>/dev/null || break
+  sleep 0.1
+done
+if kill -0 "$FORWARD_SUPERVISOR_PID" 2>/dev/null; then
+  fail "$FORWARD_CASE: the supervisor was still running 10s after its TERM; processes: $(ps -o pid=,ppid=,stat=,etime=,command= -p "$FORWARD_SUPERVISOR_PID,$FORWARD_CHILD_PID" 2>/dev/null | tr '\n' ';'); child TERMs: $(tr '\n' ' ' < "$FORWARD_TERMS" 2>/dev/null)"
+fi
+set +e
+wait "$FORWARD_SUPERVISOR_PID"
+FORWARD_RC=$?
+set -e
+FORWARD_SUPERVISOR_PID=
+[ "$FORWARD_RC" -eq 0 ] || fail "$FORWARD_CASE: the supervisor's shutdown exited $FORWARD_RC instead of 0"
+! kill -0 "$FORWARD_CHILD_PID" 2>/dev/null || fail "$FORWARD_CASE: the supervisor exited while its serving child kept running"
+FORWARD_CHILD_PID=
+[ "$(wc -l < "$FORWARD_TERMS" | tr -d ' ')" -ge 2 ] \
+  || fail "$FORWARD_CASE: the serving child did not receive a re-sent TERM"
+pass "$FORWARD_CASE"
 
 # A child that stays up for FM_REMOTE_JOB_SUPERVISOR_HEALTHY_SECONDS clears the
 # consecutive-failure backoff, so a child that dies just past that threshold
