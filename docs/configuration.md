@@ -417,6 +417,7 @@ The compaction extension reads it under the effective Firstmate home, from `FM_H
 A session started with the setting off registers no compaction hook, and a session started before it was turned off falls back to native compaction at its next compaction.
 `FM_JEV_COMPACTION=0` in a launching environment still disables it independently; neither switch changes `jev_review` or dispatch routing.
 The file is inherited into secondmate homes through the primary-authoritative configuration contract, so their workers follow the same choice.
+Native `shake` trimming is the worker default and Jev compaction stays off: every Firstmate-launched OMP session compacts with the shake-first order that [Jev's worker compaction default](jev.md#worker-compaction-default) owns, so keep this file at `off`.
 
 ## Home brief include (config/brief-include.md)
 

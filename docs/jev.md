@@ -1,8 +1,19 @@
 # Jev in Firstmate OMP sessions
 
-Firstmate uses TypeSafe's Jev for compaction and software-quality evaluation, and the installed Agent Desktop Jev operator for approved desktop work.
+Firstmate uses TypeSafe's Jev for software-quality evaluation and the installed Agent Desktop Jev operator for approved desktop work; its Jev compaction adapter stays off in favor of native trimming.
 Model and effort routing is owned by [Typed dispatch resolution](configuration.md#typed-dispatch-resolution-env-typesafe_api_key); this integration never changes saved model defaults.
 These extensions cover Firstmate and its OMP workers, not unrelated sessions, Pi, or native Claude Code.
+
+## Worker compaction default
+
+Native `shake` trimming is the worker default, and Jev compaction stays off.
+Every Firstmate-launched OMP session carries `.omp/fm-worker-overlay.yml`, whose `compaction.methodOrder` puts `shake` first, ahead of `remote`, `snapcompact`, `handoff` and `soft`.
+Automatic shake moves bulky older tool output into a session artifact and leaves a short marker naming `artifact://<id>` and a region number in its place, with no model, key or network.
+The agent recovers the exact original by locating `### region <n>` in that artifact and reading its lines with `read artifact://<id>:raw:<first>-<last>`.
+Recent tool output inside OMP's protected window stays verbatim.
+When shake cannot reclaim enough, as in a prose-heavy session, OMP advances to the next configured method, ending in its normal summary.
+The primary session keeps the captain's own `~/.omp/agent/config.yml` order, which this overlay never changes.
+Keep [`config/jev-compaction`](configuration.md#jev-compaction-configjev-compaction) at `off` so a home key never turns the Jev adapter back on; `jev_review` is unaffected.
 
 ## Key and activation
 
