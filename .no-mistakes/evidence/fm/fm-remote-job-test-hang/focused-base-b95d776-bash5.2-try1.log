@@ -1,0 +1,6 @@
+# copy=base52 interpreter=GNU bash, version 5.2.0(1)-release (aarch64-apple-darwin25.3.0) worker=fb96c8623165cf9378a775dabb6a05e29122e3e2
+ok - default queue and execution bounds independently cover long polls
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+ok - barely healthy worker failures remain bounded by the restart guard
+ALL TESTS PASSED
+rc=0 elapsed=12s

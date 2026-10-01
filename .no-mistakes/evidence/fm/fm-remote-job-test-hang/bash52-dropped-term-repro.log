@@ -1,0 +1,2 @@
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25): single TERM dropped (still running 1.5s later) in 0/200 runs; first stderr: 
+GNU bash, version 5.2.0(1)-release (aarch64-apple-darwin25.3.0): single TERM dropped (still running 1.5s later) in 2/200 runs; first stderr: /tmp/fmrj-drop.YHSwkg/victim.sh: trap: line 2: unexpected EOF while looking for matching `)'

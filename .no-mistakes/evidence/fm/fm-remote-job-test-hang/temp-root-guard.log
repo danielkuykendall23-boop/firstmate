@@ -1,0 +1,14 @@
+== variant no-helpers (tests/: fm-remote-job.test.sh lib.sh )
+/tmp/fmrj-guard.mFhGXH/no-helpers/tree/tests/lib.sh: line 39: /tmp/fmrj-guard.mFhGXH/no-helpers/tree/tests/git-config-helpers.sh: No such file or directory
+_: /tmp/fmrj-guard.mFhGXH/no-helpers/tree/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found
+/tmp/fmrj-guard.mFhGXH/no-helpers/tree/tests/fm-remote-job.test.sh: line 13: fm_test_tmproot: command not found
+not ok - fm-remote-job: no marked fixture temp root (tests/lib.sh incomplete?); refusing to run
+exit=1
+sentinel after: marker  marker=keep
+== variant no-lib (tests/: fm-remote-job.test.sh )
+/tmp/fmrj-guard.mFhGXH/no-lib/tree/tests/fm-remote-job.test.sh: line 6: /tmp/fmrj-guard.mFhGXH/no-lib/tree/tests/lib.sh: No such file or directory
+/tmp/fmrj-guard.mFhGXH/no-lib/tree/tests/fm-remote-job.test.sh: line 13: fm_test_tmproot: command not found
+not ok - fm-remote-job: no marked fixture temp root (tests/lib.sh incomplete?); refusing to run
+exit=1
+sentinel after: marker  marker=keep

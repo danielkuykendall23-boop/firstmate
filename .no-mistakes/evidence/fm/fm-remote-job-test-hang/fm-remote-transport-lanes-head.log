@@ -1,0 +1,3 @@
+ok - atomic sequence claims remain unique and reap only after expiry
+not ok - home B's job waited 6s behind home A's long job
+fm-remote-transport-lanes rc=1 elapsed=30s

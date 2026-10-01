@@ -1,0 +1,8 @@
+# copy=head interpreter=GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25) worker=89d2089d556ea948dd18283cfdefd7f41c77dc62
+ok - default queue and execution bounds independently cover long polls
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+ok - a supervisor stop re-sends TERM until a serving child that lost the first one is gone
+# skip: unprivileged PID namespaces with a writable ns_last_pid are unavailable here, so "a supervisor stop never signals an unrelated process that took a crashed child's pid" is unverified
+ok - barely healthy worker failures remain bounded by the restart guard
+ALL TESTS PASSED
+rc=0 elapsed=11s

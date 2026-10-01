@@ -1,0 +1,3 @@
+ok - atomic sequence claims remain unique and reap only after expiry
+not ok - home B's job waited 12s behind home A's long job
+head run2 rc=1
