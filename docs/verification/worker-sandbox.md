@@ -49,10 +49,56 @@ The TUI's deliberate `echo pwned > .git` was refused, and the only other refusal
 
 Known residuals of the fence as a whole:
 
-- a worker can create or move a tag or remote-tracking ref, briefly hold `packed-refs.lock`, and write the shared no-mistakes `state.sqlite`;
+- a worker can create or move a tag or remote-tracking ref, briefly hold `packed-refs.lock`, write the shared no-mistakes `state.sqlite`, and write any gate's `refs/no-mistakes/fetch/<n>-<n>` staging refs, which no-mistakes names by process rather than task;
 - deleting a packed ref fails, because `packed-refs` is denied;
-- the worktree's files stay worker-written, so anything the primary runs beyond git in a worker's worktree (its scripts, tests, or project-local tool configuration) runs worker-chosen code outside the fence;
+- Herdr lab permissions match by name, so a task whose lab label shares this task's first 16 label characters falls inside them;
+- the worktree's files stay worker-written, so anything the primary runs beyond git in a worker's worktree (its scripts, tests, or project-local tool configuration) runs worker-chosen code outside the fence, and the same holds for the download caches, including `~/.omp/puppeteer/`, whose browser the primary may later run;
+- a tool or test that hardcodes a `/tmp/...` path instead of honoring `TMPDIR` still fails;
 - only omp is supported; other harnesses refuse to spawn while the setting is on.
+
+## Fenced workflow allowances (2026-09-30)
+
+Verified on macOS 26.3 (build 25D125) with omp 18.2.10, no-mistakes v1.84.0, chrome-devtools-axi 0.1.33, and git 2.50.1 (Apple Git-155).
+Fenced workers on 2026-09-29 and 2026-09-30 met these kernel refusals, read with `log show --predicate 'sender == "Sandbox" AND eventMessage CONTAINS "deny"'`:
+
+```text
+Sandbox: omp deny(1) forbidden-exec-sugid
+Sandbox: git deny(1) file-write-create <home>/.no-mistakes/repos/<gate>.git/refs/no-mistakes/fetch
+Sandbox: git deny(1) file-write-create <repo>/.git/refs/heads/fm/<id>-v2.lock
+Sandbox: bash deny(1) file-write-create <home>/.no-mistakes/repos/<gate>.git/sh-thd-<n>
+Sandbox: omp deny(1) file-write-data <home>/.omp/puppeteer/package.json
+Sandbox: node deny(1) file-write-create /private/tmp/puppeteer_dev_chrome_profile-<rand>
+```
+
+- The kernel refuses every setuid or setgid exec from a sandboxed process, and no file rule changes that; `(allow process-exec (literal "/bin/ps") (with no-sandbox))` lets `/bin/ps` alone run, outside the sandbox.
+- macOS `/bin/bash` 3.2 ignores `TMPDIR` for here-documents: it makes `sh-thd-<n>` in `/var/tmp` when `access()` reports that directory writable, and otherwise falls back to its working directory (here the gate). The profile allows only `/private/var/tmp/sh-thd-<n>` files and a `file-write-data` check on `/private/var/tmp` itself, so no other `/var/tmp` entry is writable; a worker could still rewrite another process's short-lived here-document file.
+- The v1.84.0 binary carries `refs/no-mistakes/fetch/%d-%d`, `--no-tags`, and `--no-write-fetch-head`, and the refusal log shows no `FETCH_HEAD` write, so the gate's `FETCH_HEAD` stays denied.
+- chrome-devtools-axi 0.1.33 starts chrome-devtools-mcp through the MCP SDK's stdio transport without an explicit environment, which passes on only `HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, and `USER`, so Chrome's default profile ignores `TMPDIR`; `CHROME_DEVTOOLS_AXI_USER_DATA_DIR` moves it into the task temp.
+  Without `--no-sandbox`, Chrome's renderers crash under the fence (crash dumps under `~/Library/Application Support/Google/Chrome/Crashpad/new/` and `Requesting main frame too early!`), because its own sandbox is Seatbelt and cannot nest.
+
+Live proof, with a profile from `bin/fm-worker-sandbox.sh profile --id sbx-proof --harness omp ... --herdr-lab` and the prefix from `bin/fm-worker-sandbox.sh env --id sbx-proof --task-tmp /tmp/fm-sbx-proof`, each run as `/usr/bin/sandbox-exec -f <profile> /bin/sh -c '<prefix><command>'`:
+
+```text
+$ bash -c '. tests/lib.sh && fm_test_pid_identity $$ && echo LIB_OK'
+Wed Sep 30 12:38:55 2026     bash -c . tests/lib.sh && fm_test_pid_identity $$ && echo LIB_OK
+LIB_OK
+$ bash tests/fm-brief.test.sh
+ok - fm-brief.sh: the home brief include lands last on ship and scout, verbatim, and fails closed
+$ chrome-devtools-axi open file:///tmp/fm-sbx-proof/page.html; chrome-devtools-axi eval 'document.title'
+page:
+  title: fence-proof
+result: "\"fence-proof\""
+$ touch /tmp/fm-sbx-shared-probe
+touch: /tmp/fm-sbx-shared-probe: Operation not permitted
+$ omp -p '<open the page with the built-in browser and reply with its title>' --auto-approve --cwd <worktree>
+fence-proof
+```
+
+The remaining refusals in those runs did not stop them: Chrome's Crashpad `settings.dat`, its code-sign clone under the per-user `X` directory, chrome-devtools-mcp's `telemetry_state.json`, and omp's usual `~/.omp/natives/18.2.10` probe.
+
+Not proven live: a fenced `no-mistakes axi run` on an already-pushed branch, and a fenced Herdr lab provision, which this task's own unguarded instructions did not permit.
+`tests/fm-worker-sandbox.test.sh` pins both with real writes: a gate fetch in the same shape into `refs/no-mistakes/fetch/<n>-<n>` and its deletion, and a lab directory under the name `bin/fm-herdr-lab.sh name` derives, each beside a denied neighbour (another `refs/no-mistakes/` ref, another lab session, and the default session's `session.json`).
+A real lab session directory holds `herdr-client.log`, `herdr-server.log`, and `session.json`, all inside that directory.
 
 ## Live proof (original writable set)
 

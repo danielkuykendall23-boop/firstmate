@@ -2067,6 +2067,51 @@ EOF
   pass "Pi watcher arm distinguishes all session lock ownership states"
 }
 
+# The lock holder loads both primary extensions, then a nested pi-like process
+# started from a shell under it loads them too and exits. The ancestor walk reads
+# the nested process as owning the lock, yet only the holder itself may record the
+# loaded markers, so both keep naming the lock pid and the ownership proof holds.
+test_pi_nested_process_under_lock_holder_keeps_holder_markers() {
+  local repo home out status
+  repo="$TMP_ROOT/pi-nested-marker-root"
+  home="$TMP_ROOT/pi-nested-marker-home"
+  mkdir -p "$home/state"
+  install_pi_watch_extension_fixture "$repo"
+  cp "$ROOT/.pi/extensions/fm-primary-turnend-guard.ts" "$repo/.pi/extensions/"
+  cat > "$repo/load-primary-extensions.mjs" <<'EOF'
+import { pathToFileURL } from "node:url";
+for (const source of ["fm-primary-turnend-guard.ts", "fm-primary-pi-watch.ts"]) {
+  const mod = await import(pathToFileURL(`${process.env.REPO}/.pi/extensions/${source}`).href);
+  mod.default({ on() {}, registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {} });
+}
+EOF
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" REPO="$repo" WAKE_LIB="$ROOT/bin/fm-wake-lib.sh" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const state = `${process.env.FM_HOME}/state`;
+const loader = `${process.env.REPO}/load-primary-extensions.mjs`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+await import(pathToFileURL(loader).href);
+const nested = spawnSync("bash", ["-c", 'node --input-type=module -e "await import(process.argv[1]); console.log(process.pid); process.exit(0)" "$1"', "_", pathToFileURL(loader).href], { encoding: "utf8" });
+const nestedPid = nested.stdout.trim();
+if (nested.status !== 0 || !/^[0-9]+$/.test(nestedPid)) throw new Error(`nested pi did not load the extensions: ${nested.status} ${nested.stdout}${nested.stderr}`);
+if (nestedPid === String(process.pid)) throw new Error("nested pi must be a distinct process from the lock holder");
+for (const marker of [".pi-turnend-extension-loaded", ".pi-watch-extension-loaded"]) {
+  const recorded = readFileSync(`${state}/${marker}`, "utf8").split("\n")[1];
+  if (recorded !== String(process.pid)) throw new Error(`${marker} names ${recorded}, not the lock holder ${process.pid} (nested pi was ${nestedPid})`);
+}
+const proof = spawnSync("bash", ["-c", '. "$1"; fm_pi_extension_owns_supervision "$2" "$3"', "_", process.env.WAKE_LIB, state, process.env.REPO], { encoding: "utf8" });
+if (proof.status !== 0) throw new Error(`the lock holder lost the Pi ownership proof: ${proof.stdout}${proof.stderr}`);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "nested pi under the lock holder: $out"
+  [ -z "$out" ] || fail "nested pi marker test printed output: $out"
+  pass "Pi primary extensions: a nested pi under the lock holder leaves both loaded markers naming the holder, so the ownership proof holds"
+}
+
 test_pi_session_transition_generation_owner() {
   local repo home plugin child_pid_file child_marker_file marker_root arm_log out status
   repo="$TMP_ROOT/pi-session-transition-root"
@@ -4247,6 +4292,7 @@ test_pi_empty_close_retries_instead_of_disappearing
 test_pi_established_empty_close_honors_retry_limit
 test_pi_actionable_close_rechecks_session_lock
 test_pi_arm_distinguishes_session_lock_ownership
+test_pi_nested_process_under_lock_holder_keeps_holder_markers
 test_pi_session_transition_generation_owner
 test_pi_session_replacement_carries_inflight_actionable_close
 test_pi_streaming_followup_is_replayed_after_replacement

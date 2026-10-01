@@ -37,13 +37,17 @@ function pidAlive(pid: string): boolean {
   }
 }
 
-function lockOwnership(): LockOwnership {
-  let lockPid = "";
+function readLockPid(): string | null {
   try {
-    lockPid = readFileSync(`${state}/.lock`, "utf8").trim();
+    return readFileSync(`${state}/.lock`, "utf8").trim();
   } catch {
-    return "missing";
+    return null;
   }
+}
+
+function lockOwnership(): LockOwnership {
+  const lockPid = readLockPid();
+  if (lockPid === null) return "missing";
   if (!/^[0-9]+$/.test(lockPid) || lockPid === "1") return "other";
   let pid = String(process.pid);
   for (let i = 0; i < 8; i += 1) {
@@ -54,8 +58,16 @@ function lockOwnership(): LockOwnership {
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
+// The marker proves the lock holder itself loaded this build, so only that
+// process records it. A descendant (a nested pi started from the holder's own
+// shell) reads as "owned" through the ancestor walk but would replace the
+// holder's pid with its own short-lived one. With no live holder yet, this
+// process records itself for the lock fm-lock.sh will take in its name.
 function markLoaded(): void {
-  if (!existsSync(state) || lockOwnership() === "other") return;
+  if (!existsSync(state)) return;
+  const ownership = lockOwnership();
+  if (ownership === "other") return;
+  if (ownership === "owned" && readLockPid() !== String(process.pid)) return;
   writeFileSync(marker, `${extensionVersion}\n${process.pid}\n`);
 }
 

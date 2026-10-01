@@ -4850,6 +4850,13 @@ if [ -n "$SPAWN_TRACEPARENT" ]; then
     LAUNCH="unset TRACEPARENT; $LAUNCH"
   fi
 fi
+# Worker sandbox env prefix (bin/fm-worker-sandbox.sh env): prepended to the
+# agent command itself, so it applies after the environment reset below and
+# points the worker's temp and browser state at paths its profile allows.
+if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
+  SANDBOX_ENV=$("$SCRIPT_DIR/fm-worker-sandbox.sh" env --id "$ID" --task-tmp "$TASK_TMP") || exit 1
+  LAUNCH="$SANDBOX_ENV$LAUNCH"
+fi
 if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   LAUNCH_ENV_PREFIX='/usr/bin/env -i'
   # COMPACT_ADVISER_DISABLE is the intentional declarative floor-membership
@@ -4928,12 +4935,17 @@ fi
 # this private launch directory, outside every path the worker may write, and
 # the whole launch - environment prefix included - runs under it. A profile
 # that cannot be generated or loaded refuses the launch rather than dropping
-# the fence.
+# the fence. A brief scaffolded with --herdr-lab also gets its own lab session
+# paths.
 if [ "$WORKER_SANDBOX" = on ] && [ "$KIND" != secondmate ]; then
   SANDBOX_PROFILE="$LAUNCH_DIR/sandbox.$SPAWN_GEN.sb"
+  SANDBOX_ARGS=()
+  if fm_brief_heading_present "$SOURCE_BRIEF" "# Herdr isolation - HARD SAFETY CONTRACT"; then
+    SANDBOX_ARGS+=(--herdr-lab)
+  fi
   SANDBOX_EXEC_BIN=$("$SCRIPT_DIR/fm-worker-sandbox.sh" profile --id "$ID" --harness "$HARNESS" \
     --worktree "$WT" --task-tmp "$TASK_TMP" --state "$STATE_REAL" --data "$DATA" \
-    --output "$SANDBOX_PROFILE") || exit 1
+    --output "$SANDBOX_PROFILE" ${SANDBOX_ARGS[@]+"${SANDBOX_ARGS[@]}"}) || exit 1
   LAUNCH="$(shell_quote "$SANDBOX_EXEC_BIN") -f $(shell_quote "$SANDBOX_PROFILE") /bin/sh -c $(shell_quote "$LAUNCH")"
 fi
 if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
