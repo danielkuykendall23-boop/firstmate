@@ -3,11 +3,17 @@
 # bin/fm-spawn.sh, whose header owns why the launch carries it. It is the omp
 # analogue of the Pi adapter's `--tui-mode regular` pin: a per-launch overlay,
 # never a write to the captain's own ~/.omp/agent/config.yml, which stays
-# exactly as the captain set it (model roles, theme, providers, compaction).
+# exactly as the captain set it (model roles, theme, providers).
 # Each key below pins one setting whose captain-facing value would park an
 # unattended worker on an interactive prompt, change its pinned model under it,
-# or make its composer unreadable to bin/fm-composer-lib.sh. Verified against
-# omp 18.1.11's own settings schema (`omp config list`).
+# make its composer unreadable to bin/fm-composer-lib.sh, or lose old tool
+# output it may need again. Verified against omp 18.1.11's own settings schema
+# (`omp config list`); the compaction order against omp 18.2.10.
+compaction:
+  # Shake moved first: it moves old tool output to recoverable artifact:// links
+  # with no model, key or network; a remote-first order never reaches it. The
+  # captain's own tail order (remote, handoff, snapcompact, soft) is kept.
+  methodOrder: [shake, remote, handoff, snapcompact, soft]
 composer:
   # Renders a bare `❯` (U+276F) row, a glyph the shared composer classifier
   # already reads; the shipped default `band` and six other shapes are not in
