@@ -6,9 +6,14 @@ set -u
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-TMP_ROOT=$(fm_test_tmproot fm-remote-job)
-mkdir -p "$TMP_ROOT"
-TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
+# The EXIT cleanup below removes TMP_ROOT, so it must be the fresh fixture root
+# fm_test_tmproot creates and marks. When tests/lib.sh or a helper it sources
+# fails to load, that helper is missing and TMP_ROOT would otherwise resolve to
+# the caller's working directory.
+if ! TMP_ROOT=$(fm_test_tmproot fm-remote-job) || [ -z "$TMP_ROOT" ] || [ ! -f "$TMP_ROOT/.fm-test-fixture" ]; then
+  printf 'not ok - fm-remote-job: no marked fixture temp root (tests/lib.sh incomplete?); refusing to run\n'
+  exit 1
+fi
 REMOTE_ROOT="$TMP_ROOT/remote-root"
 REMOTE_HOME="$TMP_ROOT/remote-home"
 ACCOUNT_HOME="$TMP_ROOT/account"
@@ -831,7 +836,7 @@ else
 #!/bin/bash
 set -u
 [ "${1:-}" = --serve ] || exit 2
-printf '%s %s\n' "${BASHPID:-$$}" "$(date +%s)" > "$FM_TEST_CHILD.tmp"
+printf '%s\n' "${BASHPID:-$$}" > "$FM_TEST_CHILD.tmp"
 mv "$FM_TEST_CHILD.tmp" "$FM_TEST_CHILD"
 while [ ! -e "$FM_TEST_CRASH" ]; do sleep 0.05; done
 mkdir -p "$FM_REMOTE_JOB_STATE_ROOT/worker.lock"
@@ -860,10 +865,19 @@ PATH="$root/test-bin:$PATH" HOME="$work/home" FM_ROOT_OVERRIDE="$root" \
 sup=$!
 for _ in $(seq 1 100); do [ -s "$child_file" ] && break; sleep 0.05; done
 [ -s "$child_file" ] || { echo "error: the supervisor never started its serving child"; exit 1; }
-read -r child child_epoch < "$child_file"
-# Process identity is a one-second start stamp: the planted process must start
-# in a later second than the child, or it would share the child's identity.
-while [ "$(date +%s)" -le "$child_epoch" ]; do sleep 0.05; done
+read -r child < "$child_file"
+# Process identity is the ps start stamp, one-second resolution counted from
+# boot, so its second boundaries need not match the wall clock's. Wait until a
+# fresh process no longer shares the child's stamp; any later process, the one
+# planted below included, then carries a different identity.
+child_start=$(ps -o lstart= -p "$child")
+[ -n "$child_start" ] || { echo "error: the serving child's start stamp was unreadable"; exit 1; }
+for _ in $(seq 1 60); do
+  [ "$(sh -c 'ps -o lstart= -p $$')" != "$child_start" ] && break
+  sleep 0.05
+done
+[ "$(sh -c 'ps -o lstart= -p $$')" != "$child_start" ] \
+  || { echo "error: fresh processes still share the child's start stamp after 3s"; exit 1; }
 mkfifo "$hold"
 : > "$work/crash"
 for _ in $(seq 1 200); do [ -e "$held" ] && break; sleep 0.05; done
