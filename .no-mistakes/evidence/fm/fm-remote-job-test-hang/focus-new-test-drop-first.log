@@ -1,0 +1,4 @@
+ok - default queue and execution bounds independently cover long polls
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+FOCUSED CASES PASSED
+rc=0 elapsed=26s

@@ -1,0 +1,1 @@
+RESULT bash=3.2.57(1)-release rev=c4bc6a8 mode=burst iterations=20 clean=20 hangs=0 leaks=0 avg_stop_ms=989 max_stop_ms=6428

@@ -1,0 +1,1 @@
+RESULT bash=5.2.0(1)-release rev=b95d776 mode=supervisor iterations=30 clean=30 hangs=0 leaks=0 avg_stop_ms=743 max_stop_ms=5378

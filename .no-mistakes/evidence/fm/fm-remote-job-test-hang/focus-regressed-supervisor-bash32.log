@@ -1,0 +1,5 @@
+ok - default queue and execution bounds independently cover long polls
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+not ok - a supervisor stop re-sends TERM until a serving child that lost the first one is gone: the supervisor was still running 10s after its TERM; processes: 86339 84070 S    00:32 /bin/bash /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-remote-job.UnSdcy/forward-root/bin/fm-remote-job-supervisor-under-test.sh;86495 86339 S    00:32 /bin/bash /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-remote-job.UnSdcy/forward-root/bin/fm-remote-job-worker.sh --serve;; child TERMs: TERM 1 
+tests/focus.test.sh: line 29: 86339 Killed: 9               HOME="$FORWARD_HOME" FM_ROOT_OVERRIDE="$FORWARD_ROOT" FM_REMOTE_JOB_STATE_ROOT="$TMP_ROOT/forward-state" FM_REMOTE_JOB_PLATFORM_OVERRIDE=Linux FM_TEST_FORWARD_CHILD="$FORWARD_CHILD_FILE" FM_TEST_FORWARD_TERMS="$FORWARD_TERMS" "$FORWARD_ROOT/bin/fm-remote-job-supervisor-under-test.sh" > "$TMP_ROOT/forward-supervisor.out" 2> "$TMP_ROOT/forward-supervisor.err"
+rc=1 elapsed=34s

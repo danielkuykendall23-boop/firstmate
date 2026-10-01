@@ -1,0 +1,5 @@
+ok - default queue and execution bounds independently cover long polls
+ok - a repeatedly signalled shutdown still releases ownership for the next worker
+ok - a supervisor stop re-sends TERM until a serving child that lost the first one is gone
+FOCUSED CASES PASSED
+rc=0 elapsed=5s

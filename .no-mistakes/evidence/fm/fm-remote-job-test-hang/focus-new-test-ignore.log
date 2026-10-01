@@ -1,0 +1,3 @@
+ok - default queue and execution bounds independently cover long polls
+not ok - a repeatedly signalled shutdown still releases ownership for the next worker: the repeatedly signalled worker was still running 30s after its first TERM; process:  2869  2092  2082 SN   00:41 /bin/bash /private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-remote-job.UG0K34/remote-root/bin/fm-remote-job-worker.sh --serve; stderr: 
+rc=1 elapsed=52s

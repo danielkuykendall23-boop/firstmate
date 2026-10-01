@@ -1,0 +1,2 @@
+ok - default queue and execution bounds independently cover long polls
+rc=142 elapsed=123s (killed by 120s watchdog: HUNG)

@@ -1,0 +1,1 @@
+RESULT bash=5.2.0(1)-release rev=c4bc6a8 mode=burst iterations=20 clean=20 hangs=0 leaks=0 avg_stop_ms=885 max_stop_ms=9943
