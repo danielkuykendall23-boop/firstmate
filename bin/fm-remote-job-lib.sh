@@ -956,38 +956,37 @@ fm_remote_job_worker_process_group() { # <pid>
   printf '%s\n' "$pgid"
 }
 
+# True while the tree a stop signalled is still running: the whole isolated
+# group when one was signalled, the lone process otherwise.
+fm_remote_job_worker_tree_running() { # <pgid-or-empty> <pid>
+  if [ -n "$1" ]; then kill -0 -- "-$1" 2>/dev/null; else kill -0 "$2" 2>/dev/null; fi
+}
+
 # Stop a worker and every descendant it leaked, TERM first and KILL only for a
 # survivor. Signals the isolated worker group when one is provable and the lone
-# process otherwise. Returns non-zero when any verified worker-group member is
-# still alive afterwards.
+# process otherwise, and gives TERM the whole bounded wait to end that same
+# signalled tree: the restart supervisor finishes forwarding its stop after the
+# serving child exits, so the child's exit alone does not mean the group is done.
+# Returns non-zero when any verified worker-group member is still alive
+# afterwards.
 fm_remote_job_stop_worker_tree() { # <pid>
   local pid=$1 pgid i=0
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
   [ "$pid" -gt 1 ] || return 1
   pgid=$(fm_remote_job_worker_process_group "$pid" 2>/dev/null || true)
   if [ -n "$pgid" ]; then kill -TERM -- "-$pgid" 2>/dev/null || true; else kill -TERM "$pid" 2>/dev/null || true; fi
-  while { [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null || [ -z "$pgid" ] && kill -0 "$pid" 2>/dev/null; } \
-    && [ "$i" -lt 50 ]; do
+  while fm_remote_job_worker_tree_running "$pgid" "$pid" && [ "$i" -lt 50 ]; do
     i=$((i + 1))
     sleep 0.1
   done
-  if [ -n "$pgid" ]; then
-    kill -0 -- "-$pgid" 2>/dev/null || return 0
-  else
-    kill -0 "$pid" 2>/dev/null || return 0
-  fi
+  fm_remote_job_worker_tree_running "$pgid" "$pid" || return 0
   if [ -n "$pgid" ]; then kill -KILL -- "-$pgid" 2>/dev/null || true; else kill -KILL "$pid" 2>/dev/null || true; fi
   i=0
-  while { [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null || [ -z "$pgid" ] && kill -0 "$pid" 2>/dev/null; } \
-    && [ "$i" -lt 50 ]; do
+  while fm_remote_job_worker_tree_running "$pgid" "$pid" && [ "$i" -lt 50 ]; do
     i=$((i + 1))
     sleep 0.1
   done
-  if [ -n "$pgid" ]; then
-    ! kill -0 -- "-$pgid" 2>/dev/null
-  else
-    ! kill -0 "$pid" 2>/dev/null
-  fi
+  ! fm_remote_job_worker_tree_running "$pgid" "$pid"
 }
 
 fm_remote_job_read_single_line() {
