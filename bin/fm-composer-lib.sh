@@ -457,9 +457,14 @@ FM_COMPOSER_SHELL_PROMPT_GLYPHS=$(printf '%s\n' '>' '$' '%' '#')
 # hence the unanchored tail). cursor-agent renders
 # two, both anchored: `Plan, search, build anything` in a fresh session and
 # `Add a follow-up` once a turn has completed (verified live on cursor-agent
-# 2026.08.11-e8db854). FM_COMPOSER_IDLE_RE overrides for an unverified harness;
-# matching is case-insensitive.
-FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$'
+# 2026.08.11-e8db854). omp 18.6.1 right-aligns `⇧⇥ to change thinking effort`
+# on its EMPTY bare `❯` row: the words are a dark truecolor ghost run but the
+# `⇧⇥` keycap is bright blue (38;2;0;180;255, luminance ~134.7), so ghost
+# stripping leaves that keycap behind; the plain-row remnant rule then needs the
+# full hint here to read the row empty (verified live through Tern 0.4.5 with
+# PI_TUI_NATIVE=0; the hint vanishes once text is typed). FM_COMPOSER_IDLE_RE
+# overrides for an unverified harness; matching is case-insensitive.
+FM_COMPOSER_IDLE_RE_DEFAULT='^Type a message\.\.\.$|^Ask anything(\.\.\.|…)|^Plan, search, build anything$|^Add a follow-up$|^⇧⇥ to change thinking effort$'
 
 # Opencode draws a mode/model footer line INSIDE its left-bar composer
 # ("Build · GPT-5.5 Fast OpenAI · high"). It is composer furniture, not typed
