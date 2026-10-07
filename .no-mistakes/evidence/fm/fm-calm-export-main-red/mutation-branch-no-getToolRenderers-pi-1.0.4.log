@@ -1,0 +1,9 @@
+not ok - Pi outcomes rendering consumers must preserve stock behavior: file:///private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-pi-branch-extension.XCu5r7/stock-render-consumers/[eval1]:133
+  throw new Error(`Pi ${piVersion} HTML export renderer looked up ${exportLookups} of 4 tool renders; its createToolHtmlRenderer dependency changed`);
+        ^
+
+Error: Pi 1.0.4 HTML export renderer looked up 0 of 4 tool renders; its createToolHtmlRenderer dependency changed
+    at file:///private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-pi-branch-extension.XCu5r7/stock-render-consumers/[eval1]:133:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+Node.js v24.11.1: expected exit 0, got 1
