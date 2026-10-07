@@ -369,22 +369,32 @@ fm_backend_tern_send_text_submit() {  # <target> <text> <retries> <enter-sleep> 
     "$target" "$retries" "$sleep_s" "$expected_label"
 }
 
-# fm_backend_tern_kill: close the task's block. Already gone (or now holding
-# another tab's block) is success; a close Tern refused while the block is
-# still listed, or an unreadable inventory, is a failure the caller must not
-# paper over (fm_backend_kill's retain-and-stop contract).
+# fm_backend_tern_kill: close the task's block, including an exited
+# kept-open one still sitting in the task's tab (found by label when the
+# recorded block id is gone). Already gone (or now holding another tab's
+# block) is success; a close Tern refused while the block is still listed, or
+# an unreadable inventory, is a failure the caller must not paper over
+# (fm_backend_kill's retain-and-stop contract).
 fm_backend_tern_kill() {  # <target> [unused] [expected-label]
-  local expected_label=${3:-} inv
+  local expected_label=${3:-} inv rec session tab live
   fm_backend_tern_parse_target "$1" || return 0
   inv=$(fm_backend_tern_inventory) || {
     echo "error: could not read Tern's sessions to close $1" >&2
     return 1
   }
   if ! fm_backend_tern_target_ready "$1" "$expected_label"; then
-    if fm_backend_tern_block_record "$inv" "$FM_BACKEND_TERN_BLOCK" >/dev/null && [ -z "$expected_label" ]; then
-      : # listed but not live: an exited kept-open block - close it below
-    else
-      return 0
+    if ! rec=$(fm_backend_tern_block_record "$inv" "$FM_BACKEND_TERN_BLOCK"); then
+      [ -n "$expected_label" ] && [ -n "$FM_BACKEND_TERN_SESSION" ] || return 0
+      FM_BACKEND_TERN_BLOCK=$(fm_backend_tern_block_for_label "$inv" "$FM_BACKEND_TERN_SESSION" "$expected_label") || return 0
+      rec=$(fm_backend_tern_block_record "$inv" "$FM_BACKEND_TERN_BLOCK") || return 0
+    fi
+    IFS=$'\037' read -r session tab live <<EOF
+$rec
+EOF
+    [ "$live" = dead ] || return 0
+    if [ -n "$expected_label" ]; then
+      [ "$tab" = "$expected_label" ] || return 0
+      [ -z "$FM_BACKEND_TERN_SESSION" ] || [ "$session" = "$FM_BACKEND_TERN_SESSION" ] || return 0
     fi
   fi
   fm_backend_tern_cli close "$FM_BACKEND_TERN_BLOCK" >/dev/null 2>&1 && return 0

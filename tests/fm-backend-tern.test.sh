@@ -279,6 +279,28 @@ test_kill_closes_and_tolerates_gone() {
   pass "kill: closes the task block; an already-gone block is a quiet success"
 }
 
+test_kill_closes_exited_task_block() {
+  local out s b s2 b2
+  make_tern_world kill-dead
+  out=$(fm_backend_tern_create_task fm-a /work)
+  read -r s b <<<"$out"
+  set_block_live "$b" false
+  fm_backend_kill tern "tern:$s/$b" "" fm-a || fail "kill of an exited task block should succeed"
+  [ "$(tern_calls close)" = 1 ] || fail "kill must close the task's exited kept-open block"
+  fm_backend_tern_block_for_label "$(fm_backend_tern_inventory)" "$s" fm-a >/dev/null && fail "the exited task tab must be gone after kill"
+  out=$(fm_backend_tern_create_task fm-c /work)
+  read -r s2 b2 <<<"$out"
+  set_block_live "$b2" false
+  fm_backend_kill tern "tern:$s2/99999" "" fm-c || fail "kill of an exited task block found by label should succeed"
+  [ "$(tern_calls close)" = 2 ] || fail "kill must close the exited block it recovers by the task label"
+  out=$(fm_backend_tern_create_task fm-b /work)
+  read -r s2 b2 <<<"$out"
+  set_block_live "$b2" false
+  fm_backend_kill tern "tern:$s2/$b2" "" fm-a || fail "an exited block in another task's tab means ours is gone"
+  [ "$(tern_calls close)" = 2 ] || fail "kill must never close an exited block in another task's tab"
+  pass "kill: closes the task's exited kept-open block (by id or label), never another task's"
+}
+
 test_kill_never_closes_another_task_tab() {
   local out s b
   make_tern_world kill-other
@@ -426,10 +448,27 @@ test_validate_task_endpoint() {
 }
 
 test_explicit_target_routing() {
+  local out s b home esc=$'\033'
   [ "$(fm_backend_of_selector 'tern:s/42' 'tern:s/42' "$TMP_ROOT/no-state")" = tern ] || fail "an unrecorded tern target must route to tern"
   [ "$(fm_backend_of_selector 'firstmate:fm-x' 'firstmate:fm-x' "$TMP_ROOT/no-state")" = tmux ] || fail "tmux targets must keep routing to tmux"
-  grep -q 'tern:\*/\*)' "$ROOT/bin/fm-send.sh" || fail "fm-send's explicit-target heuristic must recognize tern targets"
-  pass "explicit targets: tern:<session>/<block> routes to tern, tmux targets unchanged"
+  make_tern_world send-explicit
+  out=$(fm_backend_tern_create_task fm-a /work)
+  read -r s b <<<"$out"
+  home="$W/home"
+  mkdir -p "$home/state"
+  printf '%s\n' "transcript" "" "❯ ${esc}[0;3;38;2;107;114;128mto change thinking effort${esc}[m" >"$W/capture/$b.ansi"
+  FM_HOME="$home" FM_SEND_SETTLE=0 "$ROOT/bin/fm-send.sh" "tern:$s/$b" "hello tern" >/dev/null 2>&1 ||
+    fail "fm-send must deliver to a live unrecorded tern:<session>/<block> target"
+  grep -qx "tern${US}send${US}$b${US}text${US}--${US}hello tern" "$TERN_LOG" || fail "fm-send must type the message into the tern block"
+  grep -qx "tern${US}send${US}$b${US}keys${US}Enter" "$TERN_LOG" || fail "fm-send must submit the message in the tern block"
+  set_block_live "$b" false
+  : >"$TERN_LOG"
+  if FM_HOME="$home" FM_SEND_SETTLE=0 "$ROOT/bin/fm-send.sh" "tern:$s/$b" "hello again" >"$W/send.err" 2>&1; then
+    fail "fm-send must refuse an exited tern block"
+  fi
+  grep -q "is not a live tern endpoint" "$W/send.err" || fail "the refusal must name the tern backend, got: $(cat "$W/send.err")"
+  [ "$(tern_calls send)" = 0 ] || fail "fm-send must not type into an exited tern block"
+  pass "explicit targets: fm-send delivers to a live tern:<session>/<block>, refuses an exited one; tmux targets unchanged"
 }
 
 test_supervisor_discovery() {
@@ -473,6 +512,7 @@ test_send_literal_and_keys
 test_capture_scrollback_trim_and_viewport
 test_composer_state_reads_omp_through_ansi
 test_kill_closes_and_tolerates_gone
+test_kill_closes_exited_task_block
 test_kill_never_closes_another_task_tab
 test_kill_reports_failures
 test_list_live_lists_home_task_tabs
