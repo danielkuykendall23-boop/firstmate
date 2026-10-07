@@ -3390,6 +3390,77 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
+# Every task copy is a LINKED git worktree, while no-mistakes registers the
+# repository under its main worktree and files the linked copy's runs there.
+# Pre-fix the capped-overview reader matched only the task worktree's own path,
+# so on any repository with more runs than the overview shows, a ship task with
+# no run yet read `unknown - complete same-branch run inventory unreadable`;
+# crew_is_provably_working then failed and every busy worker's turn-end
+# surfaced to the supervisor as an actionable wake.
+make_linked_capped_case() {  # <name> <hidden-branch-run-statuses...>
+  local name=$1 main
+  shift
+  reset_fakes
+  LINKED_CASE=$TMP_ROOT/$name
+  mkdir -p "$LINKED_CASE/state"
+  make_repo_on_branch "$LINKED_CASE/main" trunk
+  git -C "$LINKED_CASE/main" worktree add -q -b fm/linked "$LINKED_CASE/wt" \
+    || fail 'could not create the linked task worktree'
+  main=$(git -C "$LINKED_CASE/main" rev-parse --show-toplevel)
+  make_fakebin "$LINKED_CASE" >/dev/null
+  fm_write_meta "$LINKED_CASE/state/linked.meta" "window=fm:fm-linked" "worktree=$LINKED_CASE/wt" \
+    "kind=ship" "harness=claude"
+  NM_HOME="$LINKED_CASE/nm"
+  mkdir -p "$NM_HOME"
+  FM_FAKE_AXI_HOME=$(python3 - "$NM_HOME/state.sqlite" "$main" "$FM_FAKE_RUN_HEAD" "$@" <<'PY'
+import sqlite3
+import sys
+
+database, main, head = sys.argv[1:4]
+with sqlite3.connect(database) as db:
+    db.executescript("""
+        CREATE TABLE repos (id TEXT PRIMARY KEY, working_path TEXT NOT NULL UNIQUE);
+        CREATE TABLE runs (id TEXT PRIMARY KEY, repo_id TEXT NOT NULL, branch TEXT NOT NULL,
+                           status TEXT NOT NULL, head_sha TEXT NOT NULL, created_at INTEGER NOT NULL);
+    """)
+    db.execute("INSERT INTO repos VALUES ('repo', ?)", (main,))
+    db.executemany("INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)",
+                   [("01OTHER%02d" % i, "repo", "fm/other-%d" % i, "completed", head, i + 10)
+                    for i in range(11)]
+                   + [("01LINKED%d" % i, "repo", "fm/linked", status, head, i)
+                      for i, status in enumerate(sys.argv[4:])])
+print("count: 10 of %d total" % (11 + len(sys.argv[4:])))
+print("runs[10]{id,branch,status,head,pr}:")
+for i in reversed(range(1, 11)):
+    print('  "01OTHER%02d",fm/other-%d,completed,%s,""' % (i, i, head))
+PY
+) || fail 'could not create the linked-worktree run inventory fixture'
+  FM_FAKE_AXI_STATUS=$(run_running fm/other-10)
+  FM_FAKE_BUSY=1
+  local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$LINKED_CASE/state" linked)
+  "$ROOT/bin/fm-busy-event.sh" apply "$LINKED_CASE/state" linked busy --gen "$gen" \
+    --source claude-hook --event user-prompt-submit
+}
+
+test_linked_worktree_resolves_main_worktree_registration() {
+  local out
+  make_linked_capped_case linked-no-run
+  out=$(run_crew_state "$LINKED_CASE" linked)
+  assert_not_contains "$out" "unreadable" 'a linked task worktree with no run is not an unreadable inventory'
+  assert_contains "$out" "state: working" 'a busy linked task worktree with no run reads working'
+  assert_contains "$out" "source: pane" 'the working verdict comes from the busy record'
+  PATH="$LINKED_CASE/fakebin:$PATH" FM_STATE_OVERRIDE="$LINKED_CASE/state" crew_is_provably_working linked \
+    || fail 'the watcher absorb predicate rejected a busy linked task worktree with no run'
+
+  make_linked_capped_case linked-competing running running
+  out=$(run_crew_state "$LINKED_CASE" linked)
+  assert_contains "$out" "state: unknown" 'hidden competing runs filed under the main worktree are still found'
+  assert_contains "$out" "01LINKED0" 'the older hidden run is named'
+  assert_contains "$out" "01LINKED1" 'the newer hidden run is named'
+  assert_not_contains "$out" "inventory unreadable" 'the main-worktree registration was read, not missed'
+  pass 'a linked task worktree resolves its runs through the main worktree registration'
+}
+
 # The capped-overview sqlite reader runs inside the same per-read budget as
 # every other no-mistakes state read, so a contended database cannot stall a
 # crew poll: a reader that never returns must be killed and fall through to the
@@ -4926,6 +4997,7 @@ test_capped_competing_live_runs_report_both_ids
 test_capped_overview_without_branch_rows_reports_both_ids
 test_capped_overview_without_repo_line_and_no_runs_reports_absent
 test_no_branch_run_beside_a_live_run_elsewhere_reads_absent
+test_linked_worktree_resolves_main_worktree_registration
 test_capped_inventory_reader_is_time_bounded
 test_capped_inventory_requires_exact_worktree_path
 test_capped_replacement_keeps_gate_and_inventory_unchanged

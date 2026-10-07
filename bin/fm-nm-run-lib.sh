@@ -129,11 +129,15 @@ fm_nm_run_status_class() {  # <status_word>
 # ~/.no-mistakes/state.sqlite; relative NM_HOME resolves from the worktree).
 # The real CLI overview never carries a `repo: ` identity line (observed
 # 2026-09-20: a truncated overview with zero rows for this task's branch has
-# only `count:`/`runs[...]:`), so repo identity is looked up by the task
-# worktree path itself, which is exactly what `no-mistakes` records as a
-# repo's `working_path`; the recorded spelling is matched exactly, so a task
-# worktree that is not absolute, or whose spelling differs from the recorded
-# one, reads as unreadable rather than guessed among candidates.
+# only `count:`/`runs[...]:`), so repo identity is looked up by recorded
+# `working_path`. no-mistakes registers a repository under its main worktree
+# and attributes a linked worktree's runs to that registration (observed
+# 2026-10-06 on v1.84.0: every Firstmate task copy is a linked worktree whose
+# runs live under the primary checkout's row), so the lookup tries the task
+# worktree itself, then - only for a linked worktree - the main worktree git
+# reports for it. Each spelling is matched exactly: a task worktree that is not
+# absolute, whose spelling differs from the recorded one, or whose two
+# candidates both match distinct rows reads as unreadable rather than guessed.
 # The reader subprocess is bounded by $4 seconds (default 10), so a contended
 # database can never outlast the caller's per-read budget.
 # If that reader or inventory is unavailable, report unknown with available
@@ -236,12 +240,32 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import sys
 from contextlib import closing
 from pathlib import Path
 
 branch, worktree, available_ids = sys.argv[1:]
 ids = available_ids.split(", ") if available_ids else []
+
+def recorded_paths(worktree):
+    yield worktree
+    try:
+        dirs = subprocess.run(["git", "-C", worktree, "rev-parse", "--git-dir", "--git-common-dir"],
+                              capture_output=True, text=True, check=True).stdout.splitlines()
+        if len(dirs) != 2:
+            return
+        git_dir, common_dir = (os.path.realpath(os.path.join(worktree, d)) for d in dirs)
+        if git_dir == common_dir:
+            return
+        listing = subprocess.run(["git", "-C", worktree, "worktree", "list", "--porcelain"],
+                                 capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.SubprocessError):
+        return
+    main = listing.split("\n\n", 1)[0].split("\n")
+    if main[0].startswith("worktree /") and "bare" not in main[1:]:
+        yield main[0][len("worktree "):]
+
 try:
     if not os.path.isabs(worktree):
         raise ValueError
@@ -250,12 +274,15 @@ try:
         root = Path(worktree) / root
     with closing(sqlite3.connect((root / "state.sqlite").as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
         db.execute("BEGIN")
-        repo = db.execute("SELECT id FROM repos WHERE working_path = ?", (worktree,)).fetchall()
+        repo = set()
+        for path in recorded_paths(worktree):
+            repo.update(row[0] for row in db.execute("SELECT id FROM repos WHERE working_path = ?", (path,)))
         if len(repo) != 1:
             raise ValueError
+        repo_id = repo.pop()
         rows = db.execute(
             "SELECT id, branch, status, head_sha FROM runs WHERE repo_id = ? AND branch = ? "
-            "ORDER BY created_at DESC, id DESC", (repo[0][0], branch)
+            "ORDER BY created_at DESC, id DESC", (repo_id, branch)
         ).fetchall()
     displayed_ids = set(ids)
     for row in rows:
