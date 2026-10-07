@@ -1,0 +1,38 @@
+# Live isolated Tern 0.5.3 GUI window (TERN_CONFIG_DIR/TERN_DAEMON_SOCKET/STENCIL_LOG_DIR under /tmp), FIXED plugin (worktree e77668a)
+## Fresh window, stale old-format file seeded
+$ tern plugin link /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4A5XP1ZGRDV4T89K5GGZAXH/bin/backends/tern-plugin
+linked firstmate-agents 0.1.0 → /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4A5XP1ZGRDV4T89K5GGZAXH/bin/backends/tern-plugin
+no daemon running; changes apply at next start
+$ tern plugin list
+firstmate-agents 0.1.0 Firstmate agents — 0 blocks, 0 lenses, window  ready
+seeded stale old-format file: {"written_at":1700000000,"version":1}
+rewritten after 2.7s: {"blocks":{"5":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":6}},"version":1,"window_pid":83135}
+window_pid 83135 -> ps comm: tern
+## Empty window (only pane closed) + plugin reload, stale old-format file seeded
+window state: {"tabs":[],"panes":[]}
+seeded stale old-format file: {"written_at":1700000000,"version":1}
+$ tern plugin reload
+firstmate-agents 0.1.0 Firstmate agents — 0 blocks, 0 lenses, window  ready
+rewritten after ~2s: {"blocks":{},"version":1,"window_pid":83135}
+window_pid 83135 -> ps comm: tern
+## No write churn while unchanged; rewrite when a pane appears
+inode/mtime before: 67257425 1791343446
+inode/mtime after 6s of nudged ticks: 67257425 1791343446
+$ tern ctl tab new
+{"ok":true}
+after a pane appears: {"blocks":{"7":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":8}},"version":1,"window_pid":83135} inode/mtime 67257484 1791343462
+
+# Same procedure, BASELINE plugin (cc3fc4f)
+$ tern plugin link /tmp/fmtern.lab/baseline-plugin
+linked firstmate-agents 0.1.0 → /private/tmp/fmtern.lab/baseline-plugin
+no daemon running; changes apply at next start
+$ tern plugin list
+firstmate-agents 0.1.0 Firstmate agents — 0 blocks, 0 lenses, window  ready
+seeded stale old-format file: {"written_at":1700000000,"version":1}
+rewritten after 2.6s: {"blocks":{"5":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":6}},"version":1,"window_pid":96297}
+window_pid 96297 -> ps comm: tern
+window state: {"tabs":[],"panes":[]}
+seeded stale old-format file: {"written_at":1700000000,"version":1}
+$ tern plugin reload
+firstmate-agents 0.1.0 Firstmate agents — 0 blocks, 0 lenses, window  ready
+NOT rewritten after 15s: {"written_at":1700000000,"version":1}

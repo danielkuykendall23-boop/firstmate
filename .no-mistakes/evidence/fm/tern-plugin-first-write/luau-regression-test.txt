@@ -1,0 +1,5 @@
+# tests/fm-backend-tern.test.sh with workspace-local luau (fixed window.luau)
+ok - window.luau plugin: a freshly loaded window publishes current-format state as soon as window_pid is known, even with no agents/tabs
+# same test with baseline cc3fc4f window.luau swapped in (restored afterwards)
+not ok - a freshly loaded window must publish agents.json as soon as window_pid is known, even with an empty (no agents, no fm-* tabs) signature; got write_count=0, harness output: RESULT_WRITE_COUNT=0
+RESULT_COMMITTED_BODY=
