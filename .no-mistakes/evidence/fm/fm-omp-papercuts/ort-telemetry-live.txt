@@ -1,0 +1,23 @@
+== before: launch env extra: '<none>'
+tiny worker seen:
+51442 /Users/danielkuykendall/.local/bin/omp __omp_worker_tiny_inference
+git -C wt status --porcelain --untracked-files=all:
+?? :memory:.ses
+-rw-r--r--@  1 danielkuykendall  wheel   51 Oct  7 14:02 :memory:.ses
+0000000    1   7   9   1   3   9   6   1   7   4   7   4   7  \n   f   0
+0000020    6   4   4   f   4   2   -   9   1   b   1   -   4   1   5   e
+0000040    -   8   5   1   c   -   f   1   d   c   b   f   b   1   d   c
+== after: launch env extra: 'ORT_DISABLE_TELEMETRY=1'
+tiny worker seen:
+51442 /Users/danielkuykendall/.local/bin/omp __omp_worker_tiny_inference
+git -C wt status --porcelain --untracked-files=all:
+== NOTE: the 'after' block above reused the orphaned tiny worker 51442 from the 'before' run and is void; rerun below with a fresh worker
+== after2: launch env extra: 'ORT_DISABLE_TELEMETRY=1'
+tiny worker seen:
+82476 cwd=n/private/tmp/fm-ortlab.1vJ7/wt ORT=ORT_DISABLE_TELEMETRY=1
+git -C wt status --porcelain --untracked-files=all:
+== before2: launch env extra: '<none>'
+tiny worker seen:
+96805 cwd=n/private/tmp/fm-ortlab.1vJ7/wt ORT=unset
+git -C wt status --porcelain --untracked-files=all:
+?? :memory:.ses

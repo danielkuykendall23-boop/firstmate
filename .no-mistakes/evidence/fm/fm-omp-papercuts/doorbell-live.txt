@@ -1,0 +1,45 @@
+== doorbell at BASE e163726 while the running-agent hint shows
+record: /tmp/fm-ortlab.1vJ7/homebase/state/hintq.inbox/001.msg
+fm_task_inbox_ring rc=1 (0 rang, 1 skipped as pending, 2 send failed, 3 dead)
+
+❯                                                                                             ←← to see 1 running agent
+ ⠹ 1m · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.3%/1M ⟲ · S0.02 (+0.02)                    👥 1 · Run sleep command
+
+== doorbell at TARGET 6bdb719 while the running-agent hint shows
+record: /tmp/fm-ortlab.1vJ7/hometarget/state/hintq.inbox/001.msg
+fm_task_inbox_ring rc=0 (0 rang, 1 skipped as pending, 2 send failed, 3 dead)
+├─── Output ──────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ /tmp/fm-ortlab.1vJ7/hometarget/state/hintq.inbox/001.msg                                                            │
+│ ⟦Wall: 0.01s | Timeout: 300s⟧                                                                                       │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Subagents
+  └─ • SleepRunner ⟦sonic⟧: Change
+
+  ⎋ Listing inbox messages
+
+❯                                                                                             ←← to see 1 running agent
+ ⠋ 2m · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.4%/1M ⟲ · S0.03 (+0.02)                    👥 1 · Run sleep command
+
+== ~30s later
+ ● Read /tmp/fm-ortlab.1vJ7/hometarget/state/hintq.inbox/001.msg
+ Subagents
+  └─ • SleepRunner ⟦sonic⟧: Change
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ✘ Refusal (cyber): This request triggered restrictions on violative cyber content and was blocked under Anthropic's
+   Usage Policy. To learn more, see https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback.
+ Dismissed when you send your next message.
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                             ←← to see 1 running agent
+ ⠧ 2m · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.4%/1M ⟲ · S0.04 (+0.03)                    👥 1 · Run sleep command
+target inbox:
+001.msg
+handled
+
+/tmp/fm-ortlab.1vJ7/hometarget/state/hintq.inbox/handled:
+base inbox (never rung):
+001.msg
+handled
+
+/tmp/fm-ortlab.1vJ7/homebase/state/hintq.inbox/handled:
+[{"name":"default","default":true,"running":true},{"name":"fm-lab-calm-omp-evidence","default":false,"running":false},{"name":"fm-remote","default":false,"running":false}]

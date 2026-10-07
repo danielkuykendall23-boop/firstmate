@@ -1,0 +1,31 @@
+== live Herdr lab pane (fm-lab-omp-hint-19232-31435:w1:p1), omp 18.6.1 PI_TUI_NATIVE=0 with one running subagent
+  └─ • SleepRunner ⟦sonic⟧: Change
+
+❯                                                                                             ←← to see 1 running agent
+ ⠋ 32s · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.3%/1M ⟲ · S0.02 (+0.02)                   👥 1 · Run sleep command
+verdict at target 6bdb719 (fm_backend_composer_state herdr): empty
+verdict at base e163726 (same capture path, old bin/):     pending
+
+== typed draft 'hello draft' while subagent runs
+
+❯ hello drafted
+ ⠙ 45s · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.3%/1M ⟲ · S0.02 (+0.02)                   👥 1 · Run sleep command
+verdict at target: pending
+
+== draft replaced by the hint's own words typed as real input
+
+❯ hello draft←← to see 1 run
+ ⠧ 50s · ◒ Opus 5.5 · 🌳 repo/wt · ⑂ detached · ◫ 1.3%/1M ⟲ · S0.02 (+0.02)                   👥 1 · Run sleep command
+verdict at target: pending
+
+== draft cleared with Backspace while subagent still runs
+❯                                                                                             ←← to see 1 running agent
+verdict at target: empty
+
+== the hint's exact words typed as real input
+❯ ←← to see 1 running agents
+verdict at target: pending
+
+== cleared again
+❯                                                                                             ←← to see 1 running agent
+verdict at target: empty
