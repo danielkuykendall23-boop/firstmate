@@ -1,0 +1,23 @@
+Real bin/fm-crew-state.sh + real no-mistakes v1.84.0 CLI, disposable NM_HOME (schema copied from installed no-mistakes),
+real git linked worktree /private/tmp/fmlab.uGf9/wt off main worktree /private/tmp/fmlab.uGf9/main, Herdr lab pane with busy omp record.
+
+[real CLI] `no-mistakes axi` run inside the LINKED worktree with only main registered:
+  repo: /private/tmp/fmlab.uGf9/main   (no-mistakes attributes linked worktree to main registration)
+  count: 10 of 11 total                (capped overview -> sqlite inventory reader path)
+
+Busy linked worker, no run of its own, 11 other-branch runs:
+  base   (cc3fc4f): state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids:
+  target (14e8668): state: working · source: pane · harness busy (omp-ext)
+
+ADVERSARIAL - two hidden live fm/linked runs filed under main registration:
+  base:   state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids: ; last reported run id: 01LINKED1
+  target: state: unknown · source: run-step · competing live runs; run ids: 01LINKED1, 01LINKED0; last reported run id: 01LINKED1
+  (watcher still surfaces this turn-end: see watch-turnend-adversarial-competing.txt)
+
+ADVERSARIAL - linked worktree ALSO registered as its own repo (distinct row) with a capped overview, canonical meta path:
+  base:   state: working · source: pane · harness busy (omp-ext)
+  target: state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids:   (fails closed on ambiguity)
+  Same setup but meta worktree spelled /tmp/... (symlink of /private/tmp): target matched only main's row -> working,
+  while the real CLI resolved the worktree's own registration.
+
+Non-linked (main) worktree with a running run: base and target both `working · source: run-step · validating (running) · run: 01MAINRUN`.

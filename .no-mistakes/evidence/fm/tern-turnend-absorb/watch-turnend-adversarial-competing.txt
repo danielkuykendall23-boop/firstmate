@@ -1,0 +1,8 @@
+##### ADVERSARIAL 1: two hidden live runs for fm/linked filed under the main-worktree registration (target must NOT absorb)
+busy-state: v1 gen=g1791344039.60294.17391 seq=2 state=busy source=omp-ext event=turn-start ts=1791344039
+fm-crew-state: state: unknown · source: run-step · competing live runs; run ids: 01LINKED1, 01LINKED0; last reported run id: 01LINKED1
+watcher: EXITED (woke the supervisor)
+watcher stdout: signal: /tmp/fmlab.uGf9/state-target-competing/twk.turn-ended
+wake-queue: 1791344042 1 signal twk.turn-ended signal: /tmp/fmlab.uGf9/state-target-competing/twk.turn-ended
+1791344042 2 signal twk.turn-ended signal: /tmp/fmlab.uGf9/state-target-competing/twk.turn-ended
+triage log:

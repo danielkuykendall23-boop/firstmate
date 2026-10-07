@@ -1,0 +1,16 @@
+===== base (cc3fc4f)
+busy-state: v1 gen=g1791344010.51181.25659 seq=2 state=busy source=omp-ext event=turn-start ts=1791344010
+fm-crew-state: state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids: 
+watcher: EXITED (woke the supervisor)
+watcher stdout: signal: /tmp/fmlab.uGf9/state-base/twk.turn-ended
+wake-queue: 1791344014 1 signal twk.turn-ended signal: /tmp/fmlab.uGf9/state-base/twk.turn-ended
+1791344014 2 signal twk.turn-ended signal: /tmp/fmlab.uGf9/state-base/twk.turn-ended
+triage log:
+===== target (14e8668)
+busy-state: v1 gen=g1791344017.54733.20519 seq=2 state=busy source=omp-ext event=turn-start ts=1791344017
+fm-crew-state: state: working · source: pane · harness busy (omp-ext)
+watcher: still running (did not wake)
+watcher stdout: 
+wake-queue: 
+triage log:
+  [2026-10-06T23:33:40-0400] absorbed benign signal: /tmp/fmlab.uGf9/state-target/twk.turn-ended
