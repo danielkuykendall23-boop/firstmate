@@ -1312,14 +1312,35 @@ for (const { name, actual } of rows) {
     throw new Error(`${name} was not hidden before export rendering`);
   }
 }
+// Pi's /export builds its tool HTML renderer from one lookup dependency: Pi 1.0.0 and
+// older call it getToolDefinition, and Pi 1.0.1 renamed it getToolRenderers, which
+// AgentSession resolves through extension tool-renderer resolvers before the
+// registered tool. Firstmate registers no such resolver, so both names reach the
+// registered definition exactly as Pi's own export does. Every render must consult
+// the lookup, so a future rename fails here by name instead of reading as Calm hiding
+// a tool or letting the non-export check below pass without rendering anything.
+const piVersion = JSON.parse(readFileSync(`${packageRoot}/package.json`, "utf8")).version;
+function createExportHtmlRenderer() {
+  let consulted = false;
+  const lookup = (name) => {
+    consulted = true;
+    return tools.find((tool) => tool.name === name);
+  };
+  const renderer = createToolHtmlRenderer({ getToolDefinition: lookup, getToolRenderers: lookup, theme, cwd: process.cwd() });
+  const consulting = (render) => (...args) => {
+    consulted = false;
+    const html = render(...args);
+    if (!consulted) {
+      throw new Error(`Pi ${piVersion}'s HTML export renderer never looked up the tool it rendered; its createToolHtmlRenderer dependency changed`);
+    }
+    return html;
+  };
+  return { renderCall: consulting(renderer.renderCall), renderResult: consulting(renderer.renderResult) };
+}
 async function assertStockHtmlRendering(command, submitData) {
   editorText = command;
   terminalInputHandler(submitData);
-  const htmlRenderer = createToolHtmlRenderer({
-    getToolDefinition: (name) => tools.find((tool) => tool.name === name),
-    theme,
-    cwd: process.cwd(),
-  });
+  const htmlRenderer = createExportHtmlRenderer();
   const exportCases = [
     ...cases.filter(([toolName]) => toolName === "grep" || toolName === "find"),
     ["fm_watch_arm_pi", watchArgs, watchResult],
@@ -1346,11 +1367,7 @@ await assertStockHtmlRendering("/export calm.html", "\r");
 getKeybindings().setUserBindings({ "tui.input.submit": "alt+s" });
 editorText = "/export remapped.html";
 terminalInputHandler("\r");
-const unmatchedRenderer = createToolHtmlRenderer({
-  getToolDefinition: (name) => tools.find((tool) => tool.name === name),
-  theme,
-  cwd: process.cwd(),
-});
+const unmatchedRenderer = createExportHtmlRenderer();
 if (unmatchedRenderer.renderCall("unmatched-submit", "grep", { pattern: "alpha", path: "." })) {
   throw new Error("ordinary non-submit input activated HTML export rendering");
 }

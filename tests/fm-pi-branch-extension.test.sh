@@ -4526,6 +4526,7 @@ test_outcomes_tool_uses_stock_execution_and_export_consumers() {
   ln -s "$package_dir/node_modules/typebox" "$fixture/node_modules/typebox"
 
   out=$(cd "$fixture" && EXT="$fixture/.pi/extensions/fm-branch-supervision.ts" PI_PACKAGE_DIR="$package_dir" node --input-type=module 2>&1 <<'JS'
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const packageRoot = process.env.PI_PACKAGE_DIR;
@@ -4636,12 +4637,29 @@ if (JSON.stringify(actualRow.render(100)) !== JSON.stringify(stockRow.render(100
 }
 
 pi.events.emit("firstmate:calm-presentation", { active: true, stockExportRendering: true });
-const stockHtml = createToolHtmlRenderer({ getToolDefinition: () => stockDefinition, theme, cwd: process.cwd() });
-const actualHtml = createToolHtmlRenderer({ getToolDefinition: () => actualDefinition, theme, cwd: process.cwd() });
+// Pi 1.0.0 and older name the HTML exporter tool lookup getToolDefinition, and Pi
+// 1.0.1 renamed it getToolRenderers; supply both, and require the lookup to be
+// consulted so the all-undefined expectation below cannot pass on a renderer that
+// never reached either definition. This heredoc sits inside a command substitution,
+// where bash 3.2 still scans quotes, so it must stay free of unpaired apostrophes.
+const piVersion = JSON.parse(readFileSync(`${packageRoot}/package.json`, "utf8")).version;
+let exportLookups = 0;
+const exportHtmlRenderer = (definition) => {
+  const lookup = () => {
+    exportLookups += 1;
+    return definition;
+  };
+  return createToolHtmlRenderer({ getToolDefinition: lookup, getToolRenderers: lookup, theme, cwd: process.cwd() });
+};
+const stockHtml = exportHtmlRenderer(stockDefinition);
+const actualHtml = exportHtmlRenderer(actualDefinition);
 const stockCall = stockHtml.renderCall("stock-html", "fm_branch_outcomes", args);
 const actualCall = actualHtml.renderCall("actual-html", "fm_branch_outcomes", args);
 const stockResult = stockHtml.renderResult("stock-html", "fm_branch_outcomes", result.content, result.details, false);
 const actualResult = actualHtml.renderResult("actual-html", "fm_branch_outcomes", result.content, result.details, false);
+if (exportLookups !== 4) {
+  throw new Error(`Pi ${piVersion} HTML export renderer looked up ${exportLookups} of 4 tool renders; its createToolHtmlRenderer dependency changed`);
+}
 if (actualCall !== undefined || actualResult !== undefined || stockCall !== undefined || stockResult !== undefined) {
   throw new Error("stock export rendering did not delegate to Pi's structured fallback");
 }
