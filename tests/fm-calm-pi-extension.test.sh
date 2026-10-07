@@ -1800,7 +1800,9 @@ test_operational_followup_turn_e2e() {
   cp "$CALM_PREFERENCE" "$project/.pi/extensions/lib/fm-calm-preference.ts"
   cp "$WORKING_SHIP_SPRITE" "$project/.pi/extensions/lib/fm-calm-working-ship-sprite.ts"
   cp "$PI_OPERATIONAL_INPUT" "$project/.pi/extensions/lib/fm-operational-input.ts"
-  printf '%s\n' '{"followUpMode":"all"}' >"$config/settings.json"
+  # Pi 1.0.0 made fullscreen the default TUI mode; pin the regular mode fm-spawn.sh
+  # launches Pi in, so the transcript reaches the tmux pane and scrollback read here.
+  printf '%s\n' '{"followUpMode":"all","tuiMode":"regular"}' >"$config/settings.json"
 
   cat >"$project/followup-e2e.ts" <<'TS'
 import {
@@ -2178,7 +2180,9 @@ test_hidden_block_geometry_e2e() {
   cp "$WORKING_SHIP_SPRITE" "$project/.pi/extensions/lib/fm-calm-working-ship-sprite.ts"
   cp "$PI_OPERATIONAL_INPUT" "$project/.pi/extensions/lib/fm-operational-input.ts"
   printf '%s\n' on >"$home/config/calm"
-  printf '%s\n' '{"hideThinkingBlock":true,"terminal":{"clearOnShrink":false}}' >"$config/settings.json"
+  # Pi 1.0.0 made fullscreen the default TUI mode; pin the regular mode fm-spawn.sh
+  # launches Pi in, so the transcript reaches the tmux pane and scrollback read here.
+  printf '%s\n' '{"hideThinkingBlock":true,"tuiMode":"regular","terminal":{"clearOnShrink":false}}' >"$config/settings.json"
   printf '%s\n' 'tool result one' >"$project/probe-one.txt"
   printf '%s\n' 'tool result two' >"$project/probe-two.txt"
   cat >"$project/.agents/skills/ahoy/SKILL.md" <<'MD'
@@ -3622,7 +3626,9 @@ export default function (pi: ExtensionAPI): void {
 }
 TS
   printf '%s\n' '{"tui.input.submit":"alt+s"}' >"$config/keybindings.json"
-  printf '%s\n' '{"hideThinkingBlock":true}' >"$config/settings.json"
+  # Pi 1.0.0 made fullscreen the default TUI mode; pin the regular mode fm-spawn.sh
+  # launches Pi in, so the transcript reaches the tmux pane and scrollback read here.
+  printf '%s\n' '{"hideThinkingBlock":true,"tuiMode":"regular"}' >"$config/settings.json"
   now=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
   cat >"$session_file" <<JSON
 {"type":"session","version":3,"id":"11111111-1111-4111-8111-111111111111","timestamp":"$now","cwd":"$project"}
