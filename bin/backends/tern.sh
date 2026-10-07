@@ -69,10 +69,6 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 FM_BACKEND_TERN_MIN_MAJOR=0
 FM_BACKEND_TERN_MIN_MINOR=4
 
-# The plugin's published agent-state file is trusted only while this fresh;
-# the plugin rewrites it at least every 10 seconds while a window is open.
-FM_BACKEND_TERN_STATE_MAX_AGE="${FM_BACKEND_TERN_STATE_MAX_AGE:-30}"
-
 FM_BACKEND_TERN_BUNDLE_BIN="${FM_BACKEND_TERN_BUNDLE_BIN:-/Applications/Tern.app/Contents/MacOS/tern}"
 
 # fm_backend_tern_bin: the tern CLI - PATH first, then the app bundle.
@@ -493,17 +489,23 @@ fm_backend_tern_state_file() {
 
 # fm_backend_tern_plugin_state: the plugin's agent state for <block>
 # (working|idle|waiting_input|exited), or empty when the file is absent,
-# unparseable, older than FM_BACKEND_TERN_STATE_MAX_AGE seconds, or does not
-# list the block as an agent. Empty always means "no native evidence".
+# unparseable, written by a window that is no longer a running tern process
+# (closed window; an idle window rewrites nothing, so age proves nothing), or
+# does not list the block as an agent. Empty always means "no native evidence".
 fm_backend_tern_plugin_state() {  # <block>
-  local file now
+  local file pid state comm
   file=$(fm_backend_tern_state_file) || return 0
   [ -f "$file" ] || return 0
-  now=$(date +%s)
-  jq -r --arg b "$1" --argjson now "$now" --argjson max "$FM_BACKEND_TERN_STATE_MAX_AGE" '
-    select(.version == 1 and (.written_at | type) == "number" and ($now - .written_at) <= $max and ($now - .written_at) >= -5)
-    | .blocks[$b].agent // empty
-  ' "$file" 2>/dev/null
+  IFS=' ' read -r pid state <<EOF
+$(jq -r --arg b "$1" '
+    select(.version == 1 and (.window_pid | type) == "number")
+    | "\(.window_pid) \(.blocks[$b].agent // "")"
+  ' "$file" 2>/dev/null)
+EOF
+  [ -n "$pid" ] && [ -n "$state" ] || return 0
+  comm=$(ps -p "$pid" -o comm= 2>/dev/null) || return 0
+  [ "${comm##*/}" = tern ] || return 0
+  printf '%s\n' "$state"
 }
 
 # fm_backend_tern_busy_state: busy|idle|unknown from Tern's own agent state

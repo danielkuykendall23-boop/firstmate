@@ -116,13 +116,22 @@ set_process() {  # <block> <fg-name> <fg-argv0> [group]
     "$1" "${4:-999993}" "$2" "$3" >"$W/process/$1"
 }
 
-write_agents() {  # <written_at> <block> <agent-state|-> [version]
+write_agents() {  # <window_pid> <block> <agent-state|-> [version]
   local agent=$3
   if [ "$agent" = - ]; then
-    printf '{"version":%s,"written_at":%s,"blocks":{"%s":{"busy":false}}}' "${4:-1}" "$1" "$2" >"$W/agents.json"
+    printf '{"version":%s,"window_pid":%s,"blocks":{"%s":{"busy":false}}}' "${4:-1}" "$1" "$2" >"$W/agents.json"
   else
-    printf '{"version":%s,"written_at":%s,"blocks":{"%s":{"agent":"%s","busy":true}}}' "${4:-1}" "$1" "$2" "$agent" >"$W/agents.json"
+    printf '{"version":%s,"window_pid":%s,"blocks":{"%s":{"agent":"%s","busy":true}}}' "${4:-1}" "$1" "$2" "$agent" >"$W/agents.json"
   fi
+}
+
+# start_tern_window: a long-lived process whose command name is `tern`,
+# standing in for the Tern window that wrote agents.json. Sets WINDOW_PID.
+start_tern_window() {
+  mkdir -p "$W/window"
+  ln -sf "$(command -v sleep)" "$W/window/tern"
+  "$W/window/tern" 600 </dev/null >/dev/null 2>&1 &
+  WINDOW_PID=$!
 }
 
 ORIG_PATH=$PATH
@@ -368,47 +377,56 @@ test_agent_state_classifies_process() {
 }
 
 test_busy_state_reads_plugin_file() {
-  local out s b now
+  local out s b gone
   make_tern_world busy
   out=$(fm_backend_tern_create_task fm-a /work)
   read -r s b <<<"$out"
-  now=$(date +%s)
+  start_tern_window
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "no plugin file must read unknown"
   set_process "$b" omp omp
-  write_agents "$now" "$b" working
+  write_agents "$WINDOW_PID" "$b" working
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = busy ] || fail "working with a live omp must read busy"
-  write_agents "$now" "$b" idle
+  write_agents "$WINDOW_PID" "$b" idle
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = idle ] || fail "idle must read idle"
-  write_agents "$now" "$b" waiting_input
+  write_agents "$WINDOW_PID" "$b" waiting_input
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = idle ] || fail "waiting_input must read idle"
-  write_agents "$((now - 120))" "$b" working
-  [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a stale file must read unknown"
-  write_agents "$now" "$b" working 2
+  write_agents "$$" "$b" working
+  [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a file whose window pid is not a tern process must read unknown"
+  write_agents "$WINDOW_PID" "$b" working 2
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "an unknown file version must read unknown"
-  write_agents "$now" "$b" -
+  printf '{"version":1,"blocks":{"%s":{"agent":"working"}}}' "$b" >"$W/agents.json"
+  [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a file without a window pid must read unknown"
+  write_agents "$WINDOW_PID" "$b" -
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a block Tern does not list as an agent must read unknown"
   printf 'not json' >"$W/agents.json"
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a corrupt file must read unknown"
   set_process "$b" zsh /bin/zsh
-  write_agents "$now" "$b" working
+  write_agents "$WINDOW_PID" "$b" working
   [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a stale working flag over a bare shell must read unknown"
-  pass "busy_state: plugin working/idle/waiting_input map to busy/idle; absent, stale, corrupt, or shell-only read unknown"
+  set_process "$b" omp omp
+  gone=$WINDOW_PID
+  kill "$gone" 2>/dev/null
+  wait "$gone" 2>/dev/null
+  [ "$(fm_backend_busy_state tern "tern:$s/$b")" = unknown ] || fail "a file left by a closed window must read unknown"
+  pass "busy_state: plugin working/idle/waiting_input map to busy/idle while the writing window lives; closed-window, unversioned, corrupt, or shell-only read unknown"
 }
 
 test_busy_lib_trusts_tern_native_busy() {
-  local out s b now st
+  local out s b st
   make_tern_world busylib
   out=$(fm_backend_tern_create_task fm-a /work)
   read -r s b <<<"$out"
-  now=$(date +%s)
+  start_tern_window
   set_process "$b" omp omp
-  write_agents "$now" "$b" working
+  write_agents "$WINDOW_PID" "$b" working
   st="$W/state"
   mkdir -p "$st"
   # shellcheck source=/dev/null
   . "$ROOT/bin/fm-busy-lib.sh"
   out=$(fm_busy_classify tern "tern:$s/$b" omp fm-a "$st" "")
   [ "$out" = "busy tern-native" ] || fail "a recordless omp task with native working should classify 'busy tern-native', got '$out'"
+  kill "$WINDOW_PID" 2>/dev/null
+  wait "$WINDOW_PID" 2>/dev/null
   pass "fm-busy-lib: trusts Tern's native busy verdict the way it trusts Herdr's"
 }
 

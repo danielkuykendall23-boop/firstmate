@@ -31,12 +31,13 @@ tern plugin list   # firstmate-agents ... window  ready
 The plugin is optional: without it every backend operation still works, and busy state falls back to each harness's own lifecycle record and capture heuristics.
 With it:
 
-- it publishes Tern's agent state for every pane to `<plugins dir>/../plugin-data/firstmate-agents/agents.json` (on macOS `~/Library/Application Support/Tern/plugin-data/firstmate-agents/agents.json`), rewritten atomically on every change and at least every 10 seconds;
+- it publishes Tern's agent state for every pane to `<plugins dir>/../plugin-data/firstmate-agents/agents.json` (on macOS `~/Library/Application Support/Tern/plugin-data/firstmate-agents/agents.json`), rewritten atomically on every change and stamped with the pid of the window that wrote it;
 - it colors every `fm-*` task tab: blue while working, green when idle, orange when the agent waits for input or holds an unseen alert, red when it exited;
 - it adds a status-line segment counting working, idle, and waiting agents, and clicking it focuses the first agent that needs you.
 
 `FM_TERN_AGENT_STATE_FILE` overrides where the adapter reads that file.
-The adapter treats a file older than 30 seconds (`FM_BACKEND_TERN_STATE_MAX_AGE`) as absent, so a closed window or an unloaded plugin never reads as a live verdict.
+Tern runs a window plugin's timers only while the window is awake (pane output, input), so an idle window rewrites nothing and the file's age proves nothing.
+The adapter therefore treats the file as absent unless its `window_pid` is still a running `tern` process, so a closed window never reads as a live verdict; a plugin unloaded from a window that stays open leaves its last file in place until that window closes.
 
 ### Autostart
 

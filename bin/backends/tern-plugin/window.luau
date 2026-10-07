@@ -8,11 +8,13 @@
 -- bin/backends/tern.sh:
 --
 --   <tern.plugin.data>/agents.json
---   {"version":1,"written_at":<epoch s>,"blocks":{"<block id>":{...}}}
+--   {"version":1,"window_pid":<pid>,"blocks":{"<block id>":{...}}}
 --
--- written to a temporary file and renamed into place, on every change and at
--- least every HEARTBEAT_S seconds so the reader can treat an old file as
--- stale (no window open, plugin unloaded) instead of trusting it. Each block
+-- written to a temporary file and renamed into place on every change. Tern
+-- runs window timers only while the window is awake (pane output, input), so
+-- an idle window rewrites nothing and the file's age says nothing about its
+-- truth; the reader instead trusts it only while window_pid, the window that
+-- wrote it, is still a running tern process. Each block
 -- entry carries `agent` (Tern's agent state, absent for a pane that is not an
 -- agent), `shown` (the tab-bar state below), `busy`, `at_prompt`, `alert`,
 -- `exited`, `tab`, `tab_name` and `session`.
@@ -26,7 +28,6 @@
 -- those task tabs the alert is the signal that remains.
 
 local POLL_MS = 1000
-local HEARTBEAT_S = 10
 local STATE_PATH = tern.plugin.data .. "/agents.json"
 local TMP_PATH = STATE_PATH .. ".tmp"
 
@@ -38,7 +39,8 @@ local COLORS: { [string]: TabColor } = {
 }
 
 local last_signature = ""
-local last_write = 0
+local window_pid: number? = nil
+local pid_pending = false
 local moving = false
 local tab_colors: { [number]: string } = {}
 local counts = { working = 0, idle = 0, waiting = 0 }
@@ -146,11 +148,10 @@ local function scan(cx: WindowCx)
 	first_waiting = waiting_pane
 
 	local signature = table.concat(keys, ";")
-	local now = os.time()
-	if moving or (signature == last_signature and now - last_write < HEARTBEAT_S) then
+	if moving or window_pid == nil or signature == last_signature then
 		return
 	end
-	local body = tern.json.encode({ version = 1, written_at = now, blocks = blocks })
+	local body = tern.json.encode({ version = 1, window_pid = window_pid, blocks = blocks })
 	local ok, err = pcall(tern.fs.write, TMP_PATH, body)
 	if not ok then
 		tern.log.warn("firstmate-agents: write failed", err)
@@ -161,15 +162,36 @@ local function scan(cx: WindowCx)
 		moving = false
 		if result.status == 0 then
 			last_signature = signature
-			last_write = now
 		else
 			tern.log.warn("firstmate-agents: rename failed", result.stderr)
 		end
 	end)
 end
 
+-- A child's parent is this window process: the pid the reader checks.
+-- Looked up from the poll, not at load, which has its own tight budget.
+local function find_window_pid()
+	pid_pending = true
+	tern.process.run({ "/bin/sh", "-c", "echo $PPID" }, { timeout_ms = 5000 }, function(result, _cx)
+		pid_pending = false
+		local pid = tonumber((string.gsub(result.stdout, "%s", "")))
+		if result.status == 0 and pid ~= nil then
+			window_pid = pid
+		else
+			tern.log.warn("firstmate-agents: window pid unknown", result.stderr)
+		end
+	end)
+end
+
 local function tick(cx: WindowCx?)
 	tern.timer(POLL_MS, tick)
+	if window_pid == nil and not pid_pending then
+		local ok, err = pcall(find_window_pid)
+		if not ok then
+			pid_pending = false
+			tern.log.warn("firstmate-agents: window pid lookup failed", err)
+		end
+	end
 	if cx ~= nil then
 		local ok, err = pcall(scan, cx)
 		if not ok then
