@@ -71,6 +71,7 @@ done
 case "$out" in *$'\n'literal-then-key-captain*) ;; *) fail "capture did not show the command output: $out" ;; esac
 pass "real tern: literal text plus a separate Enter runs in the task shell and capture reads it"
 
+# shellcheck disable=SC2016 # The task shell, not this test, expands the loop.
 fm_backend_tern_send_text_line "$TARGET" 'for i in $(seq 1 60); do echo smoke-line-$i; done' "$LABEL" || fail "send_text_line failed"
 visible=
 for _ in 1 2 3 4 5 6 7 8 9 10; do

@@ -432,6 +432,7 @@ test_busy_lib_trusts_tern_native_busy() {
 
 # --- seams outside the adapter -----------------------------------------------
 
+# shellcheck disable=SC2016 # The child bash expands "$1" and the probe output.
 test_detection_innermost_wins() {
   local out
   out=$(env -u TMUX -u HERDR_ENV -u CMUX_WORKSPACE_ID TERN_PANE=11 TERM_PROGRAM=tern bash -c '. "$1"; fm_backend_detect >/dev/null; printf "%s %s" "$FM_BACKEND_DETECTED" "$FM_BACKEND_DETECT_SIGNAL"' _ "$ROOT/bin/fm-backend.sh")
@@ -489,6 +490,7 @@ test_explicit_target_routing() {
   pass "explicit targets: fm-send delivers to a live tern:<session>/<block>, refuses an exited one; tmux targets unchanged"
 }
 
+# shellcheck disable=SC2016 # The child bash expands "$1" and the probe output.
 test_supervisor_discovery() {
   local out
   out=$(env -u TMUX_PANE -u HERDR_ENV -u FM_SUPERVISOR_TARGET -u FM_SUPERVISOR_BACKEND TERN_PANE=11 TERM_PROGRAM=tern \
