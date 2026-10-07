@@ -1,0 +1,18 @@
+ok - create_task: first task creates the home session with its tab as the task tab; later tasks add tabs
+ok - create_task: refuses a duplicate task label (Tern enforces no tab-name uniqueness)
+ok - create_task: an existing empty session gets a new tab
+ok - parse_target: accepts tern:<session>/<block> and tern:/<block>, rejects tmux/herdr shapes and junk
+ok - target_ready: verifies the task label, recovers a moved block by label, rejects exited blocks
+ok - send: literal text after --, Tern key names, refuses a mismatched task tab
+ok - capture: scrollback trimmed locally; visible capture is the viewport; absent block fails
+ok - composer_state: classifies Tern's --ansi omp capture (idle hint empty, typed text pending, absent unknown)
+ok - kill: closes the task block; an already-gone block is a quiet success
+ok - kill: closes the task's exited kept-open block (by id or label), never another task's
+ok - kill: a recorded block reused by another task's tab is left alone
+ok - kill: a refused close or unreadable inventory is a failure, never a silent success
+ok - list_live: only fm-* tabs of this home's session
+ok - agent_state: process-level alive/dead/ambiguous, missing only from a readable inventory, absence never proven
+ok - busy_state: plugin working/idle/waiting_input map to busy/idle while the writing window lives; closed-window, unversioned, corrupt, or shell-only read unknown
+ok - fm-busy-lib: trusts Tern's native busy verdict the way it trusts Herdr's
+not ok - a freshly loaded window must publish agents.json as soon as window_pid is known, even with an empty (no agents, no fm-* tabs) signature; got write_count=0, harness output: RESULT_WRITE_COUNT=0
+RESULT_COMMITTED_BODY=

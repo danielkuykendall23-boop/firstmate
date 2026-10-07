@@ -1,0 +1,14 @@
+## isolated Tern: TERN_CONFIG_DIR=/tmp/fmtern.SS4a/cfg  TERN_DAEMON_SOCKET=/tmp/fmtern.SS4a/d.sock  (tern 0.5.3 (b7f1010))
+## step 1: seed OLD-format agents.json into the open window's plugin-data
+{"written_at":1759700000,"version":1}
+## step 2: relink the plugin from this worktree (reloads the daemon's plugins)
+unlinked firstmate-agents (/tmp/fmtern.SS4a/cfg/plugins/firstmate-agents.path)
+linked firstmate-agents 0.1.0 → /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4AACRW4X16X68PK6S0R0VF2/bin/backends/tern-plugin
+firstmate-agents 0.1.0 Firstmate agents — 0 blocks, 0 lenses, window  ready
+## step 3: agents.json after reload + ~6s
+{"blocks":{"5":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":6}},"version":1,"window_pid":5756}
+true
+current format: YES
+## window_pid process:
+  PID COMM
+ 5756 tern

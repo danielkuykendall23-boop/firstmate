@@ -1,0 +1,56 @@
+unlinked firstmate-agents (/tmp/fmtern.SS4a/cfg/plugins/firstmate-agents.path)
+linked firstmate-agents 0.1.0 → /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4AACRW4X16X68PK6S0R0VF2/bin/backends/tern-plugin
+after relink (target plugin):
+{"blocks":{"7":{"alert":false,"session":"Default","tab":8}},"version":1,"window_pid":5756}
+no change -> inode before=67705365 after=67705365 (same = not rewritten)
+tern new: new takes other arguments
+
+tern new session NAME [LAUNCH]            a session with one tab
+tern new tab [SESSION] [LAUNCH]           a tab (default: in the session shown)
+
+LAUNCH is [--cwd DIR] [--keep-open] [-- COMMAND...]; as in a window, a
+block whose program succeeds closes unless kept open.
+
+BLOCK is an id, @focused, a title or a program name, as SESSION/BLOCK to
+look in one session. --json prints what a command found or did as JSON.
+
+Every command works on one window's sessions: --window KEY's, else the
+window of the pane it runs in (its key is $TERN_WINDOW_KEY there), else
+the first window.
+
+`tern help` lists every command; `tern COMMAND --help` shows one.
+tern new: new takes other arguments
+
+tern new session NAME [LAUNCH]            a session with one tab
+tern new tab [SESSION] [LAUNCH]           a tab (default: in the session shown)
+
+LAUNCH is [--cwd DIR] [--keep-open] [-- COMMAND...]; as in a window, a
+block whose program succeeds closes unless kept open.
+
+BLOCK is an id, @focused, a title or a program name, as SESSION/BLOCK to
+look in one session. --json prints what a command found or did as JSON.
+
+Every command works on one window's sessions: --window KEY's, else the
+window of the pane it runs in (its key is $TERN_WINDOW_KEY there), else
+the first window.
+
+`tern help` lists every command; `tern COMMAND --help` shows one.
+Default (shown)
+  tab 1 (shown)
+       7  note.txt  /private/tmp/fmtern.SS4a  focused  gone
+after opening a new tab:
+{"blocks":{"7":{"alert":false,"session":"Default","tab":8}},"version":1,"window_pid":5756}
+inode now=67705365
+## open a new tab, then rename it fm-livecheck
+64424509442
+Default (shown)
+  tab 1 (shown)
+       7  note.txt  /private/tmp/fmtern.SS4a  focused  gone
+  tab 2
+    64424509442  /tmp/fmtern.SS4a  /tmp/fmtern.SS4a  80×24  focused
+tern rename SESSION|BLOCK NAME            a session, or a block's tab
+
+BLOCK is an id, @focused, a title or a program name, as SESSION/BLOCK to
+agents.json after new tab:
+{"blocks":{"64424509442":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":64424509441},"7":{"alert":false,"session":"Default","tab":8}},"version":1,"window_pid":5756}
+inode=67706098

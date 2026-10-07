@@ -1,0 +1,4 @@
+unlinked firstmate-agents (/tmp/fmtern.SS4a/cfg/plugins/firstmate-agents.path)
+linked firstmate-agents 0.1.0 → /private/tmp/fmtern.SS4a/base/bin/backends/tern-plugin
+BASE plugin, one-pane window:
+{"blocks":{"5":{"alert":false,"at_prompt":true,"busy":false,"session":"Default","tab":6}},"version":1,"window_pid":5756}
