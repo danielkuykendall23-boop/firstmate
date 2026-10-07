@@ -1,0 +1,45 @@
+== 1. home on Herdr (config/backend=herdr, lab session fm-lab-ternmix-39955-14665): spawn an in-flight worker
+rc=0
+spawned scout-herdr1 harness=bash kind=scout window=fm-lab-ternmix-39955-14665:w1:p2 worktree=/Users/danielkuykendall/.treehouse/proj-eadcaa/1/proj
+window=fm-lab-ternmix-39955-14665:w1:p2
+backend=herdr
+herdr_session=fm-lab-ternmix-39955-14665
+
+== 2. switch this home to Tern: config/backend=tern, spawn a new worker
+rc=0
+spawned scout-tern3 harness=bash kind=scout window=tern:firstmate-d69cfbc0/850403524610 worktree=/Users/danielkuykendall/.treehouse/proj-eadcaa/2/proj
+window=tern:firstmate-d69cfbc0/850403524610
+backend=tern
+tern_session=firstmate-d69cfbc0
+
+== 3. after the switch, fm-send by task id to the pre-existing Herdr worker and the new Tern worker
+fm-send: doorbell not typed because the agent in fm-lab-ternmix-39955-14665:w1:p2 has exited; the steer is durably recorded at /private/tmp/fmt2/home/state/scout-herdr1.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+rc=0
+fm-send: doorbell not typed because the agent in tern:firstmate-d69cfbc0/850403524610 has exited; the steer is durably recorded at /private/tmp/fmt2/home/state/scout-tern3.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+rc=0
+herdr pane fm-lab-ternmix-39955-14665:w1:p2 tail:
+danielkuykendall@Mac proj % export GOTMPDIR=/tmp/fm-scout-herdr1/gotmp
+FAKE-AGENT-UP
+tern block tail:
+danielkuykendall@Mac proj % export GOTMPDIR=/tmp/fm-scout-tern3/gotmp
+FAKE-AGENT-UP
+
+== 4. Tern tabs in the home session
+["fm-omp-probe","fm-scout-tern3"]
+== 5. explicit-target fm-send after the switch (config/backend=tern)
+$ fm-send.sh fm-lab-ternmix-39955-14665:w1:p2 still-on-herdr
+error: text not submitted to fm-lab-ternmix-39955-14665:w1:p2 (delivery unconfirmed; verdict=unknown; tried explicit target 'fm-lab-ternmix-39955-14665:w1:p2' matched /private/tmp/fmt2/home/state/scout-herdr1.meta; backend=herdr)
+$ fm-send.sh tern:firstmate-d69cfbc0/850403524610 now-on-tern
+error: text not submitted to tern:firstmate-d69cfbc0/850403524610 (delivery unconfirmed; verdict=unknown; tried explicit target 'tern:firstmate-d69cfbc0/850403524610' matched /private/tmp/fmt2/home/state/scout-tern3.meta; backend=tern)
+herdr pane read:
+danielkuykendall@Mac proj % export GOTMPDIR=/tmp/fm-scout-herdr1/gotmp
+GOT:still-on-herdr
+tern capture:
+danielkuykendall@Mac proj % export GOTMPDIR=/tmp/fm-scout-tern3/gotmp
+GOT:now-on-tern
+herdr agent_state(fm-lab-ternmix-39955-14665:w1:p2)=dead
+== 6. teardown both
+teardown scout-herdr1 complete (window fm-lab-ternmix-39955-14665:w1:p2, worktree /Users/danielkuykendall/.treehouse/proj-eadcaa/1/proj)
+teardown scout-tern3 complete (window tern:firstmate-d69cfbc0/850403524610, worktree /Users/danielkuykendall/.treehouse/proj-eadcaa/2/proj)
+tern tabs after: ["fm-omp-probe"]
+herdr lab panes after: 

@@ -1,0 +1,19 @@
+$ fm-spawn.sh scout-tern1 <proj> --scout --backend tern "bash -c ..."
+spawned scout-tern1 harness=bash kind=scout window=tern:firstmate-d69cfbc0/1159641169923 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj
+rc=0
+$ fm-spawn.sh scout-tern2 <proj> --scout --backend tern "bash -c ..."
+spawned scout-tern2 harness=bash kind=scout window=tern:firstmate-d69cfbc0/1322849927170 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/2/proj
+rc=0
+$ tern ls --json (summarised)
+{"name":"zz-fm-smoke-62979","shown":true,"tabs":[]}
+{"name":"firstmate-d69cfbc0","shown":false,"tabs":[{"name":"fm-scout-tern1","blocks":[{"id":1159641169923,"live":true}]},{"name":"fm-scout-tern2","blocks":[{"id":1322849927170,"live":true}]}]}
+--- /tmp/fmtl/t.9yqO/home/state/scout-tern1.meta
+window=tern:firstmate-d69cfbc0/1159641169923
+backend=tern
+tern_session=firstmate-d69cfbc0
+tern_block_id=1159641169923
+--- /tmp/fmtl/t.9yqO/home/state/scout-tern2.meta
+window=tern:firstmate-d69cfbc0/1322849927170
+backend=tern
+tern_session=firstmate-d69cfbc0
+tern_block_id=1322849927170

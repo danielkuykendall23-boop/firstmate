@@ -1,0 +1,17 @@
+$ FM_HOME=<isolated> bin/fm-send.sh tern:firstmate-d69cfbc0/871878361090 /hotkeys
+rc=0
+--- omp viewport after submit ---
+                           ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                           ▒▒  ██                  █
+                               ██       v18.6.1
+                          Tip: Please use nerdfont 😭.
+────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────
+ $ echo submitted-ok-from-fm-send
+ submitted-ok-from-fm-send
+────────────────────────────────────────────────────────────────────────────────
+❯
+ π · ◒ Opus 5.5 · 🗑 fmtl/t.9yqO/proj · ⑂ main · ◫ 1.2%/1M ⟲ · (sub)

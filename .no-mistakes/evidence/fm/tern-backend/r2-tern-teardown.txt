@@ -1,0 +1,22 @@
+== fm-teardown.sh scout-t1 --force 
+before: [{"name":"fm-scout-t1","b":[{"id":214748364803,"live":true,"exited":null,"keep_open":false}]},{"name":"fm-scout-t2","b":[{"id":377957122050,"live":true,"exited":3,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":588410519554,"live":true,"exited":null,"keep_open":false}]}]
+rc=0
+teardown: reaping leaked worktree process(es) for scout-t1: 38492 42130
+teardown: force-killing leaked worktree process(es) for scout-t1: 38492
+A new version of treehouse is available: v3.1.1 → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown scout-t1 complete (window tern:firstmate-d69cfbc0/214748364803, worktree /Users/danielkuykendall/.treehouse/proj-eadcaa/1/proj)
+after: [{"name":"fm-scout-t2","b":[{"id":377957122050,"live":true,"exited":3,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":588410519554,"live":true,"exited":null,"keep_open":false}]}]
+meta still present? no
+== fm-teardown.sh scout-t2 --force (exited, kept-open block)
+before: [{"name":"fm-scout-t2","b":[{"id":377957122050,"live":true,"exited":3,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":588410519554,"live":true,"exited":null,"keep_open":false}]}]
+rc=0
+A new version of treehouse is available: v3.1.1 → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown scout-t2 complete (window tern:firstmate-d69cfbc0/377957122050, worktree /Users/danielkuykendall/.treehouse/proj-eadcaa/2/proj)
+after: [{"name":"fm-omp-probe","b":[{"id":588410519554,"live":true,"exited":null,"keep_open":false}]}]
+meta still present? no

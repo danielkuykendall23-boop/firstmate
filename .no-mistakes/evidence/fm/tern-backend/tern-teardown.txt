@@ -1,0 +1,19 @@
+== A: teardown of a live Tern task
+before: [{"name":"fm-scout-tern1","b":[{"id":1159641169923,"live":true,"exited":null,"keep_open":false}]},{"name":"fm-scout-tern2","b":[{"id":1322849927170,"live":true,"exited":1,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":1503238553602,"live":true,"exited":null,"keep_open":false}]}]
+teardown: force-killing leaked worktree process(es) for scout-tern1: 71215
+🌳 Worktree returned to pool.
+teardown scout-tern1 complete (window tern:firstmate-d69cfbc0/1159641169923, worktree /private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj)
+Backlog: scout-tern1 just finished (this home keeps no markdown backlog at /private/tmp/fmtl/t.9yqO/home/data/backlog.md). Update /private/tmp/fmtl/t.9yqO/home/data/backlog.md - move scout-tern1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+rc=0
+after: [{"name":"fm-scout-tern2","b":[{"id":1322849927170,"live":true,"exited":1,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":1503238553602,"live":true,"exited":null,"keep_open":false}]}]
+meta still present? no
+
+== B: teardown of an exited, kept-open Tern task block
+ps: Invalid process id: null
+before: [{"name":"fm-scout-tern2","b":[{"id":1322849927170,"live":true,"exited":1,"keep_open":true}]},{"name":"fm-omp-probe","b":[{"id":1503238553602,"live":true,"exited":null,"keep_open":false}]}]
+
+🌳 Worktree returned to pool.
+teardown scout-tern2 complete (window tern:firstmate-d69cfbc0/1322849927170, worktree /private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/2/proj)
+Backlog: scout-tern2 just finished (this home keeps no markdown backlog at /private/tmp/fmtl/t.9yqO/home/data/backlog.md). Update /private/tmp/fmtl/t.9yqO/home/data/backlog.md - move scout-tern2 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+rc=0
+after: [{"name":"fm-omp-probe","b":[{"id":1503238553602,"live":true,"exited":null,"keep_open":false}]}]

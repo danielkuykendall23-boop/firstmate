@@ -1,0 +1,11 @@
+$ fm-send.sh tern:firstmate-d69cfbc0/438086664194 "hello-from-firstmate"
+error: text not submitted to tern:firstmate-d69cfbc0/438086664194 (delivery unconfirmed; verdict=unknown; tried explicit target 'tern:firstmate-d69cfbc0/438086664194' matched /tmp/fmtl/t.9yqO/home/state/scout-tern2.meta; backend=tern)
+rc=1
+$ tern capture (scout-tern2)
+danielkuykendall@Daniels-MacBook-Air-4 proj % . '/tmp/fm-scout-tern2+8f9835d433cd692835216dad1d5cf1e097b72836425a44044fc8ffd8a1fbfcd7/launch.s1791331930.1493.25863.sh'
+hello-from-firstmate
+GOT:hello-from-firstmate
+$ fm-send.sh fm-scout-tern1 "ping by task id"
+rc=0
+FAKE-AGENT-UP
+: Firstmate instruction waiting: list '/tmp/fmtl/t.9yqO/home/state/scout-tern1.inbox'/*.msg and, in numeric order, read and act on each, then mv each handled file to '/tmp/fmtl/t.9yqO/home/state/scout-tern1.inbox'/handled/.

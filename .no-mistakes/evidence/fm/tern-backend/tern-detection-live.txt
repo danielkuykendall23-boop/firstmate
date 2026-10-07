@@ -1,0 +1,5 @@
+inside Tern pane: TERN_PANE=1743756722178 TERM_PROGRAM=tern
+fm_backend_detect (plain Tern pane) -> tern
+fm_backend_detect (HERDR_ENV=1 nested) -> herdr
+fm_backend_detect (TMUX nested) -> tmux
+fm_backend_detect (TERN_PANE without TERM_PROGRAM=tern) -> 

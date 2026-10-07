@@ -1,0 +1,28 @@
+$ cat state/scout-tern1.meta
+window=tern:firstmate-d69cfbc0/261993005059
+endpoint_task_id=scout-tern1
+worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj
+project=/tmp/fmtl/t.9yqO/proj
+harness=bash
+kind=scout
+tasktmp=/tmp/fm-scout-tern1
+model=default
+effort=default
+spawn_gen=s1791331910.93159.3250
+backend=tern
+tern_session=firstmate-d69cfbc0
+tern_block_id=261993005059
+
+$ tern ls --json (firstmate session)
+{"name":"firstmate-d69cfbc0","shown":false,"tabs":[{"name":"fm-scout-tern1","blocks":[{"id":261993005059,"cwd":"/tmp/fmtl/t.9yqO/proj","live":true}]}]}
+$ tern capture 261993005059
+🌳 Setting up worktree...
+🌳 Entered worktree at /private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj. Type 'exit' to return.
+danielkuykendall@Daniels-MacBook-Air-4 proj % export GOTMPDIR=/tmp/fm-scout-tern1/gotmp
+danielkuykendall@Daniels-MacBook-Air-4 proj % export COMPACT_ADVISER_DISABLE=1
+danielkuykendall@Daniels-MacBook-Air-4 proj % export PI_TUI_NATIVE=0
+danielkuykendall@Daniels-MacBook-Air-4 proj % export FM_TASK_ID=scout-tern1
+danielkuykendall@Daniels-MacBook-Air-4 proj % . '/tmp/fm-scout-tern1+8f9835d433cd692835216dad1d5cf1e097b72836425a44044fc8ffd8a1fbfcd7/launch.s1791331910.93159.3250.sh'
+FAKE-AGENT-UP
+$ tern process
+{"pane":261993005059,"child":{"pid":93463,"name":"zsh","argv":["/bin/zsh","-l"],"cwd":"/private/tmp/fmtl/t.9yqO/proj"},"group":97360,"foreground":{"pid":97360,"name":"sleep","argv":["sleep","1800"],"cwd":"/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj"}}

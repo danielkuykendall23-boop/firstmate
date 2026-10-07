@@ -1,0 +1,5 @@
+== relaunched window pid 18924; window log:
+tern: control on /tmp/fmtern-iso/ctl.sock
+agents.json: {"window_pid":18924,"omp":"idle"}
+agents.json age=4s window_pid=18924
+tern:firstmate-d69cfbc0/588410519554: busy_state=idle agent_state=alive

@@ -1,0 +1,4 @@
+fresh file (age 2s): busy_state(omp tab)=unknown agent_state=alive
+  plugin entry: null
+fresh file: busy_state(scout-tern1 fake bash agent)=unknown agent_state=ambiguous
+idle window, file age 35s: busy_state(omp tab)=idle

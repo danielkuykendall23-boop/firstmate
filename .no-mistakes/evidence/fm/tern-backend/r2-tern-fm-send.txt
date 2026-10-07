@@ -1,0 +1,13 @@
+$ fm-send.sh tern:firstmate-d69cfbc0/377957122050 "hello-from-firstmate"
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: text not submitted to tern:firstmate-d69cfbc0/377957122050 (delivery unconfirmed; verdict=unknown; tried explicit target 'tern:firstmate-d69cfbc0/377957122050' matched /private/tmp/fmt2/home/state/scout-t2.meta; backend=tern)
+rc=1
+$ tern capture 377957122050 | tail -4
+danielkuykendall@Mac proj % . '/tmp/fm-scout-t2+acda6308b508dc5f85a62e242c9179b8ef7cae9eec9dc4199aefccadfe93bdeb/launch.s1791337479.42192.10914.sh'
+FAKE-AGENT-UP
+hello-from-firstmate
+GOT:hello-from-firstmate
+$ fm-send.sh tern:firstmate-d69cfbc0/999999 "x"   (unrecorded, nonexistent block)
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: explicit target 'tern:firstmate-d69cfbc0/999999' is not a live tern endpoint (tried meta=/private/tmp/fmt2/home/state/tern:firstmate-d69cfbc0/999999.meta; metadata window/terminal lookup; backend=tern). Use fm-<id> for a recorded task/lane, or pass a target whose backend endpoint can be verified.
+rc=1

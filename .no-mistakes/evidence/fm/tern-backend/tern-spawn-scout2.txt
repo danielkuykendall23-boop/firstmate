@@ -1,0 +1,3 @@
+spawned scout-tern2 harness=bash kind=scout window=tern:firstmate-d69cfbc0/438086664194 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/2/proj
+{"name":"zz-fm-smoke-62979","tabs":[]}
+{"name":"firstmate-d69cfbc0","tabs":["fm-scout-tern1","fm-scout-tern2"]}

@@ -1,0 +1,21 @@
+== 1. existing in-flight Herdr worker (spawned before the switch, in lab session fm-lab-ternmix-70917-7493)
+warning: herdr presentation parent is absent or ambiguous; using the ordinary flat layout without projection
+spawned scout-herdr1 harness=bash kind=scout window=fm-lab-ternmix-70917-7493:w1:p2 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj
+window=fm-lab-ternmix-70917-7493:w1:p2
+backend=herdr
+herdr_session=fm-lab-ternmix-70917-7493
+
+== 2. switch this home to Tern: config/backend=tern
+spawned scout-tern3 harness=bash kind=scout window=tern:firstmate-d69cfbc0/1769526525954 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/2/proj
+window=tern:firstmate-d69cfbc0/1769526525954
+backend=tern
+
+== 3. fm-send to the pre-existing Herdr worker after the switch
+error: text not submitted to fm-lab-ternmix-70917-7493:w1:p2 (delivery unconfirmed; verdict=unknown; tried explicit target 'fm-lab-ternmix-70917-7493:w1:p2' matched /private/tmp/fmtl/t.9yqO/home/state/scout-herdr1.meta; backend=herdr)
+rc=1
+still-on-herdr
+HERDR-GOT:still-on-herdr
+agent_state(herdr task)=dead
+
+== 4. Tern tab list
+["fm-omp-probe","fm-scout-tern3"]

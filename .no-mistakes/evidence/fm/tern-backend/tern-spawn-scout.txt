@@ -1,0 +1,1 @@
+spawned scout-tern1 harness=bash kind=scout window=tern:firstmate-d69cfbc0/261993005059 worktree=/private/tmp/fmtl/t.9yqO/proj/.treehouse/proj-3842c7/1/proj

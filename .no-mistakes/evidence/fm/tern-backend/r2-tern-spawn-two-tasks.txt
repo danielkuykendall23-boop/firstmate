@@ -1,0 +1,20 @@
+$ fm-spawn.sh scout-t1 <proj> --scout --backend tern 'bash -c ...'
+rc=0
+spawned scout-t1 harness=bash kind=scout window=tern:firstmate-d69cfbc0/214748364803 worktree=/Users/danielkuykendall/.treehouse/proj-eadcaa/1/proj
+$ fm-spawn.sh scout-t2 <proj> --scout --backend tern 'bash -c ...'
+rc=0
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+spawned scout-t2 harness=bash kind=scout window=tern:firstmate-d69cfbc0/377957122050 worktree=/Users/danielkuykendall/.treehouse/proj-eadcaa/2/proj
+$ tern ls --json (summarised)
+{"name":"Default","shown":true,"tabs":[{"name":null,"blocks":[{"id":5,"live":true}]}]}
+{"name":"firstmate-d69cfbc0","shown":false,"tabs":[{"name":"fm-scout-t1","blocks":[{"id":214748364803,"live":true}]},{"name":"fm-scout-t2","blocks":[{"id":377957122050,"live":true}]}]}
+--- state/scout-t1.meta
+window=tern:firstmate-d69cfbc0/214748364803
+backend=tern
+tern_session=firstmate-d69cfbc0
+tern_block_id=214748364803
+--- state/scout-t2.meta
+window=tern:firstmate-d69cfbc0/377957122050
+backend=tern
+tern_session=firstmate-d69cfbc0
+tern_block_id=377957122050

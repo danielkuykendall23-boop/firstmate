@@ -1,0 +1,17 @@
+== before closing the window
+agents.json age=181s window_pid=11767
+tern:firstmate-d69cfbc0/588410519554: busy_state=idle agent_state=alive
+== closing the isolated Tern window (pid 11767, ctl quit); daemon keeps the sessions
+window still running
+agents.json still present: {"window_pid":11767,"omp":"idle"}
+== reader with the writer window gone (agents.json read directly via FM_TERN_AGENT_STATE_FILE, since tern CLI needs a window)
+plugin_state(588410519554)=[idle] (empty = no native evidence)
+busy_state=idle
+== adversarial: file stamped with a live NON-tern pid (11570, this shell)
+plugin_state=[]
+== adversarial: legacy file with written_at and no window_pid
+plugin_state=[]
+== window pid 11767 terminated: gone
+agents.json left behind: {"window_pid":11767,"omp":"idle"}
+plugin_state(588410519554)=[]  (empty = stale file from a closed window not trusted)
+busy_state=unknown

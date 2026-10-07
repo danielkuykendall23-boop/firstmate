@@ -1,0 +1,19 @@
+home session=firstmate-d69cfbc0
+target=tern:firstmate-d69cfbc0/1503238553602
+agent_state(omp tab)=alive
+busy_state(omp tab)=unknown
+composer_state(omp idle)=empty
+composer_state(after typing)=pending
+composer_state(after ctrl+u)=empty
+agent_state(scout-tern1: sleep under bash launch)=missing
+--- omp viewport ---
+                           ▒▒  ██                  █
+                               ██       v18.6.1
+    Tip: With default keybindings, ⌃D deletes the character under the cursor
+        instead of quitting your draft — see /hotkeys for your exit key
+────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.7.0 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────
+❯                                                   ⇧⇥ to change thinking effort
+ π · ◒ Opus 5.5 · 🗑 fmtl/t.9yqO/proj · ⑂ main · ◫ 1.1%/1M ⟲ · (sub)

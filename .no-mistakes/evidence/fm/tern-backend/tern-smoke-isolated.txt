@@ -1,0 +1,7 @@
+ok - real tern: create_task makes an unshown session/tab named for the task and refuses a duplicate
+ok - real tern: target_ready accepts the task's own tab and rejects a mismatched label
+ok - real tern: literal text plus a separate Enter runs in the task shell and capture reads it
+ok - real tern: visible capture is the viewport only; capture includes scrollback
+ok - real tern: current_path follows the foreground process's live cwd
+ok - real tern: a bare shell reads agent_state dead and busy_state unknown
+ok - real tern: kill closes the block, reads missing afterwards, and is idempotent

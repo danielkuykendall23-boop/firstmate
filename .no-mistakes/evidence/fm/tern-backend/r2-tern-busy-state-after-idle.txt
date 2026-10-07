@@ -1,0 +1,15 @@
+agents.json mtime at start: 1791337512  window_pid=11767 (/Applications/Tern.app/Contents/MacOS/tern)
+window left idle 95s (no CLI calls)...
+agents.json mtime after idle: 1791337512  (file age now 116s; unchanged=yes)
+/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M49TTAVMM4YD10WK4KMW6ET3/bin/backends/tern.sh:.:62: no such file or directory: /Users/danielkuykendall/.no-mistakes/worktrees/bin/fm-backend-hometag-lib.sh
+/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M49TTAVMM4YD10WK4KMW6ET3/bin/backends/tern.sh:.:64: no such file or directory: /Users/danielkuykendall/.no-mistakes/worktrees/bin/fm-composer-lib.sh
+/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M49TTAVMM4YD10WK4KMW6ET3/bin/backends/tern.sh:.:66: no such file or directory: /Users/danielkuykendall/.no-mistakes/worktrees/bin/fm-agent-process-lib.sh
+busy_state(tern:firstmate-d69cfbc0/588410519554 omp idle) = idle
+fm_backend_tern_agent_state:13: command not found: fm_agent_process_classify
+fm_backend_tern_agent_state:23: command not found: fm_agent_process_classify
+agent_state(omp tab) = ambiguous
+busy_state(scout-t1, launch-file worker) = unknown
+== window idle for ~95s with no CLI calls; agents.json mtime unchanged (see above)
+agents.json age=125s window_pid=11767
+tern:firstmate-d69cfbc0/588410519554: busy_state=idle agent_state=alive
+tern:firstmate-d69cfbc0/214748364803: busy_state=unknown agent_state=dead
