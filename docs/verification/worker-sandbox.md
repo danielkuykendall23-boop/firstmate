@@ -100,6 +100,18 @@ Not proven live: a fenced `no-mistakes axi run` on an already-pushed branch, and
 `tests/fm-worker-sandbox.test.sh` pins both with real writes: a gate fetch in the same shape into `refs/no-mistakes/fetch/<n>-<n>` and its deletion, and a lab directory under the name `bin/fm-herdr-lab.sh name` derives, each beside a denied neighbour (another `refs/no-mistakes/` ref, another lab session, and the default session's `session.json`).
 A real lab session directory holds `herdr-client.log`, `herdr-server.log`, and `session.json`, all inside that directory.
 
+## ONNX Runtime telemetry stamp (2026-10-07)
+
+Verified on omp 18.6.1 with its tiny-model runtime's onnxruntime-node 1.30.0, under a profile from `bin/fm-worker-sandbox.sh profile --id lab-<n> --harness omp ...` for a throwaway linked worktree, each run as `/usr/bin/sandbox-exec -f <profile> /bin/sh -c '<prefix> omp --config .omp/fm-worker-overlay.yml --auto-approve --cwd <worktree> <brief>'` with no other tiny-model worker running.
+omp started `omp __omp_worker_tiny_inference` with the worktree as its cwd, and the fence refused that worker's telemetry database under `~/Library/Application Support/Microsoft/DeveloperTools/.onnxruntime`.
+
+```text
+without ORT_DISABLE_TELEMETRY:  git status --porcelain -> ?? :memory:.ses   (51 bytes: epoch milliseconds, then a UUID)
+with ORT_DISABLE_TELEMETRY=1:   git status --porcelain -> (empty), tiny worker still loaded libonnxruntime
+```
+
+The stray file made `bin/fm-teardown.sh` refuse cleanup of finished work, so every omp launch from `bin/fm-spawn.sh` carries `ORT_DISABLE_TELEMETRY=1`; `tests/fm-omp-harness.test.sh` runs the staged launch and pins a clean worktree.
+
 ## Live proof (original writable set)
 
 A throwaway Firstmate home held `config/worker-sandbox` set to `on` and a two-file project.
