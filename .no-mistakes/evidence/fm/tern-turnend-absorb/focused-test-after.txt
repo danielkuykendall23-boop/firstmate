@@ -1,0 +1,6 @@
+ok - a capped overview with no repo: line and zero same-branch rows reports absent, not unreadable
+ok - no run for this branch beside a live run elsewhere reads absent, not unreadable
+ok - a linked task worktree resolves its runs through the main worktree registration
+ok - the capped inventory reader is bounded by the crew read budget
+ok - a worktree spelling the inventory does not record reads unreadable
+FOCUSED-OK

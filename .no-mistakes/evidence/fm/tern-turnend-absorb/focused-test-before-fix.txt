@@ -1,0 +1,5 @@
+ok - a capped overview with no repo: line and zero same-branch rows reports absent, not unreadable
+ok - no run for this branch beside a live run elsewhere reads absent, not unreadable
+not ok - a linked task worktree with no run is not an unreadable inventory (unexpected: 'unreadable')
+--- output ---
+state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids: 

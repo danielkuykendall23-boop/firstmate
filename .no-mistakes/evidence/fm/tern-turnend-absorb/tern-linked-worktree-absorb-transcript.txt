@@ -1,0 +1,28 @@
+# Isolated Tern daemon (TERN_DAEMON_SOCKET=/tmp/fmlive/tern.sock), block tern:fm-lab-ternabsorb2/21474836483 running foreground process 'omp'
+tern 0.5.3 (b7f1010)
+{"pane":21474836483,"foreground":{"name":"omp"}}
+# Task worktree is a LINKED git worktree; disposable NM_HOME sqlite registers only the MAIN worktree, 11 other-branch runs, capped overview shows 10
+
+=== BEFORE FIX (base 214180d), linked worktree, no run of its own ===
+case=single  bin=/tmp/fmlive/base/bin
+busy-state: v1 gen=g1791348015.26605.2619 seq=2 state=busy source=omp-ext event=agent_start ts=1791348015 
+fm-crew-state.sh: state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids: 
+watcher crew_is_provably_working: NO -> turn-end surfaces to primary
+
+=== AFTER FIX (1756947), linked worktree, no run of its own ===
+case=single  bin=/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4AACXHADAD16FP72ZWDRRJE/bin
+busy-state: v1 gen=g1791348016.26810.30670 seq=2 state=busy source=omp-ext event=agent_start ts=1791348016 
+fm-crew-state.sh: state: working · source: pane · harness busy (omp-ext)
+watcher crew_is_provably_working: YES -> turn-end absorbed
+
+=== AFTER FIX, adversarial: two hidden live runs on this branch filed under main worktree ===
+case=competing  bin=/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4AACXHADAD16FP72ZWDRRJE/bin
+busy-state: v1 gen=g1791348016.27137.31772 seq=2 state=busy source=omp-ext event=agent_start ts=1791348016 
+fm-crew-state.sh: state: unknown · source: run-step · competing live runs; run ids: 01HIDDEN1, 01HIDDEN0
+watcher crew_is_provably_working: NO -> turn-end surfaces to primary
+
+=== AFTER FIX, adversarial: both main and linked paths registered as distinct repos ===
+case=dual  bin=/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4AACXHADAD16FP72ZWDRRJE/bin
+busy-state: v1 gen=g1791348017.27353.15669 seq=2 state=busy source=omp-ext event=agent_start ts=1791348017 
+fm-crew-state.sh: state: unknown · source: run-step · complete same-branch run inventory unreadable; run ids: 
+watcher crew_is_provably_working: NO -> turn-end surfaces to primary
