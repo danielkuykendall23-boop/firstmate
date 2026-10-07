@@ -17,7 +17,7 @@ Pi 0.81.1 was installed when Calm was first built, and Pi 0.82.0 was the later r
 The inspected Pi CHANGELOG shows no relevant presentation API introduced at either version, so those versions remain verification evidence rather than compatibility bounds.
 The exported classes used by the adapters (`AssistantMessageComponent` and `InteractiveMode`) are undocumented internals with no stated version guarantee.
 `tests/fm-calm-pi-extension.test.sh` records the installed Pi version as evidence without gating on it and covers both newer synthetic versions and an unavailable adapter seam.
-The [2026-09-29 record](verification/runtime-backends.md#2026-09-29-pi-renderer-and-export-compatibility) records the current outcome-renderer and export-visibility checks.
+The [2026-10-06 record](verification/runtime-backends.md#2026-10-06-pi-renderer-and-export-compatibility) records the current outcome-renderer and export-visibility checks.
 
 ### Built-in tool override constraints
 
@@ -534,7 +534,7 @@ FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=30 duration_ms=277700 fai
 Pi 0.84.4's stock `ToolExecutionComponent` collapses a text result longer than ten lines, adds Pi's expansion hint, and renders every line when expanded, while the previously verified Pi 0.81.1 stock fallback renders every line in both states.
 The `fm_branch_outcomes` self-renderer now probes the installed component's rendered capability once rather than branching on a version number, then applies that discovered preview policy while preserving Pi's exact expanded result.
 Calm still hides the complete row while active, restores the probed stock behavior when turned off, and delegates stock HTML export rendering to Pi.
-The [2026-09-29 record](verification/runtime-backends.md#2026-09-29-pi-renderer-and-export-compatibility) supersedes that probe: the renderer now delegates to Pi's installed `ToolExecutionComponent`.
+The [2026-10-06 record](verification/runtime-backends.md#2026-10-06-pi-renderer-and-export-compatibility) supersedes that probe: the renderer now delegates to Pi's installed `ToolExecutionComponent`.
 
 The real installed-package comparison and the portable legacy-capability case are both executable through:
 

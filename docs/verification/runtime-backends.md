@@ -1960,14 +1960,24 @@ FM_TEST_END 2026-08-29T01:01:01Z tests/fm-pi-branch-live-e2e.test.sh exit=0 dura
 
 The focused extension suite also exercised the installed Pi 0.84.4 picker and outcome-renderer consumers; [`calm-mode-feasibility.md`](../calm-mode-feasibility.md#2026-08-28-pi-0844-outcome-renderer-compatibility-verification) owns the version-scoped renderer evidence.
 
-### 2026-09-29 Pi renderer and export compatibility
+### 2026-10-06 Pi renderer and export compatibility
 
-On macOS arm64 with Node 24.11.1, the real stock-consumer scenario from `tests/fm-pi-branch-extension.test.sh` passed against independently installed Pi 0.87.1 and 0.99.1.
-It exercises collapsed and expanded output, Calm toggles, a row created while Calm is active, error colors, and HTML-renderer fallback.
+On macOS arm64 with Node 24.11.1, tmux 3.5a, and Google Chrome 154.0.8037.98, the complete `tests/fm-calm-pi-extension.test.sh` and `tests/fm-pi-branch-extension.test.sh` suites passed against independently installed Pi 0.99.2, 1.0.0, and 1.0.4, each run with that version's own `pi` first on `PATH`.
+They exercise collapsed and expanded output, Calm toggles, a row created while Calm is active, error colors, HTML-renderer fallback, and a real `/export` from the Pi TUI whose tool HTML and headless-Chrome visibility are both asserted.
 The outcomes renderer delegates to the installed stock component rather than copying its title or preview format.
-Real headless Chrome exports from both versions passed the browser-visibility assertions from `tests/fm-calm-pi-extension.test.sh`; making the hidden operational message visible deliberately failed that same assertion.
-The full two shell suites could not initialize in the worker sandbox because process-identity inspection was denied, so these are focused consumer and browser probes, not full-suite results.
-Refresh complete coverage with `bin/fm-test-run.sh tests/fm-pi-branch-extension.test.sh tests/fm-calm-pi-extension.test.sh` outside that restriction.
+
+Pi 1.0.1 renamed the HTML exporter's tool-lookup dependency from `getToolDefinition` to `getToolRenderers`, which `AgentSession` resolves through extension `registerToolRenderer` resolvers before the registered tool definition.
+Firstmate registers no such resolver, so Pi's own `/export` still reaches Calm's built-in wrappers and the Firstmate tool renderers unchanged.
+Both suites also build that renderer directly, so they supply both dependency names and require every render to consult the lookup.
+A fixture passing only `getToolDefinition` read Pi 1.0.1 and newer as Calm dropping `grep` from `/export`, and let the outcomes export-fallback check pass without reaching either definition.
+
+```text
+$ FM_PI_PACKAGE_DIR=<Pi 1.0.4> tests/fm-calm-pi-extension.test.sh
+ok - Pi calm centralizes transcript visibility, preserves execution/export data, keeps Pi's stock working row visible while no run is active, and persists its choice across session starts
+ok - Pi calm native E2E replaces the stock working row with a moving, resize-clamped working ship that freezes and resumes across two working periods in one Pi session, clears on abort, keeps captain turns visible, hides exact operational user rows without changing persistence, restores stock rendering Calm-off, survives restart, and preserves export plus Ctrl+O behavior
+$ FM_PI_PACKAGE_DIR=<Pi 1.0.4> tests/fm-pi-branch-extension.test.sh
+ok - fm_branch_outcomes hides through ToolExecutionComponent while Calm-off and HTML export stay stock
+```
 
 Strict type compatibility was also checked with:
 
@@ -1976,8 +1986,8 @@ FM_PI_PACKAGE_DIR=<installed Pi package> npm exec --yes --package=typescript@5.9
 ```
 
 ```text
-ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.84.4
-ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.1
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 0.99.2
+ok - tracked Pi extensions pass strict no-emit typecheck against Pi 1.0.4
 ```
 
 ### 2026-08-29 deterministic captain-outcome delivery
