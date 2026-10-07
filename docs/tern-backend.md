@@ -42,7 +42,7 @@ The adapter therefore treats the file as absent unless its `window_pid` is still
 ### Autostart
 
 `bin/fm-tern-autostart.sh` is the Tern counterpart of a Herdr login launcher.
-It waits for Tern, then leaves one `First Mate` session holding a `First Mate` tab running the omp primary at the Firstmate workspace and a `Quota` tab running `quota-axi --tui --refresh 1m`.
+It waits for Tern, then leaves one `First Mate` session holding a `First Mate` tab running the omp primary at the Firstmate workspace and, when `quota-axi` is installed, a `Quota` tab running `quota-axi --tui --refresh 1m`.
 It is idempotent: a primary already running at the workspace in any session is adopted, and an existing Quota tab is kept.
 Its header owns the flags and environment overrides, and it logs to `~/Library/Logs/fm-tern-autostart.log` on macOS.
 
@@ -79,6 +79,7 @@ The away-mode daemon's supervisor-pane discovery follows the same order and comp
 ## Task shape and metadata
 
 Each Firstmate home owns one Tern session named by the shared home tag, `firstmate-<hash>` or `2ndmate-<id>-<hash>`, from `bin/fm-backend-hometag-lib.sh`.
+`FM_TERN_SESSION` overrides that name.
 Tern enforces unique session names, so the session scopes task tab names to one home and one installation.
 The first task of a home creates the session and its first tab becomes that task's tab; later tasks add tabs.
 Each task tab is named with the caller-facing `fm-<id>` label.
