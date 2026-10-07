@@ -79,19 +79,23 @@
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
 #   config/backend, then runtime auto-detection from the runtime firstmate's
-#   environment: $TMUX, HERDR_ENV=1, or cmux runtime signals (via
-#   bin/fm-backend.sh's fm_backend_detect, with cmux fallback details in
-#   docs/cmux-backend.md),
+#   environment: $TMUX, HERDR_ENV=1, $TERN_PANE with TERM_PROGRAM=tern, or cmux
+#   runtime signals (via bin/fm-backend.sh's fm_backend_detect, with cmux
+#   fallback details in docs/cmux-backend.md),
 #   then tmux.
 #   Spawn-capable backends are the reference tmux adapter, verified herdr
-#   adapter, and experimental zellij, orca, and cmux adapters. Orca owns both
-#   the task worktree and terminal, so ship/scout Orca spawns do not run
-#   treehouse get; cmux is a session provider only, exactly like herdr/zellij,
-#   so it does. Auto-detected herdr stays silent like tmux; auto-detected cmux
-#   prints a loud stderr notice; zellij and orca are never auto-detected.
+#   adapter, and experimental zellij, orca, cmux, and tern adapters. Orca owns
+#   both the task worktree and terminal, so ship/scout Orca spawns do not run
+#   treehouse get; cmux and tern are session providers only, exactly like
+#   herdr/zellij, so they do. Auto-detected herdr stays silent like tmux;
+#   auto-detected cmux and tern print a loud stderr notice; zellij and orca are
+#   never auto-detected.
 #   codex-app is not a known backend yet; docs/codex-app-backend.md owns that
 #   blocked backend contract. Default tmux spawns do not write backend= to meta;
-#   absent backend= means tmux. cmux does not support --secondmate spawns yet.
+#   absent backend= means tmux. cmux and tern do not support --secondmate
+#   spawns yet. A tern task pane gets PI_TUI_NATIVE=0 exported before launch so
+#   pi and omp draw a capturable terminal UI instead of Tern-native surfaces
+#   (docs/tern-backend.md).
 #   A backend spawn refusal (missing dependency, version gate, unauthenticated
 #   socket, or unsupported secondmate mode) is terminal for that selected backend;
 #   callers must surface it instead of silently retrying another backend.
@@ -280,7 +284,9 @@
 #   LANG LC_ALL LC_CTYPE TMPDIR TMP TEMP GOTMPDIR, plus backend identity/routing:
 #   TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH HERDR_PANE_ID
 #   CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID CMUX_SOCKET_PATH
-#   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION, plus the task
+#   ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION TERN_PANE
+#   TERN_PANE_SOCKET TERN_WINDOW_KEY TERN_WINDOW_SOCKET, plus Tern's
+#   PI_TUI_NATIVE render switch (exported only in Tern task panes), plus the task
 #   marker FM_TASK_ID that ship and scout panes receive above, plus the
 #   compact-adviser kill switch COMPACT_ADVISER_DISABLE, which the floor also
 #   pins to 1 with a literal assignment so it survives the cleared environment
@@ -1573,6 +1579,10 @@ if [ "$RELAUNCH" -eq 0 ]; then
     echo "error: backend=cmux does not support --secondmate spawns yet" >&2
     exit 1
   fi
+  if [ "$BACKEND" = tern ] && [ "$KIND" = secondmate ]; then
+    echo "error: backend=tern does not support --secondmate spawns yet" >&2
+    exit 1
+  fi
   if [ "$BACKEND" = orca ]; then
     fm_backend_orca_runtime_check || exit 1
   fi
@@ -1624,7 +1634,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   fm_backend_validate_spawn "$BACKEND" || exit 1
   fm_backend_source "$BACKEND" || exit 1
   # A relaunch must PROVE the previous agent is gone before it launches another
-  # one into the same endpoint, and only tmux and herdr have a recovery-grade
+  # one into the same endpoint, and only tmux, herdr, and tern have a recovery-grade
   # classifier that can (bin/fm-control-lib.sh owns that capability table).
   fm_control_backend_state_verified "$BACKEND" || {
     echo "error: backend '$BACKEND' has no recovery-grade agent-state classifier, so a relaunch cannot prove the previous agent exited; refusing rather than risking two agents in one endpoint" >&2
@@ -1721,6 +1731,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     HERDR_WORKSPACE_ID=$(fm_meta_get "$RELAUNCH_META" herdr_workspace_id)
     HERDR_TAB_ID=$(fm_meta_get "$RELAUNCH_META" herdr_tab_id)
     HERDR_PANE_ID=$(fm_meta_get "$RELAUNCH_META" herdr_pane_id)
+  fi
+  if [ "$BACKEND" = tern ]; then
+    TERN_SES=$(fm_meta_get "$RELAUNCH_META" tern_session)
+    TERN_BLOCK_ID=$(fm_meta_get "$RELAUNCH_META" tern_block_id)
   fi
   # With no explicit harness, a relaunch reuses the harness already recorded
   # for this task. It must NOT fall through to the fresh-spawn config
@@ -3520,6 +3534,18 @@ EOF
     fi
     T="$CMUX_WORKSPACE_ID:$CMUX_SURFACE_ID"
     ;;
+  tern)
+    fm_backend_tern_container_ensure >/dev/null || exit 1
+    TERN_TASK_IDS=$(fm_backend_tern_create_task "$W" "$PROJ_ABS") || exit 1
+    read -r TERN_SES TERN_BLOCK_ID <<EOF
+$TERN_TASK_IDS
+EOF
+    if [ -z "$TERN_SES" ] || [ -z "$TERN_BLOCK_ID" ]; then
+      echo "error: tern did not return a session/block id for $W" >&2
+      exit 1
+    fi
+    T="tern:$TERN_SES/$TERN_BLOCK_ID"
+    ;;
   orca)
     set +e
     ORCA_WT_RAW=$(fm_backend_orca_worktree_create "$PROJ_ABS" "$W")
@@ -3565,6 +3591,7 @@ spawn_send_text_line() { # <target> <text>
   zellij) fm_backend_zellij_send_text_line "$1" "$2" "$W" ;;
   orca) fm_backend_orca_send_text_line "$1" "$2" ;;
   cmux) fm_backend_cmux_send_text_line "$1" "$2" "$W" ;;
+  tern) fm_backend_tern_send_text_line "$1" "$2" "$W" ;;
   esac
 }
 spawn_current_path() { # <target>
@@ -3573,6 +3600,7 @@ spawn_current_path() { # <target>
   herdr) fm_backend_herdr_current_path "$1" ;;
   zellij) fm_backend_zellij_current_path "$1" "$W" ;;
   cmux) fm_backend_cmux_current_path "$1" "$W" ;;
+  tern) fm_backend_tern_current_path "$1" "$W" ;;
   esac
 }
 spawn_send_literal() { # <target> <text>
@@ -3582,6 +3610,7 @@ spawn_send_literal() { # <target> <text>
   zellij) fm_backend_zellij_send_literal "$1" "$2" "$W" ;;
   orca) fm_backend_orca_send_literal "$1" "$2" ;;
   cmux) fm_backend_cmux_send_literal "$1" "$2" "$W" ;;
+  tern) fm_backend_tern_send_literal "$1" "$2" "$W" ;;
   esac
 }
 spawn_send_key() { # <target> <key>
@@ -3591,6 +3620,7 @@ spawn_send_key() { # <target> <key>
   zellij) fm_backend_zellij_send_key "$1" "$2" "$W" ;;
   orca) fm_backend_orca_send_key "$1" "$2" ;;
   cmux) fm_backend_cmux_send_key "$1" "$2" "$W" ;;
+  tern) fm_backend_tern_send_key "$1" "$2" "$W" ;;
   esac
 }
 
@@ -4539,7 +4569,7 @@ preserve_relaunch_meta() {
   # the same owned-but-unechoed technique `traceparent` already uses above.
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx secondmate_stopped_by secondmate_stopped_at", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo tasktmp model effort busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id tern_session tern_block_id home projects control_relaunch_tx secondmate_stopped_by secondmate_stopped_at", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -4582,6 +4612,10 @@ preserve_relaunch_meta() {
   if [ "$BACKEND" = cmux ]; then
     echo "cmux_workspace_id=$CMUX_WORKSPACE_ID"
     echo "cmux_surface_id=$CMUX_SURFACE_ID"
+  fi
+  if [ "$BACKEND" = tern ]; then
+    echo "tern_session=$TERN_SES"
+    echo "tern_block_id=$TERN_BLOCK_ID"
   fi
   if [ "$KIND" = secondmate ]; then
     echo "home=$PROJ_ABS"
@@ -4826,6 +4860,14 @@ spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=1"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi
+# Tern: omp and pi detect Tern and render natively through its surface
+# protocol, which `tern capture` cannot read, so every composer guard and
+# submit acknowledgement would read unknown. PI_TUI_NATIVE=0 keeps them on an
+# ordinary terminal UI (docs/tern-backend.md "Native rendering"); other
+# harnesses ignore it.
+if [ "$BACKEND" = tern ]; then
+  spawn_send_text_line "$T" "export PI_TUI_NATIVE=0"
+fi
 # Mark the pane as a task worker so bin/fm-test-run.sh can refuse to run the
 # suite in the repository's primary checkout. Ship and scout workers are the
 # ones assigned an isolated worktree; a secondmate runs its own home instead.
@@ -4867,6 +4909,7 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
     TMPDIR TMP TEMP GOTMPDIR TMUX TMUX_PANE HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH \
     HERDR_PANE_ID CMUX_WORKSPACE_ID CMUX_SURFACE_ID CMUX_TAB_ID CMUX_PANEL_ID \
     CMUX_SOCKET_PATH ZELLIJ ZELLIJ_SESSION_NAME ZELLIJ_PANE_ID FM_ZELLIJ_SESSION \
+    TERN_PANE TERN_PANE_SOCKET TERN_WINDOW_KEY TERN_WINDOW_SOCKET PI_TUI_NATIVE \
     FM_TASK_ID COMPACT_ADVISER_DISABLE LAVISH_AXI_HOST \
     $LAUNCH_ENV_NAMES; do
     # Only validated names enter shell syntax. Values expand once, quoted, in
