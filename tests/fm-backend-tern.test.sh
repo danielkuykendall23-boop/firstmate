@@ -9,8 +9,8 @@
 # test is tests/fm-backend-tern-smoke.test.sh.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found (required by the tern adapter)"; exit 0; }
 
@@ -451,6 +451,7 @@ run_plugin_harness() {
   harness="$dir/harness.luau"
   cat >"$harness" <<'LUA'
 local FAKE_PID = 54321
+local PID_STATUS = 0
 local COST = { spawn = 33, encode = 14, write = 8, panes = 2, tabs = 1, call = 0.1 }
 local now = 0
 local seq = 0
@@ -533,6 +534,7 @@ tern = {
           cb(result, CX)
         end)
       else
+        result.status = PID_STATUS
         result.stdout = tostring(FAKE_PID) .. "\n"
         schedule(5, "process", function() cb(result, CX) end)
       end
@@ -636,6 +638,30 @@ print("RESULT_COMMITTED_BODY=" .. (committed_body or ""))
   pass "window.luau plugin: with 40 busy worker tabs every hook stays under Tern's 50 ms budget (longest ${max} ms) and the final state is published and coloured"
 }
 
+# test_plugin_scans_while_pid_lookup_fails: a timer call that spawns the
+# window-pid lookup skips its scan, so a lookup that keeps failing must not be
+# retried on every call, or tab colours and the agent count never update.
+test_plugin_scans_while_pid_lookup_fails() {
+  command -v luau >/dev/null 2>&1 || { pass "luau not installed, skipping the failing pid lookup regression"; return; }
+  local out colored
+  out=$(run_plugin_harness pid-fails '
+PID_STATUS = 1
+WORLD.sessions = { { id = 1, name = "fm" } }
+WORLD.tabs = { { id = 101, name = "fm-01", session = 1, pane = 201 } }
+WORLD.panes = { { pane = 201, tab = 101, title = "omp", busy = true, at_prompt = false, alert = false, exited = nil } }
+WORLD.agents = { { pane = 201, state = "working", cwd = "/work" } }
+run_until(10500)
+print("RESULT_COLOR=" .. (colors[101] or "none"))
+print("RESULT_WRITES=" .. write_count)
+') || fail "the plugin harness crashed: $out"
+  colored=$(printf '%s\n' "$out" | sed -n 's/^RESULT_COLOR=//p')
+  [ -n "$colored" ] && [ "$colored" != none ] \
+    || fail "a failing window-pid lookup must not starve the scan that colours task tabs: $out"
+  [ "$(printf '%s\n' "$out" | sed -n 's/^RESULT_WRITES=//p')" = 0 ] \
+    || fail "the plugin must not publish agents.json without a window pid: $out"
+  pass "window.luau plugin: a failing window-pid lookup still lets every other timer call colour task tabs"
+}
+
 # --- seams outside the adapter -----------------------------------------------
 
 # shellcheck disable=SC2016 # The child bash expands "$1" and the probe output.
@@ -719,6 +745,29 @@ test_secondmate_spawn_refuses_tern() {
   pass "fm-spawn.sh: refuses backend=tern for --secondmate spawns"
 }
 
+test_omp_spawn_carries_tern_title_overlay() {
+  local case_dir="$TMP_ROOT/omp-spawn" home fakebin id=tern-omp-q1 out status staged launch
+  make_tern_world omp-spawn
+  home="$case_dir/home"
+  fakebin=$(make_spawn_fakebin "$case_dir/fake" omp)
+  fm_test_spawn_home "$home" omp
+  fm_git_worktree "$case_dir/project" "$case_dir/wt" wt-tern-omp
+  fm_test_spawn_brief "$home" "$id"
+  # The first task block in an empty world is 102; its shell sits in the worktree.
+  printf '{"pane":102,"child":{"pid":1,"name":"zsh","argv":["zsh"],"cwd":"%s"},"group":1,"foreground":{"pid":1,"name":"zsh","argv":["zsh"],"cwd":"%s"}}' \
+    "$case_dir/wt" "$case_dir/wt" >"$W/process/102"
+  out=$(fm_test_run_spawn "$home" "$case_dir/wt" "$fakebin" "$id" "$case_dir/project" --harness omp --backend tern --scout)
+  status=$?
+  [ "$status" -eq 0 ] || fail "an omp scout spawn on the tern backend should succeed: $out"
+  staged=$(sed -n "s/^tern${US}send${US}102${US}text${US}--${US}\. '\(.*\)'\$/\1/p" "$TERN_LOG")
+  [ -f "$staged" ] || fail "the tern spawn did not type a staged launch file: $(tr "$US" ' ' <"$TERN_LOG")"
+  launch=$(cat "$staged")
+  rm -rf "/tmp/fm-$id" "/tmp/fm-$id+"*
+  assert_contains "$launch" "--config '$ROOT/.omp/fm-worker-overlay.yml' --config '$ROOT/.omp/fm-tern-worker-overlay.yml' --auto-approve" \
+    "an omp worker on tern must add the title-spinner overlay after the posture overlay and before --auto-approve"
+  pass "fm-spawn.sh: an omp worker on tern carries the title-spinner overlay"
+}
+
 test_version_check() {
   make_tern_world version
   fm_backend_tern_version_check || fail "0.4.5 must pass the version gate"
@@ -747,9 +796,11 @@ test_busy_state_reads_plugin_file
 test_busy_lib_trusts_tern_native_busy
 test_plugin_first_write_publishes_current_format
 test_plugin_hooks_stay_inside_tern_budget
+test_plugin_scans_while_pid_lookup_fails
 test_detection_innermost_wins
 test_validate_task_endpoint
 test_explicit_target_routing
 test_supervisor_discovery
 test_secondmate_spawn_refuses_tern
+test_omp_spawn_carries_tern_title_overlay
 test_version_check

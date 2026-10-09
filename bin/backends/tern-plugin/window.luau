@@ -53,6 +53,7 @@ local COLORS: { [string]: TabColor } = {
 local last_signature: string? = nil
 local window_pid: number? = nil
 local pid_pending = false
+local pid_looked_up = false
 local publishing = false
 local tab_colors: { [number]: string } = {}
 local counts = { working = 0, idle = 0, waiting = 0 }
@@ -227,8 +228,11 @@ end
 
 local function tick(cx: WindowCx?)
 	tern.timer(POLL_MS, tick)
-	if window_pid == nil and not pid_pending then
+	local looked_up = pid_looked_up
+	pid_looked_up = false
+	if window_pid == nil and not pid_pending and not looked_up then
 		-- The spawn alone can take most of the budget: no scan this call.
+		pid_looked_up = true
 		local ok, err = pcall(find_window_pid)
 		if ok then
 			return
