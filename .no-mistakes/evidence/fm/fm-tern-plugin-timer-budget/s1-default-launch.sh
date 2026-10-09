@@ -1,0 +1,1 @@
+cd /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fmlab1.XDqJ/wa && PI_TUI_NATIVE=0 exec omp --no-session --no-extensions --no-skills --no-rules --thinking=off --auto-approve 'Run the shell command `sleep 12` with your bash tool, then reply with exactly the word: done'

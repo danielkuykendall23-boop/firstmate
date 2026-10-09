@@ -1,0 +1,13 @@
+tern 0.6.2 (4b3ed42) serve_pid=33742 plugin=/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/bin/backends/tern-plugin fm_tabs=30 title_interval=0.1s soak=60s
+t+10s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=9.9s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+20s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=20.1s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+30s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=30.3s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+40s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=40.5s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+50s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=50.9s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+60s agents.json: window_pid=33742 blocks=31 busy=30 mtime_age=61.1s | tab colours: {'None': 6, 'orange': 25} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+-- ctrl-c the spinner loops in tabs 2..11 (they go idle; plugin must recount/recolour)
+after: agents.json: window_pid=33742 blocks=31 busy=20 mtime_age=4.3s | tab colours: {'None': 10, 'orange': 21}
+fm-timing lines (lab timing wrapper, if loaded):
+firstmate-agents warnings:
+budget lines (any plugin): 0
+lab serve stopped

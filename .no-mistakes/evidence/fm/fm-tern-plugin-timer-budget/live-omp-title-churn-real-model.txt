@@ -1,0 +1,14 @@
+samples=211 over 40.1s
+tab 1 shell: 0 nav-row text changes, 1 distinct
+   sequence (first 15): real1⌘1
+tab 2 omp DEFAULT: 85 nav-row text changes, 25 distinct
+   sequence (first 15): cd /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR && PI_TUI_NATIVE=0 omp --no-session --no-extensions --no-skills --no-rules --thinking=off --auto-approve 'Use  | π > 01M4H8Y9D149XD403QRSXG3QJR2 | π ⠋ 01M4H8Y9D149XD403QRSXG3QJR2 | π ⠙ 01M4H8Y9D149XD403QRSXG3QJR2 | π ⠸ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠴ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠧ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠏ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠋ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠹ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠼ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠦ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠏ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠙ 01M4H8Y9D149XD403QRSXG3QJR2⌘2 | π ⠼ 01M4H8Y9D149XD403QRSXG3QJR2⌘2
+tab 3 omp + fm-tern-worker-overlay.yml: 4 nav-row text changes, 5 distinct
+   sequence (first 15): cd /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR && PI_TUI_NATIVE=0 omp --no-session --no-extensions --no-skills --no-rules --thinking=off --auto-approve --con | π: 01M4H8Y9D149XD403QRSXG3QJR3 | π: 01M4H8Y9D149XD403QRSXG3QJR3⌘3 | π: done3⌘3 | π: done3
+done markers:
+/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/real/done-default
+/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/real/done-overlay
+final nav-row:
+{"ok":true,"count":3,"nodes":[{"tag":"button","class":"nav-row","text":"real1⌘1","title":"real  ⌘1","rect":[10.0,80.0,220.0,30.0]},{"tag":"button","class":"nav-row","text":"π > done2⌘2","title":"π > done  ⌘2","rect":[10.0,111.0,220.0,30.0]},{"tag":"button","class":"nav-row on","text":"π: done3⌘3","title":"π: done  ⌘3","rect":[10.0,142.0,220.0,30.0]}]}
+
+budget lines:        0

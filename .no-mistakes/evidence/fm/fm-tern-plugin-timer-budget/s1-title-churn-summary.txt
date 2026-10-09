@@ -1,0 +1,7 @@
+Isolated headless `tern serve` (tern 0.7.0 (9ca00e4); own TERN_CONFIG_DIR, TERN_DAEMON_SOCKET, STENCIL_LOG_DIR under $TMPDIR), `tabs vertical`, omp 18.6.1 with the real authenticated model (Opus 5.5).
+Both panes: PI_TUI_NATIVE=0 omp --no-session --no-extensions --no-skills --no-rules --thinking=off --auto-approve "Run the shell command `sleep 12` ..., then reply ... done"
+tab1 adds nothing (default); tab2 adds --config <worktree>/.omp/fm-tern-worker-overlay.yml
+`ctl tree .nav-row` sampled 300 times over 67.2 s (mean interval 225 ms; ctl+jq overhead kept it above 100 ms)
+tab1 default omp: 54 title changes, 16 distinct titles: π ⠴ wa, π ⠇ wa, π ⠹ wa, π ⠦ wa, π ⠏ wa, π ⠸ done, ... π ⠇ done, π > done
+tab2 overlay omp: 1 title change, 2 distinct titles: π: wb -> π: done (session rename only)
+Both panes then showed `$ sleep 12` (Wall 12.03s) and the reply `done` (`expect done` ok; screenshots s1-tab1-default.png, s1-tab2-overlay.png)

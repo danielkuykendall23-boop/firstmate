@@ -1,0 +1,14 @@
+tern 0.6.2 (4b3ed42) serve_pid=89423 plugin=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/p-failpid fm_tabs=30 title_interval=0.1s soak=60s
+t+10s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+20s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+30s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+40s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+50s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+t+60s agents.json: agents.json absent | tab colours: {'None': 3, 'orange': 28} | nav sample: fm-zz12 | fm-zz23 | fm-zz34
+-- ctrl-c the spinner loops in tabs 2..11 (they go idle; plugin must recount/recolour)
+after: agents.json: agents.json absent | tab colours: {'None': 7, 'orange': 24}
+fm-timing lines (lab timing wrapper, if loaded):
+firstmate-agents warnings:
+ 134 firstmate-agents: window pid unknown	lab-forced-failure
+budget lines (any plugin): 0
+lab serve stopped

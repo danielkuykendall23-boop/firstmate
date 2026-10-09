@@ -1,0 +1,8 @@
+18:39:33 round=1 bell_on_tab=4 agents.json mtime=18:38:58 waiting_blocks=1 fm_blocks=30 | coloured_tabs=["fm-03=orange"] | budget_lines=0
+18:40:28 round=2 bell_on_tab=7 agents.json mtime=18:39:54 waiting_blocks=2 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange"] | budget_lines=0
+18:41:23 round=3 bell_on_tab=10 agents.json mtime=18:40:49 waiting_blocks=3 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange"] | budget_lines=0
+18:42:19 round=4 bell_on_tab=13 agents.json mtime=18:41:44 waiting_blocks=4 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange","fm-12=orange"] | budget_lines=0
+18:43:14 round=5 bell_on_tab=16 agents.json mtime=18:42:39 waiting_blocks=5 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange","fm-12=orange","fm-15=orange"] | budget_lines=0
+18:44:09 round=6 bell_on_tab=19 agents.json mtime=18:43:35 waiting_blocks=6 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange","fm-12=orange","fm-15=orange","fm-18=orange"] | budget_lines=0
+18:45:04 round=7 bell_on_tab=22 agents.json mtime=18:44:30 waiting_blocks=7 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange","fm-12=orange","fm-15=orange","fm-18=orange","fm-21=orange"] | budget_lines=0
+18:46:00 round=8 bell_on_tab=25 agents.json mtime=18:45:25 waiting_blocks=8 fm_blocks=30 | coloured_tabs=["fm-03=orange","fm-06=orange","fm-09=orange","fm-12=orange","fm-15=orange","fm-18=orange","fm-21=orange","fm-24=orange"] | budget_lines=0

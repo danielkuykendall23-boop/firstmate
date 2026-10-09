@@ -1,0 +1,4 @@
+ok - capture: scrollback trimmed locally; visible capture is the viewport; absent block fails
+ok - kill: a refused close or unreadable inventory is a failure, never a silent success
+ok - busy_state: plugin working/idle/waiting_input map to busy/idle while the writing window lives; closed-window, unversioned, corrupt, or shell-only read unknown
+not ok - a freshly loaded window must publish agents.json as soon as window_pid is known, even with an empty (no agents, no fm-* tabs) signature; got write_count=0, harness output: RESULT_WRITE_COUNT=0

@@ -1,0 +1,11 @@
+serve_pid=11115 tabs=40 interval=0.03 seconds=40
+t+5s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+10s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+15s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+20s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+25s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+30s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+35s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+t+40s nav_rows/row3=[41 fm-zz34] agents.json:[pid=11115 blocks=41 busy=40]
+tab colours: {'None': 4, 'orange': 37}
+budget lines:

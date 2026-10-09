@@ -1,0 +1,11 @@
+tern 0.6.2 (4b3ed42) serve_pid=39652 fm_tabs=40 title_interval=0.03s soak=90s
+t+10s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+20s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+30s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+40s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+50s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+60s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+70s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+80s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+t+90s agents.json: window_pid=39652 blocks=41 busy=40 at_prompt=1 | tab colours: {'None': 12, 'orange': 29}
+-- ctrl-c the title loops in tabs 2..11

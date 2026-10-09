@@ -1,0 +1,6 @@
+tab 1 shell: 0 title changes, 1 distinct titles
+   sequence (first 12): omptitle
+tab 2 omp default (posture overlay only): 1 title changes, 2 distinct titles
+   sequence (first 12): cd /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp && env HOME=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp/home PI_CODING_AGENT_DIR=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp/agent PI_TUI_NATIVE=0 omp --model fakelab/fake-model --config /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-worker-overlay.yml 'say hi from work-a' | π > omp
+tab 3 omp + fm-tern-worker-overlay.yml: 1 title changes, 2 distinct titles
+   sequence (first 12): cd /var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp && env HOME=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp/home PI_CODING_AGENT_DIR=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/omp/agent PI_TUI_NATIVE=0 omp --model fakelab/fake-model --config /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-worker-overlay.yml --config /Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-tern-worker-overlay.yml 'say hi from work-b' | π: omp

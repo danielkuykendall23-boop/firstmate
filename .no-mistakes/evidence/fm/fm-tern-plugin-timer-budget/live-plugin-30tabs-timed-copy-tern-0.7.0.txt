@@ -1,0 +1,13 @@
+tern 0.7.0 (9ca00e4) serve_pid=55736 plugin=/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T//nm-lab/p-timed fm_tabs=30 title_interval=0.1s soak=60s
+t+10s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=9.2s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+t+20s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=19.4s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+t+30s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=29.7s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+t+40s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=39.9s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+t+50s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=50.1s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+t+60s agents.json: window_pid=55736 blocks=31 busy=30 mtime_age=60.3s | tab colours: {'None': 9, 'orange': 22} | nav sample: fm-zz12⌘2 | fm-zz23⌘3 | fm-zz34⌘4
+-- ctrl-c the spinner loops in tabs 2..11 (they go idle; plugin must recount/recolour)
+after: agents.json: window_pid=55736 blocks=31 busy=20 mtime_age=4.6s | tab colours: {'None': 15, 'orange': 16}
+fm-timing lines (lab timing wrapper, if loaded):
+firstmate-agents warnings:
+budget lines (any plugin): 0
+lab serve stopped

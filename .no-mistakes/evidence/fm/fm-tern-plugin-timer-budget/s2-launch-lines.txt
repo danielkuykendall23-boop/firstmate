@@ -1,0 +1,12 @@
+=== tern backend: fm-spawn.sh tern-omp-q1 --harness omp --backend tern --scout
+spawned tern-omp-q1 harness=omp kind=scout window=tern:zz-fm-unit/102 worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-s2-evidence.A0GL6k/omp-spawn/wt
+--- staged launch file typed into tern block 102: /tmp/fm-tern-omp-q1+b0001fc93149176e32b99c6d096c6b625142e5e95de632c70540e5eb20593ae9/launch.s1791584532.80694.20739.sh
+omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-worker-overlay.yml' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-tern-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-s2-evidence.A0GL6k/omp-spawn/wt'
+
+=== tmux backend (default): fm-spawn.sh omp-tmux-q1 --harness omp --scout
+spawned omp-tmux-q1 harness=omp kind=scout window=firstmate:fm-omp-tmux-q1 worktree=/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-s2-evidence.A0GL6k/tmux-spawn/wt
+omp' --config '/Users/danielkuykendall/.no-mistakes/worktrees/6ada68ffd386/01M4H8Y9D149XD403QRSXG3QJR/.omp/fm-worker-overlay.yml' --auto-approve --cwd '/private/var/folders/c7/bb78qxx56b52ttgxx5bmdknm0000gn/T/fm-s2-evidence.A0GL6k/tmux-spawn/wt'
+
+=== checks
+PASS tern: posture overlay, then tern overlay, then --auto-approve
+PASS tmux: posture overlay only, no tern overlay

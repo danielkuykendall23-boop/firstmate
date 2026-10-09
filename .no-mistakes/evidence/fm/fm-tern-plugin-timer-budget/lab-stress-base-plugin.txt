@@ -1,0 +1,4 @@
+serve_pid=79850
+agents.json: version=1 window_pid=79850 blocks=31 fm_tabs=30
+agents.json mtime Oct  9 17:36:22 2026
+budget lines:

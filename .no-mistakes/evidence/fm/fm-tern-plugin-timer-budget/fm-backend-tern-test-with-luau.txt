@@ -1,0 +1,26 @@
+ok - create_task: first task creates the home session with its tab as the task tab; later tasks add tabs
+ok - create_task: refuses a duplicate task label (Tern enforces no tab-name uniqueness)
+ok - create_task: an existing empty session gets a new tab
+ok - parse_target: accepts tern:<session>/<block> and tern:/<block>, rejects tmux/herdr shapes and junk
+ok - target_ready: verifies the task label, recovers a moved block by label, rejects exited blocks
+ok - send: literal text after --, Tern key names, refuses a mismatched task tab
+ok - capture: scrollback trimmed locally; visible capture is the viewport; absent block fails
+ok - composer_state: classifies Tern's --ansi omp capture (idle hint empty, typed text pending, absent unknown)
+ok - kill: closes the task block; an already-gone block is a quiet success
+ok - kill: closes the task's exited kept-open block (by id or label), never another task's
+ok - kill: a recorded block reused by another task's tab is left alone
+ok - kill: a refused close or unreadable inventory is a failure, never a silent success
+ok - list_live: only fm-* tabs of this home's session
+ok - agent_state: process-level alive/dead/ambiguous, missing only from a readable inventory, absence never proven
+ok - busy_state: plugin working/idle/waiting_input map to busy/idle while the writing window lives; closed-window, unversioned, corrupt, or shell-only read unknown
+ok - fm-busy-lib: trusts Tern's native busy verdict the way it trusts Herdr's
+ok - window.luau plugin: a freshly loaded window publishes current-format state as soon as window_pid is known, even with no agents/tabs
+ok - window.luau plugin: with 40 busy worker tabs every hook stays under Tern's 50 ms budget (longest 33 ms) and the final state is published and coloured
+ok - window.luau plugin: a failing window-pid lookup still lets every other timer call colour task tabs
+ok - detection: Tern needs TERN_PANE and TERM_PROGRAM=tern; tmux and herdr nested inside it win
+ok - validate_task_endpoint: binds window to tern_session/tern_block_id and the task id
+ok - explicit targets: fm-send delivers to a live tern:<session>/<block>, refuses an exited one; tmux targets unchanged
+ok - supervisor discovery: TERN_PANE yields tern:/<block> after tmux and herdr
+ok - fm-spawn.sh: refuses backend=tern for --secondmate spawns
+ok - fm-spawn.sh: an omp worker on tern carries the title-spinner overlay
+ok - version gate and required tools
