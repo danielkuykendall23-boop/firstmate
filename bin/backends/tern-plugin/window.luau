@@ -232,6 +232,8 @@ local function tick(cx: WindowCx?)
 	pid_looked_up = false
 	if window_pid == nil and not pid_pending and not looked_up then
 		-- The spawn alone can take most of the budget: no scan this call.
+		-- Never on two calls in a row, so a lookup that keeps failing still
+		-- leaves every other call to scan and recolour.
 		pid_looked_up = true
 		local ok, err = pcall(find_window_pid)
 		if ok then
