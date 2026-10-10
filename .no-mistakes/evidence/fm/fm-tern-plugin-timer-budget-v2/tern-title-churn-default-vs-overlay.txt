@@ -1,0 +1,26 @@
+# tern 0.7.0 headless serve, vertical tabs, nav-row titles sampled 400x ~100ms
+== fm-a (default omp: fm-worker-overlay only)
+π > done
+π ⠧ done
+π ⠸ done
+π ⠦ done
+π ⠏ done
+π ⠙ done
+π ⠴ done
+π ⠇ done
+π ⠏ done
+π ⠸ done
+π ⠦ done
+π ⠋ done
+π ⠸ done
+π ⠦ done
+π ⠏ done
+π ⠸ done
+π ⠦ done
+π ⠏ done
+π ⠸ done
+π > done
+changes: 19
+== fm-b (plus .omp/fm-tern-worker-overlay.yml)
+π: done
+changes: 0

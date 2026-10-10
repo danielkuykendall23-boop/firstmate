@@ -1,0 +1,2 @@
+Tern log lines for isolated window pid 26488 mentioning budget/firstmate (fixed plugin run 11:13-11:16, base plugin run 11:16-11:18):
+(none)
