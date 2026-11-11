@@ -1201,10 +1201,10 @@ ROWS
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present' ] \
     || fail "provider validation must not depend on a key, got: $out"
 
-  printf '%s\n' '{"rules":[{"when":"gemini work","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google"}}]}' > "$case_dir/home/config/crew-dispatch.json"
+  printf '%s\n' '{"rules":[{"when":"spaceship work","use":{"harness":"spaceship","model":"ship-1"}}]}' > "$case_dir/home/config/crew-dispatch.json"
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: gemini' ] \
+  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship' ] \
     || fail "unverified harness must be flagged without any key, got: $out"
 
   printf '%s\n' '{"default":[{"harness":"codex"}]}' > "$case_dir/home/config/crew-dispatch.json"
